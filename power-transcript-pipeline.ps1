@@ -1,0 +1,286 @@
+<#
+Transcript Pipeline (REST-based)
+
+Notes:
+- Uses Invoke-RestMethod instead of Microsoft.Graph SDK to avoid assembly conflicts in Azure Functions.
+- Preserves all meeting processing logic and date parsing from user version.
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$false)]
+    [object]$FromDate,
+    
+    [Parameter(Mandatory=$false)]
+    [object]$ToDate
+)
+
+# =========================
+# DATE PARSING (Restoring your logic)
+# =========================
+
+if ($FromDate) {
+    if ($FromDate -isnot [datetime]) { $FromDate = [datetime]::Parse($FromDate) }
+} else {
+    $FromDate = (Get-Date).AddDays(-1).Date
+}
+
+if ($ToDate) {
+    if ($ToDate -isnot [datetime]) { $ToDate = [datetime]::Parse($ToDate) }
+} else {
+    $ToDate = Get-Date
+}
+
+if ($ToDate.TimeOfDay -eq [TimeSpan]::Zero) {
+    $ToDate = $ToDate.Date.AddDays(1).AddTicks(-1)
+}
+
+Write-Output "FromDate resolved to: $FromDate"
+Write-Output "ToDate resolved to: $ToDate"
+
+$runId = Get-Date -Format "yyyyMMdd_HHmmss"
+
+# =========================
+# CONFIG
+# =========================
+
+$tenantId     = "f9e144a5-228f-4e5a-86c4-2cc253376402"
+$clientId     = "9cfcadb2-27c0-41e5-8c6e-c1305c4827e2"
+$clientSecret = $env:GRAPH_CLIENT_SECRET
+
+if (-not $clientSecret) {
+    throw "GRAPH_CLIENT_SECRET environment variable is not set"
+}
+
+$calendarUserUpn = "peter@empoweringtech.com"
+# Use temporary directory for cloud compatibility (Function App file system is often read-only)
+$tempRoot = if ($null -ne $env:TEMP) { $env:TEMP } else { $PSScriptRoot }
+$outDir = Join-Path $tempRoot "TranscriptExport"
+$null = New-Item -ItemType Directory -Path $outDir -Force
+
+$spHostname             = "scanningpens.sharepoint.com"
+$spSiteServerRelPath    = "/sites/Petersplace"
+$spTranscriptRootFolder = "/Exec Intel Insights/Meeting transcripts"
+$spRunLogsFolderName    = "_DO_NOT_PRIORITISE_Run logs"
+
+# =========================
+# REST AUTH HELPER
+# =========================
+
+function Get-GraphToken {
+    $body = @{
+        client_id     = $clientId
+        client_secret = $clientSecret
+        scope         = "https://graph.microsoft.com/.default"
+        grant_type    = "client_credentials"
+    }
+    $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Body $body
+    return $tokenResponse.access_token
+}
+
+$accessToken = Get-GraphToken
+$authHeader = @{ Authorization = "Bearer $accessToken" }
+Write-Host "Connected to Microsoft Graph (REST) ✅"
+
+# =========================
+# HELPERS
+# =========================
+
+function Get-OrganiserIdFromJoinUrl {
+    param([string]$JoinUrl)
+    $decoded = [System.Net.WebUtility]::UrlDecode($JoinUrl)
+    if ($decoded -match '"Oid":"([^"]+)"') { return $matches[1] }
+    return $null
+}
+
+function Ensure-DriveFolder {
+    param($DriveId, $FolderPath)
+    $currentItem = "root"
+    $segments = $FolderPath -split "/" | Where-Object { $_ -and $_.Trim() -ne "" }
+    foreach ($seg in $segments) {
+        $uri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$currentItem/children"
+        $children = Invoke-RestMethod -Method Get -Uri $uri -Headers $authHeader
+        $exists = $children.value | Where-Object { $_.name -eq $seg -and $_.folder }
+        if ($exists) {
+            $currentItem = $exists.id
+        } else {
+            $body = @{ name = $seg; folder = @{}; "@microsoft.graph.conflictBehavior" = "rename" } | ConvertTo-Json
+            $new = Invoke-RestMethod -Method Post -Uri $uri -Headers $authHeader -Body $body -ContentType "application/json"
+            $currentItem = $new.id
+        }
+    }
+    return $currentItem
+}
+
+function Upload-FileToSharePoint {
+    param($DriveId, $FolderId, $FilePath)
+    $fileName = [System.IO.Path]::GetFileName($FilePath)
+    $uploadUri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$FolderId`:/$fileName`:/content"
+    $bytes = [System.IO.File]::ReadAllBytes($FilePath)
+    return Invoke-RestMethod -Method Put -Uri $uploadUri -Headers $authHeader -Body $bytes -ContentType "application/octet-stream"
+}
+
+# =========================
+# RESOLVE SHAREPOINT
+# =========================
+
+$siteUri = "https://graph.microsoft.com/v1.0/sites/$($spHostname):$spSiteServerRelPath"
+$site = Invoke-RestMethod -Method Get -Uri $siteUri -Headers $authHeader
+Write-Host "Resolved SharePoint site ✅"
+
+$driveUri = "https://graph.microsoft.com/v1.0/sites/$($site.id)/drive"
+$drive = Invoke-RestMethod -Method Get -Uri $driveUri -Headers $authHeader
+$driveId = $drive.id
+Write-Host "Resolved SharePoint drive ✅"
+
+$runLogsFolderPath = "$spTranscriptRootFolder/$spRunLogsFolderName"
+$runLogsFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $runLogsFolderPath
+Write-Host "Run logs folder ready ✅"
+
+# =========================
+# FETCH CALENDAR
+# =========================
+
+Write-Host "Fetching calendar events..."
+$startStr = $FromDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+$endStr = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+$calUri = "https://graph.microsoft.com/v1.0/users/$calendarUserUpn/calendarView?startDateTime=$startStr&endDateTime=$endStr&`$top=999"
+$eventsResponse = Invoke-RestMethod -Method Get -Uri $calUri -Headers $authHeader
+$events = $eventsResponse.value
+
+# Filter only relevant completed Teams meetings
+$events = $events | Where-Object {
+    $_.isOnlineMeeting -eq $true -and
+    $_.onlineMeeting -and
+    $_.onlineMeeting.joinUrl -and
+    $_.isCancelled -eq $false -and
+    $_.subject -notmatch '^Canceled:' -and
+    [datetime]$_.end.dateTime -lt (Get-Date)
+}
+
+$eventCount = ($events | Measure-Object).Count
+Write-Host ("Meetings found: " + $eventCount + " ✅")
+
+# Fallback: include events where user is listed as an attendee
+$filterEnd = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+$attendeeUri = "https://graph.microsoft.com/v1.0/users/$calendarUserUpn/events?`$top=999&`$filter=isOnlineMeeting eq true and end/dateTime lt '$filterEnd' and attendees/any(a:a/emailAddress/address eq '$calendarUserUpn')"
+
+try {
+    $attendeeResp = Invoke-RestMethod -Method Get -Uri $attendeeUri -Headers $authHeader
+    $attendeeEvents = $attendeeResp.value
+} catch {
+    $attendeeEvents = @()
+}
+
+if ($attendeeEvents -and $attendeeEvents.Count -gt 0) {
+    $map = @{}
+    foreach ($e in $events) { if ($e.id) { $map[$e.id] = $e } }
+    foreach ($e in $attendeeEvents) { if ($e.id -and -not $map.ContainsKey($e.id)) { $map[$e.id] = $e } }
+    $events = $map.Values
+}
+
+# =========================
+# PROCESS MEETINGS
+# =========================
+
+$log = @()
+
+foreach ($calendarEvent in $events) {
+    $subject   = $calendarEvent.subject
+    $joinUrl   = $calendarEvent.onlineMeeting.joinUrl
+    $organiser = $calendarEvent.organizer.emailAddress.address
+    $start     = $calendarEvent.start.dateTime
+
+    Write-Host ("Processing: " + $subject)
+
+    $eventDateFolder = (Get-Date $start -Format "yyyy-MM")
+    $eventFolderPath = "$spTranscriptRootFolder/$eventDateFolder"
+    $eventFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
+
+    $organiserId = Get-OrganiserIdFromJoinUrl -JoinUrl $joinUrl
+
+    if (-not $organiserId) {
+        $log += [pscustomobject]@{
+            RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
+            Status = "error"; Action = "None"; Detail = "Could not extract organiser ID from join URL"; File = $null
+        }
+        continue
+    }
+
+    try {
+        $encUrl = [System.Net.WebUtility]::UrlEncode($joinUrl)
+        $meetingUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings?`$filter=JoinWebUrl%20eq%20'$encUrl'"
+        $meeting = Invoke-RestMethod -Method Get -Uri $meetingUri -Headers $authHeader
+
+        if (-not $meeting.value -or $meeting.value.Count -eq 0) { continue }
+
+        $meetingId = $meeting.value[0].id
+        $transcriptsUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts"
+        $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
+
+        $eventDate = (Get-Date $start).Date
+        $transcriptsForThisEvent = @($transcripts.value | Where-Object { 
+            $_.createdDateTime -and ([datetime]$_.createdDateTime).Date -eq $eventDate 
+        })
+
+        if (-not $transcriptsForThisEvent -or $transcriptsForThisEvent.Count -eq 0) {
+            $isChannelCandidate = $joinUrl -match "threadId"
+            $log += [pscustomobject]@{
+                RunId = $runId; Subject = $subject; EventDate = $start; Organiser = $organiser;
+                Status = if ($isChannelCandidate) { "no_transcript_channel_candidate" } else { "no_transcript" };
+                Action = if ($isChannelCandidate) { "Consider RSC" } else { "None" };
+                Detail = "No transcript found for this event date"; File = $null
+            }
+            continue
+        }
+
+        foreach ($t in $transcriptsForThisEvent) {
+            $transcriptId = $t.id
+            $cleanSubject = $subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
+            $timestamp = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
+            $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
+
+            $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
+            
+            # Using Out-File because Invoke-RestMethod -OutFile doesn't support the raw content stream easily in all versions
+            $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
+            $content | Out-File -FilePath $localFile -Encoding utf8
+
+            $uploaded = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
+            $log += [pscustomobject]@{
+                RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
+                Status = "success"; Action = "None"; Detail = "Transcript uploaded"; File = $uploaded.webUrl
+            }
+        }
+    }
+    catch {
+        $log += [pscustomobject]@{
+            RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
+            Status = "error"; Action = "None"; Detail = $_.Exception.Message; File = $null
+        }
+    }
+}
+
+# =========================
+# SAVE LOGS
+# =========================
+
+Write-Host "Saving logs..."
+$csvPath  = Join-Path $outDir "transcript_log_$runId.csv"
+$jsonPath = Join-Path $outDir "transcript_log_$runId.json"
+
+if ($log -and $log.Count -gt 0) {
+    $log | Export-Csv -Path $csvPath -NoTypeInformation
+    $log | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath
+} else {
+    "RunId,Subject,Organiser,EventDate,Status,Action,Detail,File" | Out-File -FilePath $csvPath -Encoding utf8
+    '[]' | Set-Content -Path $jsonPath -Encoding utf8
+}
+
+if ($runLogsFolderId) {
+    Upload-FileToSharePoint -DriveId $driveId -FolderId $runLogsFolderId -FilePath $csvPath | Out-Null
+    Upload-FileToSharePoint -DriveId $driveId -FolderId $runLogsFolderId -FilePath $jsonPath | Out-Null
+    Write-Host "Logs uploaded ✅"
+}
+
+Write-Host "Done ✅"
