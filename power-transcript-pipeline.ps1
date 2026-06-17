@@ -320,7 +320,7 @@ foreach ($calendarEvent in $events) {
 # SAVE LOGS
 # =========================
 
-Write-Host "Saving logs..."
+Write-Host "Saving run logs..."
 $csvPath  = Join-Path $outDir "transcript_log_$runId.csv"
 $jsonPath = Join-Path $outDir "transcript_log_$runId.json"
 
@@ -335,8 +335,73 @@ if ($log -and $log.Count -gt 0) {
 if ($runLogsFolderId) {
     Upload-FileToSharePoint -DriveId $driveId -FolderId $runLogsFolderId -FilePath $csvPath | Out-Null
     Upload-FileToSharePoint -DriveId $driveId -FolderId $runLogsFolderId -FilePath $jsonPath | Out-Null
-    Write-Host "Logs uploaded ✅"
+    Write-Host "Run logs uploaded ✅"
 }
+
+# =========================
+# MAINTAIN MASTER LOG
+# =========================
+
+Write-Host "Updating Master Log..."
+$masterLogFileName = "master_log.json"
+$masterLogLocalPath = Join-Path $outDir $masterLogFileName
+
+# 1. Resolve Root Folder ID (where master_log.json lives)
+$rootFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $spTranscriptRootFolder
+
+# 2. Download existing Master Log if it exists
+$masterLogData = @{ Meetings = @() }
+try {
+    $existingFileUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$rootFolderId`:/$masterLogFileName"
+    $existingFile = Invoke-RestMethod -Method Get -Uri $existingFileUri -Headers $authHeader
+    
+    $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($existingFile.id)/content"
+    $masterLogData = Invoke-RestMethod -Method Get -Uri $downloadUri -Headers $authHeader
+} catch {
+    Write-Host "No existing Master Log found. Starting fresh."
+}
+
+# 3. Merge current run results into Master Log
+$now = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+foreach ($runEntry in $log) {
+    # Generate unique ID: yyyy-MM-dd_HHmm_slugified_subject
+    $datePart = (Get-Date $runEntry.EventDate -Format "yyyy-MM-dd_HHmm")
+    $slugSubject = ($runEntry.Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
+    $meetingId = "$datePart`_$slugSubject"
+
+    $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $meetingId }
+
+    $updatedEntry = @{
+        MeetingId      = $meetingId
+        Subject        = $runEntry.Subject
+        Organiser      = $organiser # Scoped from the loop
+        EventDate      = $runEntry.EventDate
+        Type           = $runEntry.Type
+        Priority       = $runEntry.Priority
+        HasTranscript  = ($runEntry.Status -eq "success")
+        TranscriptFile = $runEntry.File
+        Status         = $runEntry.Status
+        AgentState     = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
+        LastProcessed  = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
+        RetryCount     = if ($existingMatch) { $existingMatch.RetryCount } else { 0 }
+        LastRunId      = $runId
+        LastUpdated    = $now
+    }
+
+    if ($existingMatch) {
+        # Update in place
+        $idx = [array]::IndexOf($masterLogData.Meetings, $existingMatch)
+        $masterLogData.Meetings[$idx] = $updatedEntry
+    } else {
+        # Add new
+        $masterLogData.Meetings += $updatedEntry
+    }
+}
+
+# 4. Save and Upload updated Master Log
+$masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
+Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogLocalPath | Out-Null
+Write-Host "Master Log updated and uploaded ✅"
 
 Write-Host "Done ✅"
 
