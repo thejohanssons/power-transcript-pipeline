@@ -6,10 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-    paths-ignore:
-      - 'README.md'
-      - '.gitignore'
-
 jobs:
   deploy-and-release:
     runs-on: ubuntu-latest
@@ -18,15 +14,16 @@ jobs:
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for better versioning
 
-      - name: 'Run Azure Functions Action'
+      - name: 'Login via Azure CLI'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 'Deploy to Azure Functions'
         uses: Azure/functions-action@v1
         with:
           app-name: 'peter-consolidate-meeting-transcripts'
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
-          slot-name: 'production'
           scm-do-build-during-deployment: false
           enable-oryx-build: false
 
@@ -40,6 +37,5 @@ jobs:
           body: |
             Automated release from GitHub Actions.
             Run ID: ${{ github.run_id }}
-            Commit: ${{ github.sha }}
           draft: false
           prerelease: false
