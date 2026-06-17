@@ -199,6 +199,17 @@ foreach ($calendarEvent in $events) {
 
     Write-Host ("Processing: " + $subject)
 
+    # --- Determine Type and Priority based on Subject ---
+    $meetingType = "General"
+    $priority    = "normal"
+
+    if ($subject -match "ExCo") {
+        $meetingType = "ExCo"
+        $priority    = "high"
+    } elseif ($subject -match "NPI") {
+        $meetingType = "Product"
+    }
+
     $eventDateFolder = (Get-Date $start -Format "yyyy-MM")
     $eventFolderPath = "$spTranscriptRootFolder/$eventDateFolder"
     $eventFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
@@ -207,8 +218,16 @@ foreach ($calendarEvent in $events) {
 
     if (-not $organiserId) {
         $log += [pscustomobject]@{
-            RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
-            Status = "error"; Action = "None"; Detail = "Could not extract organiser ID from join URL"; File = $null
+            RunId         = $runId
+            Subject       = $subject
+            EventDate     = $start
+            Status        = "error"
+            Type          = $meetingType
+            Priority      = $priority
+            AgentState    = "error"
+            LastProcessed = $null
+            RetryCount    = 0
+            File          = $null
         }
         continue
     }
@@ -232,10 +251,16 @@ foreach ($calendarEvent in $events) {
         if (-not $transcriptsForThisEvent -or $transcriptsForThisEvent.Count -eq 0) {
             $isChannelCandidate = $joinUrl -match "threadId"
             $log += [pscustomobject]@{
-                RunId = $runId; Subject = $subject; EventDate = $start; Organiser = $organiser;
-                Status = if ($isChannelCandidate) { "no_transcript_channel_candidate" } else { "no_transcript" };
-                Action = if ($isChannelCandidate) { "Consider RSC" } else { "None" };
-                Detail = "No transcript found for this event date"; File = $null
+                RunId         = $runId
+                Subject       = $subject
+                EventDate     = $start
+                Status        = if ($isChannelCandidate) { "no_transcript_channel_candidate" } else { "no_transcript" }
+                Type          = $meetingType
+                Priority      = $priority
+                AgentState    = "skipped"
+                LastProcessed = $null
+                RetryCount    = 0
+                File          = $null
             }
             continue
         }
@@ -248,21 +273,37 @@ foreach ($calendarEvent in $events) {
 
             $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
             
-            # Using Out-File because Invoke-RestMethod -OutFile doesn't support the raw content stream easily in all versions
             $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
             $content | Out-File -FilePath $localFile -Encoding utf8
 
             $uploaded = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
+            
             $log += [pscustomobject]@{
-                RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
-                Status = "success"; Action = "None"; Detail = "Transcript uploaded"; File = $uploaded.webUrl
+                RunId         = $runId
+                Subject       = $subject
+                EventDate     = $start
+                Status        = "success"
+                Type          = $meetingType
+                Priority      = $priority
+                AgentState    = "pending"
+                LastProcessed = $null
+                RetryCount    = 0
+                File          = $uploaded.webUrl
             }
         }
     }
     catch {
         $log += [pscustomobject]@{
-            RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start;
-            Status = "error"; Action = "None"; Detail = $_.Exception.Message; File = $null
+            RunId         = $runId
+            Subject       = $subject
+            EventDate     = $start
+            Status        = "error"
+            Type          = $meetingType
+            Priority      = $priority
+            AgentState    = "error"
+            LastProcessed = $null
+            RetryCount    = 0
+            File          = $null
         }
     }
 }
@@ -279,7 +320,7 @@ if ($log -and $log.Count -gt 0) {
     $log | Export-Csv -Path $csvPath -NoTypeInformation
     $log | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath
 } else {
-    "RunId,Subject,Organiser,EventDate,Status,Action,Detail,File" | Out-File -FilePath $csvPath -Encoding utf8
+    "RunId,Subject,EventDate,Status,Type,Priority,AgentState,LastProcessed,RetryCount,File" | Out-File -FilePath $csvPath -Encoding utf8
     '[]' | Set-Content -Path $jsonPath -Encoding utf8
 }
 
