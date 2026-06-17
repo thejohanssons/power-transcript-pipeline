@@ -54,9 +54,15 @@ if (-not $clientSecret) {
 
 $calendarUserUpn = "peter@empoweringtech.com"
 # Use temporary directory for cloud compatibility (Function App file system is often read-only)
-$tempRoot = if ($null -ne $env:TEMP) { $env:TEMP } else { $PSScriptRoot }
+# On Linux Azure Functions, /tmp is the guaranteed writable location.
+$tempRoot = if ($null -ne $env:TEMP) { $env:TEMP } elseif ($IsLinux) { "/tmp" } else { $PSScriptRoot }
 $outDir = Join-Path $tempRoot "TranscriptExport"
-$null = New-Item -ItemType Directory -Path $outDir -Force
+
+if (-not (Test-Path $outDir)) {
+    $null = New-Item -ItemType Directory -Path $outDir -Force
+}
+
+Write-Output "Local working directory: $outDir"
 
 $spHostname             = "scanningpens.sharepoint.com"
 $spSiteServerRelPath    = "/sites/Petersplace"
@@ -284,3 +290,9 @@ if ($runLogsFolderId) {
 }
 
 Write-Host "Done ✅"
+
+# Clean up local temporary files (for cloud maintenance)
+if (Test-Path $outDir) {
+    Remove-Item -Path $outDir -Recurse -Force
+    Write-Host "Local temp folder cleaned up ✅"
+}
