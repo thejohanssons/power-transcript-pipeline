@@ -26,6 +26,9 @@ jobs:
         with:
           app-name: 'peter-consolidate-meeting-transcripts'
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          slot-name: 'production'
+          scm-do-build-during-deployment: false
+          enable-oryx-build: false
 
       - name: 'Create GitHub Release'
         uses: actions/create-release@v1
