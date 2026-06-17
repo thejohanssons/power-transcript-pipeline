@@ -11,6 +11,8 @@ on:
 jobs:
   deploy-and-release:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
