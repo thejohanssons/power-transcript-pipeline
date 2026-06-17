@@ -200,14 +200,22 @@ foreach ($calendarEvent in $events) {
     Write-Host ("Processing: " + $subject)
 
     # --- Determine Type and Priority based on Subject ---
-    $meetingType = "General"
+    $meetingType = "Work"
     $priority    = "normal"
 
     if ($subject -match "ExCo") {
         $meetingType = "ExCo"
         $priority    = "high"
-    } elseif ($subject -match "NPI") {
-        $meetingType = "Product"
+    } elseif ($subject -match "Payment" -or $subject -match "Finance") {
+        $meetingType = "Finance"
+    } elseif ($subject -match "Sales") {
+        $meetingType = "Sales"
+    } elseif ($subject -match "Market" -or $subject -match "Marketing") {
+        $meetingType = "Marketing"
+    } elseif ($subject -match "Education") {
+        $meetingType = "Education"
+    } elseif ($subject -match "NPI" -or $subject -match "Stage") {
+        $meetingType = "Product Management"
     }
 
     $eventDateFolder = (Get-Date $start -Format "yyyy-MM")
