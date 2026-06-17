@@ -398,10 +398,34 @@ foreach ($runEntry in $log) {
     }
 }
 
-# 4. Save and Upload updated Master Log
+# 4. Save and Upload updated Master Log (JSON for deduplication source)
 $masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
 Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogLocalPath | Out-Null
-Write-Host "Master Log updated and uploaded ✅"
+
+# 5. Generate and Upload Human-Readable Master Log (.txt)
+$masterLogTxtName = "master_log.txt"
+$masterLogTxtLocalPath = Join-Path $outDir $masterLogTxtName
+
+$txtContent = @()
+foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
+    $txtContent += "MEETING ID: $($m.MeetingId)"
+    $txtContent += "SUBJECT: $($m.Subject)"
+    $txtContent += "ORGANISER: $($m.Organiser)"
+    $txtContent += "EVENT DATE: $($m.EventDate)"
+    $txtContent += "TYPE: $($m.Type)"
+    $txtContent += "PRIORITY: $($m.Priority)"
+    $txtContent += "STATUS: $($m.Status)"
+    $txtContent += "AGENT STATE: $($m.AgentState)"
+    $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"
+    $txtContent += "TRANSCRIPT FILE: $($m.TranscriptFile)"
+    $txtContent += "LAST UPDATED: $($m.LastUpdated)"
+    $txtContent += "" # Blank line separator
+}
+
+$txtContent | Out-File -FilePath $masterLogTxtLocalPath -Encoding utf8
+Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogTxtLocalPath | Out-Null
+
+Write-Host "Master Log (.json and .txt) updated and uploaded ✅"
 
 Write-Host "Done ✅"
 
