@@ -295,7 +295,7 @@ MEETING ID: $mId
 SUBJECT: $subject
 ORGANISER: $organiserId
 EVENT DATE: $start
-TYPE: $meetingType
+CATEGORY: $meetingType
 PRIORITY: $priority
 STATUS: success
 BACK-LINK (MASTER LOG): $masterLogUrl
