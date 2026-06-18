@@ -109,10 +109,24 @@ function Get-MeetingClassification {
             } | ConvertTo-Json -Depth 10
             
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } else { $rules.LLMConfig.ApiKey }
-            $headers = @{ "Authorization" = "Bearer $llmKey" }
-            $fullUri = "$($rules.LLMConfig.Endpoint)/chat/completions"
+            $headers = @{ "api-key" = $llmKey }
             
-            $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
+            # Construct the Azure-specific deployment URL if it looks like an Azure host
+            $fullUri = if ($rules.LLMConfig.Endpoint -match "openai.azure.com") {
+                # Azure OpenAI format: {endpoint}/openai/deployments/{model}/chat/completions?api-version=...
+                $base = $rules.LLMConfig.Endpoint -replace "/openai/v1/?$", ""
+                "$base/openai/deployments/$($rules.LLMConfig.Model)/chat/completions?api-version=2024-02-15-preview"
+            } else {
+                "$($rules.LLMConfig.Endpoint)/chat/completions"
+            }
+            
+            $response = try {
+                Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
+            } catch {
+                # Fallback to standard Authorization header if api-key fails
+                $headers = @{ "Authorization" = "Bearer $llmKey" }
+                Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
+            }
             
             $rawContent = $response.choices[0].message.content
             # The LLM might wrap the JSON in Markdown backticks
