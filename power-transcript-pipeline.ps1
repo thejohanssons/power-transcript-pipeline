@@ -282,10 +282,45 @@ foreach ($calendarEvent in $events) {
             $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
             
             $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
-            $content | Out-File -FilePath $localFile -Encoding utf8
+
+            # --- METADATA ENHANCEMENT ---
+            $datePart = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
+            $slugSubject = ($subject -replace '[^a-zA-Z0-9]', '_').ToLower()
+            $mId = "$datePart`_$slugSubject"
+            $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
+
+            $header = @"
+---
+MEETING ID: $mId
+SUBJECT: $subject
+ORGANISER: $organiserId
+EVENT DATE: $start
+TYPE: $meetingType
+PRIORITY: $priority
+STATUS: success
+BACK-LINK (MASTER LOG): $masterLogUrl
+---
+
+"@
+            # Prepend header to content
+            $contentWithHeader = $header + $content
+            $contentWithHeader | Out-File -FilePath $localFile -Encoding utf8
 
             $uploaded = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
             
+            # Update SharePoint Columns (Drives API doesn't support custom columns directly, must hit the List Item)
+            try {
+                $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($uploaded.id)/listitem/fields"
+                $fieldData = @{
+                    "MeetingId" = $mId
+                    "Type"      = $meetingType
+                    "Priority"  = $priority
+                }
+                Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
+            } catch {
+                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingId', 'Type', and 'Priority' exist in the library."
+            }
+
             $log += [pscustomobject]@{
                 RunId         = $runId
                 Subject       = $subject
