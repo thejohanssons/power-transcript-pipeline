@@ -312,13 +312,13 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             try {
                 $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($uploaded.id)/listitem/fields"
                 $fieldData = @{
-                    "MeetingId" = $mId
+                    "MeetingID" = $mId
                     "Category"  = $meetingType
                     "Priority"  = $priority
                 }
                 Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
             } catch {
-                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingId', 'Category', and 'Priority' exist in the library."
+                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingID', 'Category', and 'Priority' exist in the library."
             }
 
             $log += [pscustomobject]@{
@@ -360,7 +360,7 @@ $csvPath  = Join-Path $outDir "transcript_log_$runId.csv"
 $jsonPath = Join-Path $outDir "transcript_log_$runId.json"
 
 if ($log -and $log.Count -gt 0) {
-    $log | Export-Csv -Path $csvPath -NoTypeInformation
+    $log | Export-Csv -Path $csvPath
     $log | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath
 } else {
     "RunId,Subject,EventDate,Status,Type,Priority,AgentState,LastProcessed,RetryCount,File" | Out-File -FilePath $csvPath -Encoding utf8
