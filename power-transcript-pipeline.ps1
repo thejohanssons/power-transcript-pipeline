@@ -72,6 +72,68 @@ $spRunLogsFolderName    = "_DO_NOT_PRIORITISE_Run logs"
 # =========================
 # REST AUTH HELPER
 # =========================
+$rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
+$rules = Get-Content -Path $rulesPath | ConvertFrom-Json
+
+function Get-MeetingClassification {
+    param($type, $organiser, $transcriptContent)
+
+    # 1. TYPE (fast heuristic)
+    if ($rules.TypeRules.CEO -contains $type) {
+        return @{ classification = "CEO"; confidence = "High"; source = "rule" }
+    }
+    if ($rules.TypeRules.CPO -contains $type) {
+        return @{ classification = "CPO"; confidence = "High"; source = "rule" }
+    }
+
+    # 2. ORGANISER (disambiguation)
+    if ($type -eq "Work" -or $type -eq "Ad-Hoc" -or $type -eq "Compliance") {
+        if ($rules.OrganiserRules.CEO -contains $organiser) {
+            return @{ classification = "CEO"; confidence = "High"; source = "rule" }
+        }
+        if ($rules.OrganiserRules.CPO -contains $organiser) {
+            return @{ classification = "CPO"; confidence = "High"; source = "rule" }
+        }
+    }
+
+    # 3. TRANSCRIPT (LLM pre-analysis)
+    if ($transcriptContent -and $rules.LLMConfig.Endpoint) {
+        try {
+            $llmBody = @{
+                model = $rules.LLMConfig.Model
+                messages = @(
+                    @{ role = "system"; content = $rules.LLMConfig.Prompt },
+                    @{ role = "user"; content = "Transcript to classify:`n`n$transcriptContent" }
+                )
+                temperature = 0
+            } | ConvertTo-Json -Depth 10
+            
+            $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } else { $rules.LLMConfig.ApiKey }
+            $headers = @{ "Authorization" = "Bearer $llmKey" }
+            $fullUri = "$($rules.LLMConfig.Endpoint)/chat/completions"
+            
+            $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
+            
+            $rawContent = $response.choices[0].message.content
+            # The LLM might wrap the JSON in Markdown backticks
+            $sanitizedContent = $rawContent -replace "(?s)^.*?\{", "{" -replace "\}.*?$", "}"
+            $resultJson = $sanitizedContent | ConvertFrom-Json
+            
+            return @{ 
+                classification = $resultJson.classification; 
+                confidence     = $resultJson.confidence; 
+                source         = "llm" 
+            }
+        } catch {
+            Write-Warning "LLM Classification failed: $_"
+        }
+    }
+
+    # Default if everything fails
+    return @{ classification = "CEO"; confidence = "Low"; source = "default" }
+}
+
+# =========================
 
 function Get-GraphToken {
     $body = @{
@@ -258,17 +320,25 @@ foreach ($calendarEvent in $events) {
 
         if (-not $transcriptsForThisEvent -or $transcriptsForThisEvent.Count -eq 0) {
             $isChannelCandidate = $joinUrl -match "threadId"
+            
+            # --- CLASSIFICATION LOGIC (without transcript) ---
+            $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $null
+
             $log += [pscustomobject]@{
-                RunId         = $runId
-                Subject       = $subject
-                EventDate     = $start
-                Status        = if ($isChannelCandidate) { "no_transcript_channel_candidate" } else { "no_transcript" }
-                Type          = $meetingType
-                Priority      = $priority
-                AgentState    = "skipped"
-                LastProcessed = $null
-                RetryCount    = 0
-                File          = $null
+                RunId                    = $runId
+                Subject                  = $subject
+                Organiser                = $organiser
+                EventDate                = $start
+                Status                   = if ($isChannelCandidate) { "no_transcript_channel_candidate" } else { "no_transcript" }
+                Type                     = $meetingType
+                Priority                 = $priority
+                Classification           = $cls.classification
+                ClassificationConfidence = $cls.confidence
+                ClassificationSource     = $cls.source
+                AgentState               = "skipped"
+                LastProcessed            = $null
+                RetryCount               = 0
+                File                     = $null
             }
             continue
         }
@@ -289,14 +359,20 @@ foreach ($calendarEvent in $events) {
             $mId = "$datePart`_$slugSubject"
             $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
 
+            # --- CLASSIFICATION LOGIC ---
+            $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
+
             $header = @"
 ---
 MEETING ID: $mId
 SUBJECT: $subject
 ORGANISER: $organiserId
 EVENT DATE: $start
-CATEGORY: $meetingType
+TYPE: $meetingType
 PRIORITY: $priority
+CLASSIFICATION: $($cls.classification)
+CLASSIFICATION_CONFIDENCE: $($cls.confidence)
+CLASSIFICATION_SOURCE: $($cls.source)
 STATUS: success
 BACK-LINK (MASTER LOG): $masterLogUrl
 ---
@@ -312,41 +388,50 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             try {
                 $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($uploaded.id)/listitem/fields"
                 $fieldData = @{
-                    "MeetingID" = $mId
-                    "Category"  = $meetingType
-                    "Priority"  = $priority
+                    "MeetingID"      = $mId
+                    "Type"           = $meetingType
+                    "Priority"       = $priority
+                    "Classification" = $cls.classification
                 }
                 Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
             } catch {
-                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingID', 'Category', and 'Priority' exist in the library."
+                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingID', 'Type', 'Priority', and 'Classification' exist in the library."
             }
 
             $log += [pscustomobject]@{
-                RunId         = $runId
-                Subject       = $subject
-                EventDate     = $start
-                Status        = "success"
-                Type          = $meetingType
-                Priority      = $priority
-                AgentState    = "pending"
-                LastProcessed = $null
-                RetryCount    = 0
-                File          = $uploaded.webUrl
+                RunId                    = $runId
+                Subject                  = $subject
+                Organiser                = $organiser
+                EventDate                = $start
+                Status                   = "success"
+                Type                     = $meetingType
+                Priority                 = $priority
+                Classification           = $cls.classification
+                ClassificationConfidence = $cls.confidence
+                ClassificationSource     = $cls.source
+                AgentState               = "pending"
+                LastProcessed            = $null
+                RetryCount               = 0
+                File                     = $uploaded.webUrl
             }
         }
     }
     catch {
         $log += [pscustomobject]@{
-            RunId         = $runId
-            Subject       = $subject
-            EventDate     = $start
-            Status        = "error"
-            Type          = $meetingType
-            Priority      = $priority
-            AgentState    = "error"
-            LastProcessed = $null
-            RetryCount    = 0
-            File          = $null
+            RunId                    = $runId
+            Subject                  = $subject
+            Organiser                = $organiser
+            EventDate                = $start
+            Status                   = "error"
+            Type                     = $meetingType
+            Priority                 = $priority
+            Classification           = "CEO"
+            ClassificationConfidence = "Low"
+            ClassificationSource     = "error"
+            AgentState               = "error"
+            LastProcessed            = $null
+            RetryCount               = 0
+            File                     = $null
         }
     }
 }
@@ -407,20 +492,23 @@ foreach ($runEntry in $log) {
     $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $meetingId }
 
     $updatedEntry = @{
-        MeetingId      = $meetingId
-        Subject        = $runEntry.Subject
-        Organiser      = $organiser # Scoped from the loop
-        EventDate      = $runEntry.EventDate
-        Type           = $runEntry.Type
-        Priority       = $runEntry.Priority
-        HasTranscript  = ($runEntry.Status -eq "success")
-        TranscriptFile = $runEntry.File
-        Status         = $runEntry.Status
-        AgentState     = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
-        LastProcessed  = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
-        RetryCount     = if ($existingMatch) { $existingMatch.RetryCount } else { 0 }
-        LastRunId      = $runId
-        LastUpdated    = $now
+        MeetingId                = $meetingId
+        Subject                  = $runEntry.Subject
+        Organiser                = $runEntry.Organiser # Using the property from the run log entry
+        EventDate                = $runEntry.EventDate
+        Type                     = $runEntry.Type
+        Priority                 = $runEntry.Priority
+        Classification           = $runEntry.Classification
+        ClassificationConfidence = $runEntry.ClassificationConfidence
+        ClassificationSource     = $runEntry.ClassificationSource
+        HasTranscript            = ($runEntry.Status -eq "success")
+        TranscriptFile           = $runEntry.File
+        Status                   = $runEntry.Status
+        AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
+        LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
+        RetryCount               = if ($existingMatch) { $existingMatch.RetryCount } else { 0 }
+        LastRunId                = $runId
+        LastUpdated              = $now
     }
 
     if ($existingMatch) {
@@ -449,6 +537,9 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
     $txtContent += "EVENT DATE: $($m.EventDate)"
     $txtContent += "TYPE: $($m.Type)"
     $txtContent += "PRIORITY: $($m.Priority)"
+    $txtContent += "CLASSIFICATION: $($m.Classification)"
+    $txtContent += "CLASSIFICATION_CONFIDENCE: $($m.ClassificationConfidence)"
+    $txtContent += "CLASSIFICATION_SOURCE: $($m.ClassificationSource)"
     $txtContent += "STATUS: $($m.Status)"
     $txtContent += "AGENT STATE: $($m.AgentState)"
     $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"

@@ -1,0 +1,16 @@
+{
+  "TypeRules": {
+    "CEO": ["ExCo", "Finance", "Payment Strategy", "Sales", "Marketing", "Education"],
+    "CPO": ["Product Management", "NPI"]
+  },
+  "OrganiserRules": {
+    "CEO": ["carolynn@empoweringtech.com", "nick@empoweringtech.com"],
+    "CPO": ["theo@wizcomtech.com", "mangesh@wizcomtech.com", "mandar@wizcomtech.com"]
+  },
+  "LLMConfig": {
+    "Model": "gpt-4o",
+    "Prompt": "Classify the following meeting transcript as either CEO or CPO based on the provided criteria. Return ONLY a JSON object with 'classification' (CEO or CPO) and 'confidence' (High | Medium | Low).\n\nCEO Criteria:\n- Commercial & Financial (Revenue, Sales, Marketing spend)\n- Strategy & Growth (Partnerships, Market positioning)\n- Organisation & Leadership (Hiring, ExCo decision making)\n- Business Level Operations\n\nCPO Criteria:\n- Product Development & NPI (Roadmap, MVP definition)\n- R&D Execution (Engineering progress, technical trade-offs)\n- Product Design & Quality (UX, Content quality)\n- Delivery & Coordination (Sprint planning, AI integration)",
+    "Endpoint": "https://atlassian-rovo-forge.openai.azure.com/openai/v1",
+    "ApiKey": ""
+  }
+}
