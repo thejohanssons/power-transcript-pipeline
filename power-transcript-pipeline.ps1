@@ -455,6 +455,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 # =========================
 
 Write-Host "Saving run logs..."
+# Ensure directory exists (safeguard against accidental deletion during execution)
+if (-not (Test-Path $outDir)) { $null = New-Item -ItemType Directory -Path $outDir -Force }
+
 $csvPath  = Join-Path $outDir "transcript_log_$runId.csv"
 $jsonPath = Join-Path $outDir "transcript_log_$runId.json"
 
