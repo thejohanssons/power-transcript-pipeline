@@ -111,13 +111,16 @@ function Get-MeetingClassification {
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } else { $rules.LLMConfig.ApiKey }
             $headers = @{ "api-key" = $llmKey }
             
-            # Construct the Azure-specific deployment URL if it looks like an Azure host
-            $fullUri = if ($rules.LLMConfig.Endpoint -match "openai.azure.com") {
-                # Azure OpenAI format: {endpoint}/openai/deployments/{model}/chat/completions?api-version=...
-                $base = $rules.LLMConfig.Endpoint -replace "/openai/v1/?$", ""
+            # Construct the API URL
+            # If the endpoint already ends in /v1, we treat it as an OpenAI-compatible proxy and just append /chat/completions
+            $fullUri = if ($rules.LLMConfig.Endpoint -match "/v1/?$") {
+                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
+            } elseif ($rules.LLMConfig.Endpoint -match "openai.azure.com") {
+                # Standard Azure OpenAI format
+                $base = $rules.LLMConfig.Endpoint -replace "/$", ""
                 "$base/openai/deployments/$($rules.LLMConfig.Model)/chat/completions?api-version=2024-02-15-preview"
             } else {
-                "$($rules.LLMConfig.Endpoint)/chat/completions"
+                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             }
             
             $response = try {
@@ -493,9 +496,16 @@ try {
     $existingFile = Invoke-RestMethod -Method Get -Uri $existingFileUri -Headers $authHeader
     
     $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($existingFile.id)/content"
-    $masterLogData = Invoke-RestMethod -Method Get -Uri $downloadUri -Headers $authHeader
+    $rawMasterData = Invoke-RestMethod -Method Get -Uri $downloadUri -Headers $authHeader
+    
+    # Resilience: Ensure we have a .Meetings property regardless of the source JSON structure
+    if ($rawMasterData.Meetings) {
+        $masterLogData.Meetings = @($rawMasterData.Meetings)
+    } elseif ($rawMasterData -is [array]) {
+        $masterLogData.Meetings = @($rawMasterData)
+    }
 } catch {
-    Write-Host "No existing Master Log found. Starting fresh."
+    Write-Host "No existing Master Log found or could not parse. Starting fresh."
 }
 
 # 3. Merge current run results into Master Log
