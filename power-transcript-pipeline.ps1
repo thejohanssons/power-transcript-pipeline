@@ -78,32 +78,14 @@ $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
-    # 1. TYPE (fast heuristic)
-    if ($rules.TypeRules.CEO -contains $type) {
-        return @{ classification = "CEO"; confidence = "High"; source = "rule" }
-    }
-    if ($rules.TypeRules.CPO -contains $type) {
-        return @{ classification = "CPO"; confidence = "High"; source = "rule" }
-    }
-
-    # 2. ORGANISER (disambiguation)
-    if ($type -eq "Work" -or $type -eq "Ad-Hoc" -or $type -eq "Compliance") {
-        if ($rules.OrganiserRules.CEO -contains $organiser) {
-            return @{ classification = "CEO"; confidence = "High"; source = "rule" }
-        }
-        if ($rules.OrganiserRules.CPO -contains $organiser) {
-            return @{ classification = "CPO"; confidence = "High"; source = "rule" }
-        }
-    }
-
-    # 3. TRANSCRIPT (LLM pre-analysis)
+    # --- Case 1: Transcript exists - Always call LLM for summary and classification ---
     if ($transcriptContent -and $rules.LLMConfig.Endpoint) {
         try {
             $llmBody = @{
                 model = $rules.LLMConfig.Model
                 messages = @(
                     @{ role = "system"; content = $rules.LLMConfig.Prompt },
-                    @{ role = "user"; content = "Transcript to classify:`n`n$transcriptContent" }
+                    @{ role = "user"; content = "Transcript to analyze:`n`n$transcriptContent" }
                 )
                 temperature = 0
             } | ConvertTo-Json -Depth 10
@@ -111,12 +93,9 @@ function Get-MeetingClassification {
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } else { $rules.LLMConfig.ApiKey }
             $headers = @{ "api-key" = $llmKey }
             
-            # Construct the API URL
-            # If the endpoint already ends in /v1, we treat it as an OpenAI-compatible proxy and just append /chat/completions
             $fullUri = if ($rules.LLMConfig.Endpoint -match "/v1/?$") {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             } elseif ($rules.LLMConfig.Endpoint -match "openai.azure.com") {
-                # Standard Azure OpenAI format
                 $base = $rules.LLMConfig.Endpoint -replace "/$", ""
                 "$base/openai/deployments/$($rules.LLMConfig.Model)/chat/completions?api-version=2024-02-15-preview"
             } else {
@@ -126,28 +105,45 @@ function Get-MeetingClassification {
             $response = try {
                 Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
             } catch {
-                # Fallback to standard Authorization header if api-key fails
                 $headers = @{ "Authorization" = "Bearer $llmKey" }
                 Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
             }
             
             $rawContent = $response.choices[0].message.content
-            # The LLM might wrap the JSON in Markdown backticks
             $sanitizedContent = $rawContent -replace "(?s)^.*?\{", "{" -replace "\}.*?$", "}"
             $resultJson = $sanitizedContent | ConvertFrom-Json
             
             return @{ 
                 classification = $resultJson.classification; 
                 confidence     = $resultJson.confidence; 
+                summary        = $resultJson.summary;
                 source         = "llm" 
             }
         } catch {
-            Write-Warning "LLM Classification failed: $_"
+            Write-Warning "LLM Analysis failed: $_"
         }
     }
 
+    # --- Case 2: No transcript - Use heuristics ---
+
+    # 1. TYPE (fast heuristic)
+    if ($rules.TypeRules.CEO -contains $type) {
+        return @{ classification = "CEO"; confidence = "High"; source = "rule"; summary = $null }
+    }
+    if ($rules.TypeRules.CPO -contains $type) {
+        return @{ classification = "CPO"; confidence = "High"; source = "rule"; summary = $null }
+    }
+
+    # 2. ORGANISER (disambiguation)
+    if ($rules.OrganiserRules.CEO -contains $organiser) {
+        return @{ classification = "CEO"; confidence = "High"; source = "rule"; summary = $null }
+    }
+    if ($rules.OrganiserRules.CPO -contains $organiser) {
+        return @{ classification = "CPO"; confidence = "High"; source = "rule"; summary = $null }
+    }
+
     # Default if everything fails
-    return @{ classification = "CEO"; confidence = "Low"; source = "default" }
+    return @{ classification = "CEO"; confidence = "Low"; source = "default"; summary = $null }
 }
 
 # =========================
@@ -376,7 +372,7 @@ foreach ($calendarEvent in $events) {
             $mId = "$datePart`_$slugSubject"
             $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
 
-            # --- CLASSIFICATION LOGIC ---
+            # --- CLASSIFICATION & SUMMARY LOGIC ---
             $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
 
             $header = @"
@@ -395,24 +391,37 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 ---
 
 "@
-            # Prepend header to content
+            # 1. Save and Upload RAW TRANSCRIPT
             $contentWithHeader = $header + $content
             $contentWithHeader | Out-File -FilePath $localFile -Encoding utf8
+            $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
 
-            $uploaded = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
+            # 2. Save and Upload SUMMARY (if available)
+            $uploadedSummary = $null
+            if ($cls.summary) {
+                $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
+                $summaryWithHeader = $header + $cls.summary
+                $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
+                $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
+            }
             
-            # Update SharePoint Columns (Drives API doesn't support custom columns directly, must hit the List Item)
-            try {
-                $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($uploaded.id)/listitem/fields"
-                $fieldData = @{
-                    "MeetingID"      = $mId
-                    "Category"       = $meetingType
-                    "Priority"       = $priority
-                    "Classification" = $cls.classification
+            # Update SharePoint Columns for both files
+            $filesToUpdate = @($uploadedTranscript)
+            if ($uploadedSummary) { $filesToUpdate += $uploadedSummary }
+
+            foreach ($fileItem in $filesToUpdate) {
+                try {
+                    $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
+                    $fieldData = @{
+                        "MeetingID"      = $mId
+                        "Category"       = $meetingType
+                        "Priority"       = $priority
+                        "Classification" = $cls.classification
+                    }
+                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
+                } catch {
+                    Write-Warning "Could not update SharePoint columns for $($fileItem.name). Ensure the columns 'MeetingID', 'Category', 'Priority', and 'Classification' exist in the library."
                 }
-                Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
-            } catch {
-                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingID', 'Category', 'Priority', and 'Classification' exist in the library."
             }
 
             $log += [pscustomobject]@{
@@ -429,7 +438,8 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 AgentState               = "pending"
                 LastProcessed            = $null
                 RetryCount               = 0
-                File                     = $uploaded.webUrl
+                File                     = $uploadedTranscript.webUrl
+                SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
             }
         }
     }
@@ -530,6 +540,7 @@ foreach ($runEntry in $log) {
         ClassificationSource     = $runEntry.ClassificationSource
         HasTranscript            = ($runEntry.Status -eq "success")
         TranscriptFile           = $runEntry.File
+        SummaryFile              = $runEntry.SummaryFile
         Status                   = $runEntry.Status
         AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
         LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
@@ -571,6 +582,7 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
     $txtContent += "AGENT STATE: $($m.AgentState)"
     $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"
     $txtContent += "TRANSCRIPT FILE: $($m.TranscriptFile)"
+    $txtContent += "SUMMARY FILE: $($m.SummaryFile)"
     $txtContent += "LAST UPDATED: $($m.LastUpdated)"
     $txtContent += "" # Blank line separator
 }
