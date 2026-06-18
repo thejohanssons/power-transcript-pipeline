@@ -313,12 +313,12 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($uploaded.id)/listitem/fields"
                 $fieldData = @{
                     "MeetingId" = $mId
-                    "Type"      = $meetingType
+                    "Category"  = $meetingType
                     "Priority"  = $priority
                 }
                 Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
             } catch {
-                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingId', 'Type', and 'Priority' exist in the library."
+                Write-Warning "Could not update SharePoint columns for $($uploaded.name). Ensure the columns 'MeetingId', 'Category', and 'Priority' exist in the library."
             }
 
             $log += [pscustomobject]@{
