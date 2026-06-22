@@ -853,6 +853,16 @@ foreach ($runEntry in $log) {
 
     $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $meetingId }
 
+    # Success-Sticky Logic: Do not overwrite a successful record with an error/empty one
+    $shouldUpdate = $true
+    if ($existingMatch -and $existingMatch.Status -eq "success" -and $runEntry.Status -ne "success") {
+        $shouldUpdate = $false
+    }
+
+    if (-not $shouldUpdate) {
+        continue
+    }
+
     $updatedEntry = @{
         MeetingId                = $meetingId
         Subject                  = $runEntry.Subject
