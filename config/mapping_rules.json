@@ -1,17 +1,23 @@
 {
-  "Version": "1.0",
+  "Version": "2.0",
   "Rules": [
-    { "TopicId": "T01", "Keywords": ["development", "progress", "engineering", "sprint", "feature"] },
-    { "TopicId": "T02", "Keywords": ["blocker", "constraint", "delay", "stuck", "resource"] },
-    { "TopicId": "T03", "Keywords": ["quality", "defect", "bug", "thermal", "performance", "testing"] },
-    { "TopicId": "T04", "Keywords": ["NPI", "stage gate", "milestone", "launch"] },
-    { "TopicId": "T05", "Keywords": ["MVP", "pilot", "customer trial", "feedback"] },
-    { "TopicId": "T06", "Keywords": ["delivery", "supply chain", "risk", "manufacturing", "tooling"] },
-    { "TopicId": "T10", "Keywords": ["strategy", "vision", "direction", "priorities"] },
-    { "TopicId": "T11", "Keywords": ["roadmap", "alignment", "plan", "future"] },
-    { "TopicId": "T20", "Keywords": ["sales", "revenue", "pipeline", "deals", "customer"] },
-    { "TopicId": "T21", "Keywords": ["marketing", "campaign", "branding", "leads"] },
-    { "TopicId": "T30", "Keywords": ["finance", "profit", "loss", "audit", "tax"] },
-    { "TopicId": "T31", "Keywords": ["budget", "allocation", "spend", "forecast"] }
+    { "TopicId": "T01", "Keywords": ["performance", "speed", "battery", "accuracy", "latency"] },
+    { "TopicId": "T02", "Keywords": ["quality", "defect", "bug", "compliance", "standard", "safety", "testing"] },
+    { "TopicId": "T03", "Keywords": ["value", "perception", "customer feedback", "usability", "appeal"] },
+    { "TopicId": "T04", "Keywords": ["scope", "prioritisation", "feature list", "requirements", "MVP", "backlog"] },
+    { "TopicId": "T05", "Keywords": ["delivery", "readiness", "launch", "deployment", "rollout", "milestone"] },
+    { "TopicId": "T06", "Keywords": ["risk", "constraints", "blockers", "delay", "stalled", "bottleneck"] },
+    { "TopicId": "T07", "Keywords": ["execution", "engineering", "sprint", "development", "build", "code"] },
+    { "TopicId": "T08", "Keywords": ["cash flow", "liquidity", "funding", "runway", "capital"] },
+    { "TopicId": "T09", "Keywords": ["cost", "margin", "COGS", "pricing", "expense", "profitability"] },
+    { "TopicId": "T10", "Keywords": ["revenue", "sales", "deals", "pipeline", "commercial", "growth"] },
+    { "TopicId": "T11", "Keywords": ["exposure", "financial risk", "liability", "audit", "compliance"] },
+    { "TopicId": "T12", "Keywords": ["organisation", "capability", "hiring", "talent", "skills", "training"] },
+    { "TopicId": "T13", "Keywords": ["resource", "allocation", "staffing", "headcount", "capacity"] },
+    { "TopicId": "T14", "Keywords": ["operational", "effectiveness", "process", "efficiency", "workflow"] },
+    { "TopicId": "T15", "Keywords": ["strategy", "alignment", "vision", "direction", "priorities", "objectives"] },
+    { "TopicId": "T16", "Keywords": ["market fit", "competitor", "positioning", "TAM", "segments"] },
+    { "TopicId": "T17", "Keywords": ["growth", "opportunity", "partnership", "expansion", "innovation"] },
+    { "TopicId": "T18", "Keywords": ["confidence", "certainty", "trust", "reliability", "execution quality"] }
   ]
 }
