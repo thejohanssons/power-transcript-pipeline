@@ -430,6 +430,15 @@ Write-Host "Connected to Microsoft Graph (REST) ✅"
 # HELPERS
 # =========================
 
+function Test-IsExternalTenant {
+    param($JoinUrl, $InternalTenantId)
+    if ($JoinUrl -match "Tid%22%3a%22([a-f0-9-]+)%22") {
+        $tid = $matches[1]
+        return ($tid -ne $InternalTenantId)
+    }
+    return $false
+}
+
 function Get-OrganiserIdFromJoinUrl {
     param([string]$JoinUrl)
     $decoded = [System.Net.WebUtility]::UrlDecode($JoinUrl)
@@ -588,6 +597,28 @@ foreach ($calendarEvent in $events) {
     $start     = $calendarEvent.start.dateTime
 
     Write-Host ("Processing: " + $subject)
+
+    # --- EXTERNAL TENANT CHECK ---
+    if (Test-IsExternalTenant -JoinUrl $joinUrl -InternalTenantId $tenantId) {
+        Write-Output "  [SKIP] Meeting '$subject' belongs to an external tenant. Skipping."
+        $log += [pscustomobject]@{
+            RunId                    = $runId
+            Subject                  = $subject
+            Organiser                = $organiser
+            EventDate                = $start
+            Status                   = "skipped_external_tenant"
+            Type                     = "Work"
+            Priority                 = "normal"
+            Classification           = "CEO"
+            ClassificationConfidence = "Low"
+            ClassificationSource     = "skip"
+            AgentState               = "skipped"
+            LastProcessed            = $null
+            RetryCount               = 0
+            File                     = $null
+        }
+        continue
+    }
 
     # --- Determine Type and Priority based on Subject ---
     $meetingType = "Work"
@@ -816,7 +847,8 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     }
     catch {
         $errMessage = $_.Exception.Message
-        Write-Error "  [CRITICAL ERROR] Failed to process meeting '$subject': $errMessage"
+        $uriStr = if ($_.Exception.Response) { $_.Exception.Response.RequestMessage.RequestUri.ToString() } else { "Unknown URI" }
+        Write-Error "  [CRITICAL ERROR] Failed to process meeting '$subject': $errMessage (URI: $uriStr)"
         
         $log += [pscustomobject]@{
             RunId                    = $runId
