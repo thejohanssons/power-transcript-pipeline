@@ -140,8 +140,77 @@ function Classify-Topic {
 
 function Enrich-Summary {
     param($summaryText, $meetingId)
-    $res = $summaryText
-    return $res
+
+    if (-not $summaryText) { return $null }
+
+    # 1. Split by numbered sections
+    $sections = [regex]::Split($summaryText, '(?m)^\d+\.\s+')
+    if ($sections.Count -le 1) { return $summaryText } 
+
+    $topicSection = $sections[1]
+    $topicLines = $topicSection -split "`n"
+    
+    # Identify if the first line is the section header
+    $section1Name = if ($sectionNames.Count -ge 1) { $sectionNames[0] } else { "Topics / Context" }
+    $startIdx = if ($topicLines[0] -match $section1Name) { 1 } else { 0 }
+
+    $newTopicSection = ""
+    $topicRecords = @()
+
+    for ($idx = $startIdx; $idx -lt $topicLines.Count; $idx++) {
+        $line = $topicLines[$idx]
+        if ($line -match "^\s*-\s+(.+)") {
+            $contentPart = $matches[1].Trim()
+            $cls = & "Classify-Topic" $contentPart
+            
+            $newTopicSection += $line + "`n"
+            $newTopicSection += "  DOMAIN: " + $cls.Domain + "`n"
+            $newTopicSection += "  TOPIC_ID: " + $cls.TopicId + "`n"
+            $newTopicSection += "  TOPIC_NAME: " + $cls.TopicName + "`n`n"
+
+            $topicRecords += [pscustomobject]@{
+                RecordId  = $meetingId + "_" + $cls.TopicId
+                Domain    = $cls.Domain
+                TopicId   = $cls.TopicId
+                TopicName = $cls.TopicName
+                Content   = $contentPart
+            }
+        } else {
+            if ($line.Trim()) { $newTopicSection += $line + "`n" }
+        }
+    }
+
+    # 2. Reconstruct the summary
+    $finalSummary = ""
+    $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
+    
+    for ($i = 1; $i -lt $sections.Count; $i++) {
+        $name = if ($i -le $sectionNames.Count) { $sectionNames[$i-1] } else { "Section " + $i }
+        
+        if ($i -eq 1) {
+            $finalSummary += $i.ToString() + ". " + $name + "`n" + $newTopicSection.Trim() + "`n`n"
+        } else {
+            $cLines = $sections[$i] -split "`n"
+            $actualContent = if ($cLines[0] -match $name) {
+                ($cLines | Select-Object -Skip 1) -join "`n"
+            } else {
+                $sections[$i]
+            }
+            $finalSummary += $i.ToString() + ". " + $name + "`n" + $actualContent.Trim() + "`n`n"
+        }
+    }
+
+    # 3. Add Topic Records block
+    $finalSummary += "## Topic Records (Internal)`n`n"
+    foreach ($rec in $topicRecords) {
+        $finalSummary += "[Record: " + $rec.RecordId + "]`n"
+        $finalSummary += "DOMAIN: " + $rec.Domain + "`n"
+        $finalSummary += "TOPIC_ID: " + $rec.TopicId + "`n"
+        $finalSummary += "TOPIC_NAME: " + $rec.TopicName + "`n"
+        $finalSummary += "CONTENT: " + $rec.Content + "`n`n"
+    }
+
+    return $finalSummary
 }
 
 function Get-MeetingClassification {
