@@ -104,6 +104,30 @@ function Assign-Mode {
     return @{ mode = "CEO"; source = "default"; confidence = "Low" }
 }
 
+function Get-TopicSentiment {
+    param($topicText)
+    $txt = $topicText.ToLower()
+    
+    $pos = @("fixed", "resolved", "improving", "ahead", "success", "on track", "complete", "positive")
+    $neg = @("issue", "blocker", "stalled", "delay", "risk", "declining", "behind", "negative", "drain")
+    
+    $isPos = $false
+    $isNeg = $false
+
+    foreach ($p in $pos) { if ($txt -match "\b$([regex]::Escape($p))\b") { $isPos = $true } }
+    foreach ($n in $neg) { if ($txt -match "\b$([regex]::Escape($n))\b") { $isNeg = $true } }
+    
+    # Priority Logic: If "fixed" or "resolved" is present, it's Positive regardless of "issue" or "risk"
+    if ($txt -match "\bfixed\b" -or $txt -match "\bresolved\b") {
+        return @{ Signal = "Positive"; Trajectory = "Improving" }
+    }
+
+    if ($isPos -and -not $isNeg) { return @{ Signal = "Positive"; Trajectory = "Improving" } }
+    if ($isNeg) { return @{ Signal = "Negative"; Trajectory = "Declining" } }
+    
+    return @{ Signal = "Neutral"; Trajectory = "Stable" }
+}
+
 function Classify-Topic {
     param($topicText)
 
@@ -160,18 +184,23 @@ function Enrich-Summary {
         if ($line -match "^\s*-\s+(.+)") {
             $contentPart = $matches[1].Trim()
             $cls = & "Classify-Topic" $contentPart
+            $sent = & "Get-TopicSentiment" $contentPart
             
             $newTopicSection += $line + "`n"
             $newTopicSection += "  DOMAIN: " + $cls.Domain + "`n"
             $newTopicSection += "  TOPIC_ID: " + $cls.TopicId + "`n"
-            $newTopicSection += "  TOPIC_NAME: " + $cls.TopicName + "`n`n"
+            $newTopicSection += "  TOPIC_NAME: " + $cls.TopicName + "`n"
+            $newTopicSection += "  SIGNAL: " + $sent.Signal + "`n"
+            $newTopicSection += "  TRAJECTORY: " + $sent.Trajectory + "`n`n"
 
             $topicRecords += [pscustomobject]@{
-                RecordId  = $meetingId + "_" + $cls.TopicId
-                Domain    = $cls.Domain
-                TopicId   = $cls.TopicId
-                TopicName = $cls.TopicName
-                Content   = $contentPart
+                RecordId   = $meetingId + "_" + $cls.TopicId
+                Domain     = $cls.Domain
+                TopicId    = $cls.TopicId
+                TopicName  = $cls.TopicName
+                Content    = $contentPart
+                Signal     = $sent.Signal
+                Trajectory = $sent.Trajectory
             }
         } else {
             if ($line.Trim()) { $newTopicSection += $line + "`n" }
@@ -197,11 +226,14 @@ function Enrich-Summary {
         }
     }
 
-    # --- STALLED WORK DETECTION ---
-    $stalled = & "Get-StalledWork" $topicRecords $historyRecords
-    if ($stalled.Count -gt 0) {
-        $finalSummary += "## STALLED WORK DETECTED`n"
-        foreach ($s in $stalled) { $finalSummary += "- " + $s.TopicName + " (Stalled)`n" }
+    # --- TREND & STALLED WORK DETECTION ---
+    $trends = & "Get-StalledWork" $topicRecords $historyRecords
+    if ($trends.Count -gt 0) {
+        $finalSummary += "## TOPIC TRENDS & PERSISTENCE`n"
+        foreach ($t in $trends) { 
+            $status = if ($t.IsStalled) { "Stalled" } else { $t.TrendType }
+            $finalSummary += "- " + $t.TopicName + ": " + $status + " (Last seen: " + $t.LastSeen + ")`n"
+        }
         $finalSummary += "`n"
     }
 
@@ -211,6 +243,8 @@ function Enrich-Summary {
         $finalSummary += "DOMAIN: " + $rec.Domain + "`n"
         $finalSummary += "TOPIC_ID: " + $rec.TopicId + "`n"
         $finalSummary += "TOPIC_NAME: " + $rec.TopicName + "`n"
+        $finalSummary += "SIGNAL: " + $rec.Signal + "`n"
+        $finalSummary += "TRAJECTORY: " + $rec.Trajectory + "`n"
         $finalSummary += "CONTENT: " + $rec.Content + "`n`n"
     }
 
@@ -222,29 +256,31 @@ function Get-StalledWork {
 
     if (-not $historyRecords -or $historyRecords.Count -eq 0) { return @() }
 
-    $stalled = @()
+    $results = @()
     foreach ($curr in $currentRecords) {
-        # Find matches for the same TopicId in history
-        # History is expected to be an array of Topic Records from previous meetings
         $pastMatches = $historyRecords | Where-Object { $_.TopicId -eq $curr.TopicId } | Sort-Object EventDate -Descending
         
         if ($pastMatches -and $pastMatches.Count -gt 0) {
-            # Basic stall detection: if the content is highly similar (naive check)
-            # or if the same topic has appeared in the last 2 meetings
-            # For now, we'll flag any topic that appeared in the immediately preceding meeting
             $lastMatch = $pastMatches[0]
-            if ($lastMatch) {
-                $stalled += [pscustomobject]@{
-                    TopicId     = $curr.TopicId
-                    TopicName   = $curr.TopicName
-                    CurrentText = $curr.Content
-                    LastSeen    = $lastMatch.EventDate
-                    LastText    = $lastMatch.Content
-                }
+            
+            # 1. Detect Trajectory Shift
+            $trendType = "Persistent"
+            if ($curr.Signal -eq "Positive" -and $lastMatch.Signal -eq "Negative") { $trendType = "Improving" }
+            if ($curr.Signal -eq "Negative" -and $lastMatch.Signal -eq "Positive") { $trendType = "Declining" }
+
+            # 2. Add to results
+            $results += [pscustomobject]@{
+                TopicId     = $curr.TopicId
+                TopicName   = $curr.TopicName
+                TrendType   = $trendType
+                CurrentText = $curr.Content
+                LastSeen    = $lastMatch.EventDate
+                LastText    = $lastMatch.Content
+                IsStalled   = ($curr.Content -eq $lastMatch.Content)
             }
         }
     }
-    return $stalled
+    return $results
 }
 
 function Get-MeetingClassification {
@@ -563,6 +599,7 @@ foreach ($calendarEvent in $events) {
                                 TopicId   = $tr.TopicId
                                 TopicName = $tr.TopicName
                                 Content   = $tr.Content
+                                Signal    = $tr.Signal
                                 EventDate = $mEntry.EventDate
                             }
                         }
