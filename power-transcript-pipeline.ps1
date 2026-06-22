@@ -87,9 +87,10 @@ $taxonomy = if (Test-Path (Join-Path $configDir "taxonomy.json")) { Get-Content 
 $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get-Content -Path (Join-Path $configDir "mapping_rules.json") | ConvertFrom-Json } else { @{ Rules = @() } }
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
 $sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
+$pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { @{ enable_stable_topic_classification = $false } }
 
 function Assign-Mode {
-    param($type, $organiser)
+    param($type, $organiser, $topicRecords)
 
     # 1. Deterministic Rule based on Roles Config (Organiser)
     $roleMatch = $rolesConfig.Mappings | Where-Object { $_.Email -eq $organiser }
@@ -102,8 +103,16 @@ function Assign-Mode {
         return @{ mode = $rolesConfig.TypeMappings.$type; source = "config_rule"; confidence = "High" }
     }
 
-    # Fallback to default
-    return @{ mode = "CEO"; source = "default"; confidence = "Low" }
+    # Task 5.1: Smart Mode Switch for "Work" meetings
+    if ($type -eq "Work" -and $topicRecords) {
+        $hasProductTopics = $topicRecords | Where-Object { $_.Domain -eq "Product" -or $_.Domain -eq "Execution" }
+        if ($hasProductTopics) {
+            return @{ mode = "CPO"; source = "smart_rule"; confidence = "Medium" }
+        }
+    }
+
+    # Fallback
+    return @{ mode = "CEO"; source = "default_fallback"; confidence = "Low" }
 }
 
 function Get-TopicSentiment {
@@ -134,33 +143,40 @@ function Classify-Topic {
 
     $cleanText = $topicText.ToLower()
     $bestMatch = $null
-    $maxHits = 0
+    $maxDensity = 0.0
 
     foreach ($rule in $mappingRules.Rules) {
         $hits = 0
         foreach ($keyword in $rule.Keywords) {
             $pattern = "\b" + [regex]::Escape($keyword.ToLower()) + "\b"
-            if ($cleanText -match $pattern) {
-                $hits++
+            if ($cleanText -match $pattern) { $hits++ }
+        }
+
+        if ($hits -gt 0) {
+            # Basic density score (hits relative to keywords available)
+            # This helps differentiate between topics with many keywords vs few
+            $density = $hits / $rule.Keywords.Count
+            if ($density -gt $maxDensity) {
+                $maxDensity = $density
+                $bestMatch = $rule.TopicId
             }
         }
-
-        if ($hits -gt $maxHits) {
-            $maxHits = $hits
-            $bestMatch = $rule.TopicId
-        }
     }
 
-    if ($bestMatch) {
-        $topicInfo = $taxonomy.Topics.$bestMatch
-        return @{
-            TopicId   = $bestMatch
-            TopicName = $topicInfo.Name
-            Domain    = $topicInfo.Domain
-        }
+    if (-not $bestMatch) {
+        # Task 2.2: Best-fit fallback logic
+        # Fallback to Strategy (T15) if no keywords match, 
+        # as it is the safest catch-all for executive discussion
+        $bestMatch = "T15"
     }
 
-    return @{ TopicId = "T00"; TopicName = "Unclassified"; Domain = "Unknown" }
+    $topicInfo = $taxonomy.Topics.$bestMatch
+    return @{
+        TopicId   = $bestMatch
+        TopicName = $topicInfo.Name
+        Domain    = $topicInfo.Domain
+        Score     = $maxDensity
+    }
 }
 
 function Enrich-Summary {
@@ -171,63 +187,81 @@ function Enrich-Summary {
     $sections = [regex]::Split($summaryText, '(?m)^\d+\.\s+')
     if ($sections.Count -le 1) { return @{ Summary = $summaryText; Records = @() } } 
 
-    $topicSection = $sections[1]
-    $topicLines = $topicSection -split "`n"
+    $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
     
-    $section1Name = if ($sectionNames.Count -ge 1) { $sectionNames[0] } else { "Topics / Context" }
-    $startIdx = if ($topicLines[0] -match $section1Name) { 1 } else { 0 }
-
+    # --- PHASE 1 & 2: BLOCK-LEVEL PARSING ---
+    $topicSection = $sections[1]
+    
+    # Identify topic blocks using '### Topic: <name>'
+    $blocks = [regex]::Split($topicSection, '(?m)^### Topic:\s+')
     $newTopicSection = ""
-    $topicRecords = @()
+    $topicRecordsMap = @{} # Task 3.1: Topic Merge Dictionary
 
-    for ($idx = $startIdx; $idx -lt $topicLines.Count; $idx++) {
-        $line = $topicLines[$idx]
-        if ($line -match "^\s*-\s+(.+)") {
-            $contentPart = $matches[1].Trim()
-            $cls = & "Classify-Topic" $contentPart
-            $sent = & "Get-TopicSentiment" $contentPart
-            
-            $newTopicSection += $line + "`n"
-            $newTopicSection += "  DOMAIN: " + $cls.Domain + "`n"
-            $newTopicSection += "  TOPIC_ID: " + $cls.TopicId + "`n"
-            $newTopicSection += "  TOPIC_NAME: " + $cls.TopicName + "`n"
-            $newTopicSection += "  SIGNAL: " + $sent.Signal + "`n"
-            $newTopicSection += "  TRAJECTORY: " + $sent.Trajectory + "`n`n"
+    for ($idx = 0; $idx -lt $blocks.Count; $idx++) {
+        $block = $blocks[$idx]
+        if (-not $block.Trim() -or $idx -eq 0) { continue } # Skip noise before first '### Topic'
+        
+        $lines = $block -split "`n"
+        $label = $lines[0].Trim()
+        $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match "^\s*-\s+" }) -join "`n"
+        
+        if (-not $bullets.Trim()) { continue }
 
-            $topicRecords += [pscustomobject]@{
+        $cls = & "Classify-Topic" ($label + "`n" + $bullets)
+        
+        # Aggregate Signals
+        $posCount = 0; $negCount = 0
+        foreach ($line in ($bullets -split "`n")) {
+            if ($line -match "^\s*-\s+(.+)") {
+                $sent = & "Get-TopicSentiment" $matches[1]
+                if ($sent.Signal -eq "Positive") { $posCount++ }
+                if ($sent.Signal -eq "Negative") { $negCount++ }
+            }
+        }
+        $finalSignal = if ($negCount -gt $posCount) { "Negative" } elseif ($posCount -gt $negCount) { "Positive" } else { "Neutral" }
+        $finalTrajectory = if ($finalSignal -eq "Negative") { "Declining" } elseif ($finalSignal -eq "Positive") { "Improving" } else { "Stable" }
+
+        if ($topicRecordsMap.ContainsKey($cls.TopicId)) {
+            $topicRecordsMap[$cls.TopicId].Content += "`n" + $bullets
+            if ($finalSignal -eq "Negative") { $topicRecordsMap[$cls.TopicId].Signal = "Negative" }
+        } else {
+            $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
                 RecordId   = $meetingId + "_" + $cls.TopicId
                 Domain     = $cls.Domain
                 TopicId    = $cls.TopicId
                 TopicName  = $cls.TopicName
-                Content    = $contentPart
-                Signal     = $sent.Signal
-                Trajectory = $sent.Trajectory
+                Label      = $label
+                Content    = $bullets
+                Signal     = $finalSignal
+                Trajectory = $finalTrajectory
             }
-        } else {
-            if ($line.Trim()) { $newTopicSection += $line + "`n" }
         }
     }
 
+    # Construct Section with Task 1.2 Boundaries
+    foreach ($tid in ($topicRecordsMap.Keys | Sort-Object)) {
+        $rec = $topicRecordsMap[$tid]
+        $newTopicSection += "## Topic: " + $rec.Label + "`n`n"
+        $newTopicSection += "DOMAIN: " + $rec.Domain + "`n"
+        $newTopicSection += "TOPIC_ID: " + $rec.TopicId + "`n"
+        $newTopicSection += "TOPIC_NAME: " + $rec.TopicName + "`n`n"
+        $newTopicSection += "Content:`n" + $rec.Content.Trim() + "`n`n"
+    }
+
     $finalSummary = ""
-    $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
-    
     for ($i = 1; $i -lt $sections.Count; $i++) {
         $name = if ($i -le $sectionNames.Count) { $sectionNames[$i-1] } else { "Section " + $i }
-        
         if ($i -eq 1) {
             $finalSummary += $i.ToString() + ". " + $name + "`n" + $newTopicSection.Trim() + "`n`n"
         } else {
             $cLines = $sections[$i] -split "`n"
-            $actualContent = if ($cLines[0] -match $name) {
-                ($cLines | Select-Object -Skip 1) -join "`n"
-            } else {
-                $sections[$i]
-            }
+            $actualContent = if ($cLines[0] -match $name) { ($cLines | Select-Object -Skip 1) -join "`n" } else { $sections[$i] }
             $finalSummary += $i.ToString() + ". " + $name + "`n" + $actualContent.Trim() + "`n`n"
         }
     }
 
     # --- TREND & STALLED WORK DETECTION ---
+    $topicRecords = $topicRecordsMap.Values | ForEach-Object { $_ }
     $trends = & "Get-StalledWork" $topicRecords $historyRecords
     if ($trends.Count -gt 0) {
         $finalSummary += "## TOPIC TRENDS & PERSISTENCE`n"
@@ -238,6 +272,7 @@ function Enrich-Summary {
         $finalSummary += "`n"
     }
 
+    # Clean Topic Record Section (Task 3.2)
     $finalSummary += "## Topic Records (Internal)`n`n"
     foreach ($rec in $topicRecords) {
         $finalSummary += "[Record: " + $rec.RecordId + "]`n"
@@ -246,7 +281,7 @@ function Enrich-Summary {
         $finalSummary += "TOPIC_NAME: " + $rec.TopicName + "`n"
         $finalSummary += "SIGNAL: " + $rec.Signal + "`n"
         $finalSummary += "TRAJECTORY: " + $rec.Trajectory + "`n"
-        $finalSummary += "CONTENT: " + $rec.Content + "`n`n"
+        $finalSummary += "CONTENT:`n" + $rec.Content.Trim() + "`n`n"
     }
 
     return @{ Summary = $finalSummary; Records = $topicRecords }
@@ -299,7 +334,7 @@ function Get-MeetingClassification {
                 temperature = 0
             } | ConvertTo-Json -Depth 10
             
-            $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } else { $rules.LLMConfig.ApiKey }
+            $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
             $headers = @{ "api-key" = $llmKey }
             
             $fullUri = if ($rules.LLMConfig.Endpoint -match "/v1/?$") {
@@ -585,30 +620,48 @@ foreach ($calendarEvent in $events) {
             $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
 
             # --- EIP ENHANCEMENT LAYER ---
-            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser
-            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
-            $enrichedSummaryText = $enrichResult.Summary
-            $topicRecords = $enrichResult.Records
-
-            # --- COMPARISON ENGINE (STALLED WORK) ---
+            # Pre-extract history for Enrichment function
             $historyTopicRecords = @()
             if ($masterLogData.Meetings) {
-                foreach ($mEntry in $masterLogData.Meetings) {
-                    if ($mEntry.TopicRecords) {
-                        foreach ($tr in $mEntry.TopicRecords) {
+                foreach ($mE in $masterLogData.Meetings) {
+                    if ($mE.TopicRecords) {
+                        foreach ($tr in $mE.TopicRecords) {
                             $historyTopicRecords += [pscustomobject]@{
                                 TopicId   = $tr.TopicId
                                 TopicName = $tr.TopicName
                                 Content   = $tr.Content
                                 Signal    = $tr.Signal
-                                EventDate = $mEntry.EventDate
+                                EventDate = $mE.EventDate
                             }
                         }
                     }
                 }
             }
-            $stalledWorkList = & "Get-StalledWork" $topicRecords $historyTopicRecords
-            $stalledNote = ""
+
+            # Phase 1-4: Stable Topic Classification & Consolidation
+            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
+            $enrichedSummaryText = $enrichResult.Summary
+            $topicRecords = $enrichResult.Records
+
+            # Task 5.1: Smart Mode Switch for "Work" meetings based on topic content
+            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords
+
+            # --- PHASE 7: VALIDATION & LOGGING ---
+            if ($pipelineConfig.enable_stable_topic_classification) {
+                $topicCount = if ($topicRecords) { $topicRecords.Count } else { 0 }
+                $t00Count = ($topicRecords | Where-Object { $_.TopicId -eq "T00" }).Count
+                $t00Usage = if ($topicCount -gt 0) { ($t00Count / $topicCount) * 100 } else { 0 }
+                
+                Write-Output "  [VALIDATION] Topics detected: $topicCount"
+                Write-Output "  [VALIDATION] T00 Usage: $($t00Usage.ToString('F1'))%"
+                Write-Output "  [VALIDATION] Mode Assigned: $($modeInfo.mode) ($($modeInfo.source))"
+
+                # Safety Check: Ensure we have at least one topic for successful runs
+                if ($topicCount -eq 0 -and $cls.summary) {
+                    Write-Warning "  [VALIDATION] No topics extracted from summary. Check LLM prompt compliance."
+                }
+            }
+
             $header = @"
 ---
 MEETING ID: $mId
@@ -660,7 +713,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     }
                     Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
                 } catch {
-                    Write-Warning "Could not update SharePoint columns for $($fileItem.name). Ensure the columns 'MeetingID', 'Category', 'Priority', and 'Classification' exist in the library."
+                    Write-Warning "Could not update SharePoint columns for $($fileItem.name). Ensure the columns 'MeetingID', 'Category', 'Priority', and 'Mode' exist in the library."
                 }
             }
 
