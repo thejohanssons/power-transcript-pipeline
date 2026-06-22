@@ -815,12 +815,12 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     $err = $_.Exception.Message
                     $details = "No response body."
                     
-                    # More robust error body extraction for PowerShell Core / HttpResponseMessage
                     if ($_.Exception.Response) {
                         try {
-                            $stream = $_.Exception.Response.Content.ReadAsStream()
-                            $reader = New-Object System.IO.StreamReader($stream)
-                            $details = $reader.ReadToEnd()
+                            # Using ReadAsStringAsync to avoid stream disposal issues in some environments
+                            $task = $_.Exception.Response.Content.ReadAsStringAsync()
+                            $task.Wait()
+                            $details = $task.Result
                         } catch {
                             $details = "Error extracting body: $($_.Exception.Message)"
                         }
