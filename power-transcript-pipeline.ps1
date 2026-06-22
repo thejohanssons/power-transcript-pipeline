@@ -523,6 +523,17 @@ if ($attendeeEvents -and $attendeeEvents.Count -gt 0) {
     $events = $map.Values
 }
 
+# --- DEDUPLICATE BY ONLINE MEETING JOIN URL ---
+# Prevents processing the same meeting multiple times if it exists on multiple calendars
+$uniqueMeetings = @{}
+foreach ($e in $events) {
+    $key = $e.onlineMeeting.joinUrl
+    if (-not $uniqueMeetings.ContainsKey($key)) {
+        $uniqueMeetings[$key] = $e
+    }
+}
+$events = $uniqueMeetings.Values
+
 # =========================
 # PROCESS MEETINGS
 # =========================
