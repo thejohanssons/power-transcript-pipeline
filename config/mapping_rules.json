@@ -1,7 +1,7 @@
 {
   "Version": "2.0",
   "Rules": [
-    { "TopicId": "T01", "Keywords": ["performance", "speed", "battery", "accuracy", "latency"] },
+    { "TopicId": "T01", "Keywords": ["performance", "speed", "battery", "accuracy", "latency", "thermal", "throttling"] },
     { "TopicId": "T02", "Keywords": ["quality", "defect", "bug", "compliance", "standard", "safety", "testing"] },
     { "TopicId": "T03", "Keywords": ["value", "perception", "customer feedback", "usability", "appeal"] },
     { "TopicId": "T04", "Keywords": ["scope", "prioritisation", "feature list", "requirements", "MVP", "backlog"] },

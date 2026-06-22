@@ -7,7 +7,7 @@
   ],
   "Negative": [
     "issue", "blocker", "stalled", "delay", "risk", "declining", "behind", "negative", "drain",
-    "regression", "defect", "bottleneck", "drift", "rejected", "failed", "critical",
+    "regression", "defect", "bottleneck", "drift", "rejected", "failed", "critical", "constraints",
     "escalated", "missing", "overbudget", "unclear", "uncertain", "leak", "bug"
   ],
   "ResolutionPriority": ["fixed", "resolved", "delivered", "shipped", "complete"]
