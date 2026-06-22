@@ -464,6 +464,22 @@ function Upload-FileToSharePoint {
     return Invoke-RestMethod -Method Put -Uri $uploadUri -Headers $authHeader -Body $bytes -ContentType "application/octet-stream"
 }
 
+function Get-MeetingLogId {
+    param($EventDate, [string]$Subject)
+    $datePart = (Get-Date $EventDate -Format "yyyy-MM-dd_HHmm")
+    $slugSubject = ($Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
+    return "$datePart`_$slugSubject"
+}
+
+function Get-StickyMasterLogValue {
+    param($NewValue, $ExistingEntry, [string]$PropertyName)
+    if ($NewValue) { return $NewValue }
+    if (-not $ExistingEntry) { return $null }
+    $existing = $ExistingEntry.$PropertyName
+    if ($existing) { return $existing }
+    return $null
+}
+
 # =========================
 # RESOLVE SHAREPOINT
 # =========================
@@ -480,6 +496,31 @@ Write-Host "Resolved SharePoint drive ✅"
 $runLogsFolderPath = "$spTranscriptRootFolder/$spRunLogsFolderName"
 $runLogsFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $runLogsFolderPath
 Write-Host "Run logs folder ready ✅"
+
+# =========================
+# LOAD MASTER LOG (before processing — needed for history enrichment and merge)
+# =========================
+
+Write-Host "Loading existing Master Log..."
+$masterLogFileName = "master_log.json"
+$rootFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $spTranscriptRootFolder
+$masterLogData = @{ Meetings = @() }
+try {
+    $existingFileUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$rootFolderId`:/$masterLogFileName"
+    $existingFile = Invoke-RestMethod -Method Get -Uri $existingFileUri -Headers $authHeader
+
+    $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($existingFile.id)/content"
+    $rawMasterData = Invoke-RestMethod -Method Get -Uri $downloadUri -Headers $authHeader
+
+    if ($rawMasterData.Meetings) {
+        $masterLogData.Meetings = @($rawMasterData.Meetings)
+    } elseif ($rawMasterData -is [array]) {
+        $masterLogData.Meetings = @($rawMasterData)
+    }
+    Write-Host "Master Log loaded ($($masterLogData.Meetings.Count) meetings) ✅"
+} catch {
+    Write-Host "No existing Master Log found or could not parse. Starting fresh."
+}
 
 # =========================
 # FETCH CALENDAR
@@ -641,9 +682,7 @@ foreach ($calendarEvent in $events) {
             $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
 
             # --- METADATA ENHANCEMENT ---
-            $datePart = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
-            $slugSubject = ($subject -replace '[^a-zA-Z0-9]', '_').ToLower()
-            $mId = "$datePart`_$slugSubject"
+            $mId = Get-MeetingLogId -EventDate $start -Subject $subject
             $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
 
             # --- CLASSIFICATION & SUMMARY LOGIC ---
@@ -829,38 +868,12 @@ if ($runLogsFolderId) {
 # =========================
 
 Write-Host "Updating Master Log..."
-$masterLogFileName = "master_log.json"
 $masterLogLocalPath = Join-Path $outDir $masterLogFileName
 
-# 1. Resolve Root Folder ID (where master_log.json lives)
-$rootFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $spTranscriptRootFolder
-
-# 2. Download existing Master Log if it exists
-$masterLogData = @{ Meetings = @() }
-try {
-    $existingFileUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$rootFolderId`:/$masterLogFileName"
-    $existingFile = Invoke-RestMethod -Method Get -Uri $existingFileUri -Headers $authHeader
-    
-    $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($existingFile.id)/content"
-    $rawMasterData = Invoke-RestMethod -Method Get -Uri $downloadUri -Headers $authHeader
-    
-    # Resilience: Ensure we have a .Meetings property regardless of the source JSON structure
-    if ($rawMasterData.Meetings) {
-        $masterLogData.Meetings = @($rawMasterData.Meetings)
-    } elseif ($rawMasterData -is [array]) {
-        $masterLogData.Meetings = @($rawMasterData)
-    }
-} catch {
-    Write-Host "No existing Master Log found or could not parse. Starting fresh."
-}
-
-# 3. Merge current run results into Master Log
+# Merge current run results into Master Log
 $now = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
 foreach ($runEntry in $log) {
-    # Generate unique ID: yyyy-MM-dd_HHmm_slugified_subject
-    $datePart = (Get-Date $runEntry.EventDate -Format "yyyy-MM-dd_HHmm")
-    $slugSubject = ($runEntry.Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
-    $meetingId = "$datePart`_$slugSubject"
+    $meetingId = Get-MeetingLogId -EventDate $runEntry.EventDate -Subject $runEntry.Subject
 
     $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $meetingId }
 
@@ -874,21 +887,30 @@ foreach ($runEntry in $log) {
         continue
     }
 
+    # Preserve file URLs and topic data when re-run produces success but LLM/upload partial failure
+    $transcriptFile = Get-StickyMasterLogValue -NewValue $runEntry.File -ExistingEntry $existingMatch -PropertyName "TranscriptFile"
+    $summaryFile = Get-StickyMasterLogValue -NewValue $runEntry.SummaryFile -ExistingEntry $existingMatch -PropertyName "SummaryFile"
+    $topicRecords = Get-StickyMasterLogValue -NewValue $runEntry.TopicRecords -ExistingEntry $existingMatch -PropertyName "TopicRecords"
+    $organiserValue = Get-StickyMasterLogValue -NewValue $runEntry.Organiser -ExistingEntry $existingMatch -PropertyName "Organiser"
+
     $updatedEntry = @{
         MeetingId                = $meetingId
         Subject                  = $runEntry.Subject
-        Organiser                = $runEntry.Organiser # Using the property from the run log entry
+        Organiser                = $organiserValue
         EventDate                = $runEntry.EventDate
         Type                     = $runEntry.Type
         Priority                 = $runEntry.Priority
-        Mode                     = $runEntry.Classification # Re-mapping legacy prop for now
+        Mode                     = $runEntry.Classification
         ModeConfidence           = $runEntry.ClassificationConfidence
         ModeSource               = $runEntry.ClassificationSource
+        Classification           = $runEntry.Classification
+        ClassificationConfidence = $runEntry.ClassificationConfidence
+        ClassificationSource     = $runEntry.ClassificationSource
         PipelineVersion          = $PIPELINE_VERSION
-        TopicRecords             = $runEntry.TopicRecords
-        HasTranscript            = ($runEntry.Status -eq "success")
-        TranscriptFile           = $runEntry.File
-        SummaryFile              = $runEntry.SummaryFile
+        TopicRecords             = $topicRecords
+        HasTranscript            = ($runEntry.Status -eq "success") -or ($existingMatch -and $existingMatch.HasTranscript -and $transcriptFile)
+        TranscriptFile           = $transcriptFile
+        SummaryFile              = $summaryFile
         Status                   = $runEntry.Status
         AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
         LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
@@ -917,15 +939,19 @@ $masterLogTxtLocalPath = Join-Path $outDir $masterLogTxtName
 
 $txtContent = @()
 foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
+    $mode = if ($m.Mode) { $m.Mode } else { $m.Classification }
+    $modeConfidence = if ($m.ModeConfidence) { $m.ModeConfidence } else { $m.ClassificationConfidence }
+    $modeSource = if ($m.ModeSource) { $m.ModeSource } else { $m.ClassificationSource }
+
     $txtContent += "MEETING ID: $($m.MeetingId)"
     $txtContent += "SUBJECT: $($m.Subject)"
     $txtContent += "ORGANISER: $($m.Organiser)"
     $txtContent += "EVENT DATE: $($m.EventDate)"
     $txtContent += "TYPE: $($m.Type)"
     $txtContent += "PRIORITY: $($m.Priority)"
-    $txtContent += "CLASSIFICATION: $($m.Classification)"
-    $txtContent += "CLASSIFICATION_CONFIDENCE: $($m.ClassificationConfidence)"
-    $txtContent += "CLASSIFICATION_SOURCE: $($m.ClassificationSource)"
+    $txtContent += "MODE: $mode"
+    $txtContent += "MODE_CONFIDENCE: $modeConfidence"
+    $txtContent += "MODE_SOURCE: $modeSource"
     $txtContent += "STATUS: $($m.Status)"
     $txtContent += "AGENT STATE: $($m.AgentState)"
     $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"
