@@ -209,7 +209,7 @@ function Enrich-Summary {
 
         $cls = & "Classify-Topic" ($label + "`n" + $bullets)
         
-        # Aggregate Signals
+        # Refinement D: Nuanced Signal Aggregation (Mixed State)
         $posCount = 0; $negCount = 0
         foreach ($line in ($bullets -split "`n")) {
             if ($line -match "^\s*-\s+(.+)") {
@@ -218,19 +218,35 @@ function Enrich-Summary {
                 if ($sent.Signal -eq "Negative") { $negCount++ }
             }
         }
-        $finalSignal = if ($negCount -gt $posCount) { "Negative" } elseif ($posCount -gt $negCount) { "Positive" } else { "Neutral" }
-        $finalTrajectory = if ($finalSignal -eq "Negative") { "Declining" } elseif ($finalSignal -eq "Positive") { "Improving" } else { "Stable" }
+        
+        $finalSignal = "Neutral"
+        $finalTrajectory = "Stable"
+
+        if ($posCount -gt 0 -and $negCount -gt 0) {
+            $finalSignal = "Mixed"
+            $finalTrajectory = "Stabilising / Improving"
+        } elseif ($negCount -gt $posCount) {
+            $finalSignal = "Negative"
+            $finalTrajectory = "Declining"
+        } elseif ($posCount -gt $negCount) {
+            $finalSignal = "Positive"
+            $finalTrajectory = "Improving"
+        }
 
         if ($topicRecordsMap.ContainsKey($cls.TopicId)) {
             $topicRecordsMap[$cls.TopicId].Content += "`n" + $bullets
-            if ($finalSignal -eq "Negative") { $topicRecordsMap[$cls.TopicId].Signal = "Negative" }
+            # Propagate "Negative" or "Mixed" as highest priority for merged records
+            if ($finalSignal -eq "Mixed" -or ($finalSignal -eq "Negative" -and $topicRecordsMap[$cls.TopicId].Signal -ne "Mixed")) {
+                $topicRecordsMap[$cls.TopicId].Signal = $finalSignal
+                $topicRecordsMap[$cls.TopicId].Trajectory = $finalTrajectory
+            }
         } else {
             $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
                 RecordId   = $meetingId + "_" + $cls.TopicId
                 Domain     = $cls.Domain
                 TopicId    = $cls.TopicId
-                TopicName  = $cls.TopicName
-                Label      = $label
+                TopicName  = $cls.TopicName # Refinement B: Canonical Name
+                DisplayLabel = $label        # Refinement B: Human-friendly Name
                 Content    = $bullets
                 Signal     = $finalSignal
                 Trajectory = $finalTrajectory
@@ -238,13 +254,15 @@ function Enrich-Summary {
         }
     }
 
-    # Construct Section with Task 1.2 Boundaries
+    # Construct Section with Refinement A separators and Refinement B Naming
     foreach ($tid in ($topicRecordsMap.Keys | Sort-Object)) {
         $rec = $topicRecordsMap[$tid]
-        $newTopicSection += "## Topic: " + $rec.Label + "`n`n"
+        $newTopicSection += "## Topic: " + $rec.DisplayLabel + "`n`n"
         $newTopicSection += "DOMAIN: " + $rec.Domain + "`n"
         $newTopicSection += "TOPIC_ID: " + $rec.TopicId + "`n"
-        $newTopicSection += "TOPIC_NAME: " + $rec.TopicName + "`n`n"
+        $newTopicSection += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
+        $newTopicSection += "SIGNAL: " + $rec.Signal + "`n"
+        $newTopicSection += "TRAJECTORY: " + $rec.Trajectory + "`n`n"
         $newTopicSection += "Content:`n" + $rec.Content.Trim() + "`n`n"
     }
 
@@ -278,7 +296,8 @@ function Enrich-Summary {
         $finalSummary += "[Record: " + $rec.RecordId + "]`n"
         $finalSummary += "DOMAIN: " + $rec.Domain + "`n"
         $finalSummary += "TOPIC_ID: " + $rec.TopicId + "`n"
-        $finalSummary += "TOPIC_NAME: " + $rec.TopicName + "`n"
+        $finalSummary += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
+        $finalSummary += "DISPLAY_LABEL: " + $rec.DisplayLabel + "`n"
         $finalSummary += "SIGNAL: " + $rec.Signal + "`n"
         $finalSummary += "TRAJECTORY: " + $rec.Trajectory + "`n"
         $finalSummary += "CONTENT:`n" + $rec.Content.Trim() + "`n`n"

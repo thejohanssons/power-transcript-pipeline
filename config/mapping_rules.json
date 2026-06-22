@@ -5,7 +5,7 @@
     { "TopicId": "T02", "Keywords": ["compliance", "UL", "REACH", "RoHS", "certification", "quality", "defect", "bug", "standard", "safety", "testing"] },
     { "TopicId": "T03", "Keywords": ["value", "perception", "customer feedback", "usability", "appeal"] },
     { "TopicId": "T04", "Keywords": ["scope", "prioritisation", "feature list", "requirements", "MVP", "backlog"] },
-    { "TopicId": "T05", "Keywords": ["delivery", "readiness", "launch", "deployment", "rollout", "milestone"] },
+    { "TopicId": "T05", "Keywords": ["delivery", "readiness", "launch", "deployment", "rollout", "milestone", "rescheduling", "calendar", "timing"] },
     { "TopicId": "T06", "Keywords": ["risk", "constraints", "blockers", "delay", "stalled", "bottleneck"] },
     { "TopicId": "T07", "Keywords": ["execution", "engineering", "sprint", "development", "build", "code"] },
     { "TopicId": "T08", "Keywords": ["cash flow", "liquidity", "funding", "runway", "capital"] },
