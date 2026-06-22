@@ -819,6 +819,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     }
     catch {
+        $errMessage = $_.Exception.Message
+        Write-Error "  [CRITICAL ERROR] Failed to process meeting '$subject': $errMessage"
+        
         $log += [pscustomobject]@{
             RunId                    = $runId
             Subject                  = $subject
