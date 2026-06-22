@@ -1,0 +1,14 @@
+{
+  "Version": "1.0",
+  "Positive": [
+    "fixed", "resolved", "improving", "ahead", "success", "on track", "complete", "positive",
+    "stabilized", "optimized", "delivered", "agreed", "approved", "shipped", "validated",
+    "passed", "outperforming", "ready", "achieved", "gain"
+  ],
+  "Negative": [
+    "issue", "blocker", "stalled", "delay", "risk", "declining", "behind", "negative", "drain",
+    "regression", "defect", "bottleneck", "drift", "rejected", "failed", "critical",
+    "escalated", "missing", "overbudget", "unclear", "uncertain", "leak", "bug"
+  ],
+  "ResolutionPriority": ["fixed", "resolved", "delivered", "shipped", "complete"]
+}

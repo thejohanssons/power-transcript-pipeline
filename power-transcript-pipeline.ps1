@@ -79,12 +79,14 @@ $PIPELINE_VERSION = "2.0"
 $TAXONOMY_VERSION = "1.0"
 $MAPPING_RULES_VERSION = "1.0"
 $ROLES_CONFIG_VERSION = "1.0"
+$SENTIMENT_RULES_VERSION = "1.0"
 
 # --- EIP CONFIG LOADING ---
 $configDir = Join-Path $PSScriptRoot "config"
 $taxonomy = if (Test-Path (Join-Path $configDir "taxonomy.json")) { Get-Content -Path (Join-Path $configDir "taxonomy.json") | ConvertFrom-Json } else { @{} }
 $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get-Content -Path (Join-Path $configDir "mapping_rules.json") | ConvertFrom-Json } else { @{ Rules = @() } }
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
+$sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
 
 function Assign-Mode {
     param($type, $organiser)
@@ -108,18 +110,17 @@ function Get-TopicSentiment {
     param($topicText)
     $txt = $topicText.ToLower()
     
-    $pos = @("fixed", "resolved", "improving", "ahead", "success", "on track", "complete", "positive")
-    $neg = @("issue", "blocker", "stalled", "delay", "risk", "declining", "behind", "negative", "drain")
-    
     $isPos = $false
     $isNeg = $false
 
-    foreach ($p in $pos) { if ($txt -match "\b$([regex]::Escape($p))\b") { $isPos = $true } }
-    foreach ($n in $neg) { if ($txt -match "\b$([regex]::Escape($n))\b") { $isNeg = $true } }
+    foreach ($p in $sentimentRules.Positive) { if ($txt -match "\b$([regex]::Escape($p.ToLower()))\b") { $isPos = $true } }
+    foreach ($n in $sentimentRules.Negative) { if ($txt -match "\b$([regex]::Escape($n.ToLower()))\b") { $isNeg = $true } }
     
-    # Priority Logic: If "fixed" or "resolved" is present, it's Positive regardless of "issue" or "risk"
-    if ($txt -match "\bfixed\b" -or $txt -match "\bresolved\b") {
-        return @{ Signal = "Positive"; Trajectory = "Improving" }
+    # Resolution Priority Logic (e.g., "fixed", "shipped")
+    foreach ($r in $sentimentRules.ResolutionPriority) {
+        if ($txt -match "\b$([regex]::Escape($r.ToLower()))\b") {
+            return @{ Signal = "Positive"; Trajectory = "Improving" }
+        }
     }
 
     if ($isPos -and -not $isNeg) { return @{ Signal = "Positive"; Trajectory = "Improving" } }
@@ -623,6 +624,7 @@ PIPELINE_VERSION: $PIPELINE_VERSION
 TAXONOMY_VERSION: $TAXONOMY_VERSION
 MAPPING_RULES_VERSION: $MAPPING_RULES_VERSION
 ROLES_CONFIG_VERSION: $ROLES_CONFIG_VERSION
+SENTIMENT_RULES_VERSION: $SENTIMENT_RULES_VERSION
 PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
 STATUS: success
 BACK-LINK (MASTER LOG): $masterLogUrl
