@@ -796,31 +796,20 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
             foreach ($fileItem in $filesToUpdate) {
                 try {
-                    Write-Output "  [DEBUG] SharePoint Metadata Update for: $($fileItem.name)"
+                    Write-Output "  Updating SharePoint columns for: $($fileItem.name)"
                     $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
                     
                     $fieldData = @{
-                        "MeetingID"      = $mId
-                        "Category"       = $meetingType
-                        "Priority"       = $priority
-                        "Mode"           = $modeInfo.mode
-                        "Classification" = $modeInfo.mode
+                        "MeetingID" = $mId
+                        "Category"  = $meetingType
+                        "Priority"  = $priority
+                        "Mode"      = $modeInfo.mode
                     }
                     
-                    $jsonBody = $fieldData | ConvertTo-Json -Compress
-                    Write-Output "  [DEBUG] Payload: $jsonBody"
-
-                    # Use Invoke-WebRequest with -SkipHttpErrorCheck to get error details without disposing the object
-                    $response = Invoke-WebRequest -Method Patch -Uri $fieldsUri -Headers $authHeader -Body $jsonBody -ContentType "application/json" -SkipHttpErrorCheck
-                    
-                    if ($response.StatusCode -ne 200 -and $response.StatusCode -ne 204) {
-                        Write-Warning "SharePoint Update Failed for $($fileItem.name): $($response.StatusCode) $($response.StatusDescription)"
-                        Write-Warning "  [DEBUG] SharePoint Detail: $($response.Content)"
-                    } else {
-                        Write-Output "  [DEBUG] SharePoint Metadata Update Successful."
-                    }
+                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
                 } catch {
-                    Write-Warning "Critical Error during SharePoint Metadata Update for $($fileItem.name): $($_.Exception.Message)"
+                    $err = $_.Exception.Message
+                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
                 }
             }
         }
