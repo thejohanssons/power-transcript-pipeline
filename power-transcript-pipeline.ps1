@@ -810,23 +810,17 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     $jsonBody = $fieldData | ConvertTo-Json -Compress
                     Write-Output "  [DEBUG] Payload: $jsonBody"
 
-                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body $jsonBody -ContentType "application/json" | Out-Null
-                } catch {
-                    $err = $_.Exception.Message
-                    $details = "No response body."
+                    # Use Invoke-WebRequest with -SkipHttpErrorCheck to get error details without disposing the object
+                    $response = Invoke-WebRequest -Method Patch -Uri $fieldsUri -Headers $authHeader -Body $jsonBody -ContentType "application/json" -SkipHttpErrorCheck
                     
-                    if ($_.Exception.Response) {
-                        try {
-                            # Using ReadAsStringAsync to avoid stream disposal issues in some environments
-                            $task = $_.Exception.Response.Content.ReadAsStringAsync()
-                            $task.Wait()
-                            $details = $task.Result
-                        } catch {
-                            $details = "Error extracting body: $($_.Exception.Message)"
-                        }
+                    if ($response.StatusCode -ne 200 -and $response.StatusCode -ne 204) {
+                        Write-Warning "SharePoint Update Failed for $($fileItem.name): $($response.StatusCode) $($response.StatusDescription)"
+                        Write-Warning "  [DEBUG] SharePoint Detail: $($response.Content)"
+                    } else {
+                        Write-Output "  [DEBUG] SharePoint Metadata Update Successful."
                     }
-                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
-                    Write-Warning "  [DEBUG] SharePoint Detail: $details"
+                } catch {
+                    Write-Warning "Critical Error during SharePoint Metadata Update for $($fileItem.name): $($_.Exception.Message)"
                 }
             }
         }
