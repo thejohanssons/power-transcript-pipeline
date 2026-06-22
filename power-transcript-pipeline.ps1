@@ -789,12 +789,17 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
                 } catch {
                     $err = $_.Exception.Message
+                    # Try to get detailed error from Response body (compatible with pwsh)
+                    $details = ""
                     if ($_.Exception.Response) {
-                        $details = (New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd()
-                        Write-Warning "SharePoint Update Failed for $($fileItem.name): $details"
-                    } else {
-                        Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
+                        try {
+                            $reader = New-Object System.IO.StreamReader($_.Exception.Response.Content.ReadAsStream())
+                            $details = $reader.ReadToEnd()
+                        } catch { 
+                            $details = "Could not read response body."
+                        }
                     }
+                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err. $details"
                 }
             }
 
