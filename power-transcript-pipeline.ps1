@@ -139,18 +139,16 @@ function Classify-Topic {
 }
 
 function Enrich-Summary {
-    param($summaryText, $meetingId)
+    param($summaryText, $meetingId, $historyRecords)
 
-    if (-not $summaryText) { return $null }
+    if (-not $summaryText) { return @{ Summary = $null; Records = @() } }
 
-    # 1. Split by numbered sections
     $sections = [regex]::Split($summaryText, '(?m)^\d+\.\s+')
-    if ($sections.Count -le 1) { return $summaryText } 
+    if ($sections.Count -le 1) { return @{ Summary = $summaryText; Records = @() } } 
 
     $topicSection = $sections[1]
     $topicLines = $topicSection -split "`n"
     
-    # Identify if the first line is the section header
     $section1Name = if ($sectionNames.Count -ge 1) { $sectionNames[0] } else { "Topics / Context" }
     $startIdx = if ($topicLines[0] -match $section1Name) { 1 } else { 0 }
 
@@ -180,7 +178,6 @@ function Enrich-Summary {
         }
     }
 
-    # 2. Reconstruct the summary
     $finalSummary = ""
     $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
     
@@ -200,7 +197,14 @@ function Enrich-Summary {
         }
     }
 
-    # 3. Add Topic Records block
+    # --- STALLED WORK DETECTION ---
+    $stalled = & "Get-StalledWork" $topicRecords $historyRecords
+    if ($stalled.Count -gt 0) {
+        $finalSummary += "## STALLED WORK DETECTED`n"
+        foreach ($s in $stalled) { $finalSummary += "- " + $s.TopicName + " (Stalled)`n" }
+        $finalSummary += "`n"
+    }
+
     $finalSummary += "## Topic Records (Internal)`n`n"
     foreach ($rec in $topicRecords) {
         $finalSummary += "[Record: " + $rec.RecordId + "]`n"
@@ -210,7 +214,37 @@ function Enrich-Summary {
         $finalSummary += "CONTENT: " + $rec.Content + "`n`n"
     }
 
-    return $finalSummary
+    return @{ Summary = $finalSummary; Records = $topicRecords }
+}
+
+function Get-StalledWork {
+    param($currentRecords, $historyRecords)
+
+    if (-not $historyRecords -or $historyRecords.Count -eq 0) { return @() }
+
+    $stalled = @()
+    foreach ($curr in $currentRecords) {
+        # Find matches for the same TopicId in history
+        # History is expected to be an array of Topic Records from previous meetings
+        $pastMatches = $historyRecords | Where-Object { $_.TopicId -eq $curr.TopicId } | Sort-Object EventDate -Descending
+        
+        if ($pastMatches -and $pastMatches.Count -gt 0) {
+            # Basic stall detection: if the content is highly similar (naive check)
+            # or if the same topic has appeared in the last 2 meetings
+            # For now, we'll flag any topic that appeared in the immediately preceding meeting
+            $lastMatch = $pastMatches[0]
+            if ($lastMatch) {
+                $stalled += [pscustomobject]@{
+                    TopicId     = $curr.TopicId
+                    TopicName   = $curr.TopicName
+                    CurrentText = $curr.Content
+                    LastSeen    = $lastMatch.EventDate
+                    LastText    = $lastMatch.Content
+                }
+            }
+        }
+    }
+    return $stalled
 }
 
 function Get-MeetingClassification {
@@ -513,10 +547,30 @@ foreach ($calendarEvent in $events) {
             # --- CLASSIFICATION & SUMMARY LOGIC ---
             $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
 
-            # --- EIP MINIMAL LAYER ENHANCEMENT ---
+            # --- EIP ENHANCEMENT LAYER ---
             $modeInfo = Assign-Mode -type $meetingType -organiser $organiser
-            $enrichedSummary = Enrich-Summary -summaryText $cls.summary -meetingId $mId
+            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
+            $enrichedSummaryText = $enrichResult.Summary
+            $topicRecords = $enrichResult.Records
 
+            # --- COMPARISON ENGINE (STALLED WORK) ---
+            $historyTopicRecords = @()
+            if ($masterLogData.Meetings) {
+                foreach ($mEntry in $masterLogData.Meetings) {
+                    if ($mEntry.TopicRecords) {
+                        foreach ($tr in $mEntry.TopicRecords) {
+                            $historyTopicRecords += [pscustomobject]@{
+                                TopicId   = $tr.TopicId
+                                TopicName = $tr.TopicName
+                                Content   = $tr.Content
+                                EventDate = $mEntry.EventDate
+                            }
+                        }
+                    }
+                }
+            }
+            $stalledWorkList = & "Get-StalledWork" $topicRecords $historyTopicRecords
+            $stalledNote = ""
             $header = @"
 ---
 MEETING ID: $mId
@@ -547,7 +601,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             $uploadedSummary = $null
             if ($cls.summary) {
                 $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-                $summaryWithHeader = $header + $enrichedSummary
+                $summaryWithHeader = $header + $enrichedSummaryText
                 $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
             }
@@ -587,6 +641,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 RetryCount               = 0
                 File                     = $uploadedTranscript.webUrl
                 SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
+                TopicRecords             = $topicRecords
             }
         }
     }
@@ -686,6 +741,7 @@ foreach ($runEntry in $log) {
         ModeConfidence           = $runEntry.ClassificationConfidence
         ModeSource               = $runEntry.ClassificationSource
         PipelineVersion          = $PIPELINE_VERSION
+        TopicRecords             = $runEntry.TopicRecords
         HasTranscript            = ($runEntry.Status -eq "success")
         TranscriptFile           = $runEntry.File
         SummaryFile              = $runEntry.SummaryFile
