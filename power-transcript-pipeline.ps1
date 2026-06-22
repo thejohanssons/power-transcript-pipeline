@@ -75,6 +75,75 @@ $spRunLogsFolderName    = "_DO_NOT_PRIORITISE_Run logs"
 $rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
 $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 
+$PIPELINE_VERSION = "2.0"
+$TAXONOMY_VERSION = "1.0"
+$MAPPING_RULES_VERSION = "1.0"
+$ROLES_CONFIG_VERSION = "1.0"
+
+# --- EIP CONFIG LOADING ---
+$configDir = Join-Path $PSScriptRoot "config"
+$taxonomy = if (Test-Path (Join-Path $configDir "taxonomy.json")) { Get-Content -Path (Join-Path $configDir "taxonomy.json") | ConvertFrom-Json } else { @{} }
+$mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get-Content -Path (Join-Path $configDir "mapping_rules.json") | ConvertFrom-Json } else { @{ Rules = @() } }
+$rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
+
+function Assign-Mode {
+    param($type, $organiser)
+
+    # 1. Deterministic Rule based on Roles Config (Organiser)
+    $roleMatch = $rolesConfig.Mappings | Where-Object { $_.Email -eq $organiser }
+    if ($roleMatch) {
+        return @{ mode = $roleMatch.DefaultMode; source = "config_rule"; confidence = "High" }
+    }
+
+    # 2. Deterministic Rule based on Meeting Type
+    if ($rolesConfig.TypeMappings.$type) {
+        return @{ mode = $rolesConfig.TypeMappings.$type; source = "config_rule"; confidence = "High" }
+    }
+
+    # Fallback to default
+    return @{ mode = "CEO"; source = "default"; confidence = "Low" }
+}
+
+function Classify-Topic {
+    param($topicText)
+
+    $cleanText = $topicText.ToLower()
+    $bestMatch = $null
+    $maxHits = 0
+
+    foreach ($rule in $mappingRules.Rules) {
+        $hits = 0
+        foreach ($keyword in $rule.Keywords) {
+            $pattern = "\b" + [regex]::Escape($keyword.ToLower()) + "\b"
+            if ($cleanText -match $pattern) {
+                $hits++
+            }
+        }
+
+        if ($hits -gt $maxHits) {
+            $maxHits = $hits
+            $bestMatch = $rule.TopicId
+        }
+    }
+
+    if ($bestMatch) {
+        $topicInfo = $taxonomy.Topics.$bestMatch
+        return @{
+            TopicId   = $bestMatch
+            TopicName = $topicInfo.Name
+            Domain    = $topicInfo.Domain
+        }
+    }
+
+    return @{ TopicId = "T00"; TopicName = "Unclassified"; Domain = "Unknown" }
+}
+
+function Enrich-Summary {
+    param($summaryText, $meetingId)
+    $res = $summaryText
+    return $res
+}
+
 function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
@@ -375,17 +444,26 @@ foreach ($calendarEvent in $events) {
             # --- CLASSIFICATION & SUMMARY LOGIC ---
             $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
 
+            # --- EIP MINIMAL LAYER ENHANCEMENT ---
+            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser
+            $enrichedSummary = Enrich-Summary -summaryText $cls.summary -meetingId $mId
+
             $header = @"
 ---
 MEETING ID: $mId
 SUBJECT: $subject
-ORGANISER: $organiserId
+ORGANISER: $organiser
 EVENT DATE: $start
 TYPE: $meetingType
 PRIORITY: $priority
-CLASSIFICATION: $($cls.classification)
-CLASSIFICATION_CONFIDENCE: $($cls.confidence)
-CLASSIFICATION_SOURCE: $($cls.source)
+MODE: $($modeInfo.mode)
+MODE_SOURCE: $($modeInfo.source)
+MODE_CONFIDENCE: $($modeInfo.confidence)
+PIPELINE_VERSION: $PIPELINE_VERSION
+TAXONOMY_VERSION: $TAXONOMY_VERSION
+MAPPING_RULES_VERSION: $MAPPING_RULES_VERSION
+ROLES_CONFIG_VERSION: $ROLES_CONFIG_VERSION
+PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
 STATUS: success
 BACK-LINK (MASTER LOG): $masterLogUrl
 ---
@@ -400,7 +478,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             $uploadedSummary = $null
             if ($cls.summary) {
                 $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-                $summaryWithHeader = $header + $cls.summary
+                $summaryWithHeader = $header + $enrichedSummary
                 $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
             }
@@ -416,7 +494,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         "MeetingID"      = $mId
                         "Category"       = $meetingType
                         "Priority"       = $priority
-                        "Classification" = $cls.classification
+                        "Mode"           = $modeInfo.mode
                     }
                     Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
                 } catch {
@@ -535,9 +613,10 @@ foreach ($runEntry in $log) {
         EventDate                = $runEntry.EventDate
         Type                     = $runEntry.Type
         Priority                 = $runEntry.Priority
-        Classification           = $runEntry.Classification
-        ClassificationConfidence = $runEntry.ClassificationConfidence
-        ClassificationSource     = $runEntry.ClassificationSource
+        Mode                     = $runEntry.Classification # Re-mapping legacy prop for now
+        ModeConfidence           = $runEntry.ClassificationConfidence
+        ModeSource               = $runEntry.ClassificationSource
+        PipelineVersion          = $PIPELINE_VERSION
         HasTranscript            = ($runEntry.Status -eq "success")
         TranscriptFile           = $runEntry.File
         SummaryFile              = $runEntry.SummaryFile

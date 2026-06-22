@@ -1,0 +1,25 @@
+{
+  "Version": "1.0",
+  "Domains": {
+    "Execution": ["T01", "T02", "T03", "T04", "T05", "T06"],
+    "Strategy": ["T10", "T11", "T12"],
+    "Commercial": ["T20", "T21", "T22"],
+    "Finance": ["T30", "T31"]
+  },
+  "Topics": {
+    "T01": { "Name": "Product Development Progress", "Domain": "Execution" },
+    "T02": { "Name": "R&D Blockers & Constraints", "Domain": "Execution" },
+    "T03": { "Name": "Quality & Performance Issues", "Domain": "Execution" },
+    "T04": { "Name": "NPI Stage Gate Review", "Domain": "Execution" },
+    "T05": { "Name": "MVP & Pilot Status", "Domain": "Execution" },
+    "T06": { "Name": "Delivery Risk & Constraints", "Domain": "Execution" },
+    "T10": { "Name": "Strategic Direction", "Domain": "Strategy" },
+    "T11": { "Name": "Roadmap Alignment", "Domain": "Strategy" },
+    "T12": { "Name": "Market Positioning", "Domain": "Strategy" },
+    "T20": { "Name": "Sales Performance", "Domain": "Commercial" },
+    "T21": { "Name": "Marketing Campaign Status", "Domain": "Commercial" },
+    "T22": { "Name": "Partnership Development", "Domain": "Commercial" },
+    "T30": { "Name": "Financial Reporting", "Domain": "Finance" },
+    "T31": { "Name": "Budget & Resource Allocation", "Domain": "Finance" }
+  }
+}

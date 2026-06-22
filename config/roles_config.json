@@ -1,0 +1,19 @@
+{
+  "Version": "1.0",
+  "Mappings": [
+    { "Email": "carolynn@empoweringtech.com", "DefaultMode": "CEO" },
+    { "Email": "nick@empoweringtech.com", "DefaultMode": "CEO" },
+    { "Email": "theo@wizcomtech.com", "DefaultMode": "CPO" },
+    { "Email": "mangesh@wizcomtech.com", "DefaultMode": "CPO" },
+    { "Email": "mandar@wizcomtech.com", "DefaultMode": "CPO" },
+    { "Email": "peter@empoweringtech.com", "DefaultMode": "CEO" }
+  ],
+  "TypeMappings": {
+    "ExCo": "CEO",
+    "Finance": "CFO",
+    "Sales": "CEO",
+    "Marketing": "CEO",
+    "Education": "CEO",
+    "Product Management": "CPO"
+  }
+}
