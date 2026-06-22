@@ -767,43 +767,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
             }
             
-            # Update SharePoint Columns for both files (Transcript and Summary)
-            $filesToUpdate = New-Object System.Collections.Generic.List[Object]
-            if ($uploadedTranscript) { $filesToUpdate.Add($uploadedTranscript) }
-            if ($uploadedSummary) { $filesToUpdate.Add($uploadedSummary) }
-
-            foreach ($fileItem in $filesToUpdate) {
-                try {
-                    Write-Output "  Updating SharePoint columns for: $($fileItem.name)"
-                    $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
-                    
-                    # Note: SharePoint requires the INTERNAL name. 
-                    # If 'Mode' was renamed from 'Classification', the internal name remains 'Classification'.
-                    $fieldData = @{
-                        "MeetingID"      = $mId
-                        "Category"       = $meetingType
-                        "Priority"       = $priority
-                        "Mode"           = $modeInfo.mode
-                        "Classification" = $modeInfo.mode # Fallback for original internal name
-                    }
-                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
-                } catch {
-                    $err = $_.Exception.Message
-                    # Try to get detailed error from Response body (compatible with pwsh)
-                    $details = ""
-                    if ($_.Exception.Response) {
-                        try {
-                            $reader = New-Object System.IO.StreamReader($_.Exception.Response.Content.ReadAsStream())
-                            $details = $reader.ReadToEnd()
-                        } catch { 
-                            $details = "Could not read response body."
-                        }
-                    }
-                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err. $details"
-                }
-            }
-
-            $log += [pscustomobject]@{
+            # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
+            # We record the file URLs BEFORE attempting metadata updates so they aren't lost if SharePoint is glitchy
+            $logEntry = [pscustomobject]@{
                 RunId                    = $runId
                 Subject                  = $subject
                 Organiser                = $organiser
@@ -820,6 +786,38 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 File                     = $uploadedTranscript.webUrl
                 SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
                 TopicRecords             = $topicRecords
+            }
+            $log += $logEntry
+
+            # Update SharePoint Columns for both files (Transcript and Summary)
+            $filesToUpdate = New-Object System.Collections.Generic.List[Object]
+            if ($uploadedTranscript) { $filesToUpdate.Add($uploadedTranscript) }
+            if ($uploadedSummary) { $filesToUpdate.Add($uploadedSummary) }
+
+            foreach ($fileItem in $filesToUpdate) {
+                try {
+                    Write-Output "  Updating SharePoint columns for: $($fileItem.name)"
+                    $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
+                    
+                    $fieldData = @{
+                        "MeetingID"      = $mId
+                        "Category"       = $meetingType
+                        "Priority"       = $priority
+                        "Mode"           = $modeInfo.mode
+                        "Classification" = $modeInfo.mode # Fallback
+                    }
+                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
+                } catch {
+                    $err = $_.Exception.Message
+                    $details = ""
+                    if ($_.Exception.Response) {
+                        try {
+                            $reader = New-Object System.IO.StreamReader($_.Exception.Response.Content.ReadAsStream())
+                            $details = $reader.ReadToEnd()
+                        } catch { $details = "Could not read response body." }
+                    }
+                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err. $details"
+                }
             }
         }
     }
