@@ -796,7 +796,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
             foreach ($fileItem in $filesToUpdate) {
                 try {
-                    Write-Output "  Updating SharePoint columns for: $($fileItem.name)"
+                    Write-Output "  [DEBUG] SharePoint Metadata Update for: $($fileItem.name)"
                     $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
                     
                     $fieldData = @{
@@ -804,19 +804,29 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         "Category"       = $meetingType
                         "Priority"       = $priority
                         "Mode"           = $modeInfo.mode
-                        "Classification" = $modeInfo.mode # Fallback
+                        "Classification" = $modeInfo.mode
                     }
-                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
+                    
+                    $jsonBody = $fieldData | ConvertTo-Json -Compress
+                    Write-Output "  [DEBUG] Payload: $jsonBody"
+
+                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body $jsonBody -ContentType "application/json" | Out-Null
                 } catch {
                     $err = $_.Exception.Message
-                    $details = ""
+                    $details = "No response body."
+                    
+                    # More robust error body extraction for PowerShell Core / HttpResponseMessage
                     if ($_.Exception.Response) {
                         try {
-                            $reader = New-Object System.IO.StreamReader($_.Exception.Response.Content.ReadAsStream())
+                            $stream = $_.Exception.Response.Content.ReadAsStream()
+                            $reader = New-Object System.IO.StreamReader($stream)
                             $details = $reader.ReadToEnd()
-                        } catch { $details = "Could not read response body." }
+                        } catch {
+                            $details = "Error extracting body: $($_.Exception.Message)"
+                        }
                     }
-                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err. $details"
+                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
+                    Write-Warning "  [DEBUG] SharePoint Detail: $details"
                 }
             }
         }
