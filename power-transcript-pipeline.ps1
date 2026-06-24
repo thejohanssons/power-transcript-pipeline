@@ -559,32 +559,9 @@ function Send-TeamsNotification {
         return 
     }
 
-    # Modern AdaptiveCard payload (required by new Teams Workflows)
+    # Unified Webhook payload
     $payload = @{
-        "type" = "message"
-        "attachments" = @(
-            @{
-                "contentType" = "application/vnd.microsoft.card.adaptive"
-                "content" = @{
-                    "type" = "AdaptiveCard"
-                    "body" = @(
-                        @{
-                            "type" = "TextBlock"
-                            "size" = "Medium"
-                            "weight" = "Bolder"
-                            "text" = "Executive Intelligence Update"
-                        },
-                        @{
-                            "type" = "TextBlock"
-                            "text" = $MessageBlock
-                            "wrap" = $true
-                            "fontType" = "Monospace"
-                        }
-                    )
-                    "version" = "1.4"
-                }
-            }
-        )
+        "text" = "### Executive Intelligence Update`n$MessageBlock"
     } | ConvertTo-Json -Depth 10
 
     try {

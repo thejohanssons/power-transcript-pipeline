@@ -5,5 +5,5 @@
   "confluence_parent_id": "2102919177",
   "confluence_base_url": "https://etpd.atlassian.net/wiki",
   "enable_teams_notifications": true,
-  "teams_webhook_url": ""
+  "teams_webhook_url": "https://webhookbot.c-toss.com/api/bot/webhooks/1dc81f0a-d74d-4b18-9dd1-0340af30efd9"
 }
