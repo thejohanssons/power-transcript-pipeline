@@ -497,22 +497,75 @@ function Convert-SummaryToConfluenceHtml {
 }
 
 function Publish-SummaryToConfluence {
-    param($HtmlContent, $Title, $ParentUrl)
+    param($HtmlContent, $Title, $SpaceKey, $ParentPageId)
 
-    Write-Output "  [CONFLUENCE] Attempting to mirror summary to: $Title"
+    Write-Output "  [CONFLUENCE] Attempting to mirror summary: $Title"
+
+    $user = $env:CONFLUENCE_USER
+    $token = $env:CONFLUENCE_TOKEN
+    $baseUrl = $env:CONFLUENCE_BASE_URL 
     
-    $tempHtmlFile = Join-Path $env:TEMP "summary_mirror.html"
-    if ($null -eq $env:TEMP) { $tempHtmlFile = Join-Path "/tmp" "summary_mirror.html" }
-    
-    $HtmlContent | Out-File -FilePath $tempHtmlFile -Encoding utf8
+    if (-not $user -or -not $token -or -not $baseUrl) {
+        Write-Warning "  [CONFLUENCE] Skipping: Missing CONFLUENCE credentials."
+        return $null
+    }
+
+    $pair = "$($user):$($token)"
+    $encodedCreds = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($pair))
+    $headers = @{ Authorization = "Basic $encodedCreds"; "Content-Type" = "application/json"; Accept = "application/json" }
 
     try {
-        # Implementation Detail: 
-        # In this Rovo environment, we would call the 'create_confluence_page' tool.
-        # In a real deployment, this would be an Invoke-RestMethod to the Confluence API.
-        Write-Output "  [CONFLUENCE] HTML mirror ready ($($HtmlContent.Length) chars) at $tempHtmlFile"
+        $spaceUrl = "$baseUrl/api/v2/spaces?keys=$SpaceKey"
+        $spaceResponse = Invoke-RestMethod -Uri $spaceUrl -Headers $headers -Method Get
+        $spaceId = $spaceResponse.results[0].id
+        
+        $body = @{ spaceId = $spaceId; status = "current"; title = $Title; parentId = $ParentPageId; body = @{ representation = "storage"; value = $HtmlContent } } | ConvertTo-Json -Depth 10
+
+        $targetPage = $null
+        try {
+            $targetPage = Invoke-RestMethod -Uri "$baseUrl/api/v2/pages" -Headers $headers -Method Post -Body $body
+            Write-Output "  [CONFLUENCE] Created new page: $($targetPage.id)"
+        }
+        catch {
+            if ($_.Exception.Message -match "400" -or $_.Exception.Message -match "Already exists") {
+                $searchUrl = "$baseUrl/api/v2/pages?spaceKey=$SpaceKey&title=$([uri]::EscapeDataString($Title))&limit=1"
+                $existing = (Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get).results[0]
+                if ($existing) {
+                    $updateBody = @{ id = $existing.id; status = "current"; title = $Title; spaceId = $spaceId; version = @{ number = $existing.version.number + 1 }; body = @{ representation = "storage"; value = $HtmlContent } } | ConvertTo-Json -Depth 10
+                    $targetPage = Invoke-RestMethod -Uri "$baseUrl/api/v2/pages/$($existing.id)" -Headers $headers -Method Put -Body $updateBody
+                    Write-Output "  [CONFLUENCE] Updated page to v$($targetPage.version.number)"
+                }
+            } else { throw $_.Exception }
+        }
+
+        if ($targetPage) {
+            $webui = $targetPage._links.webui
+            return "$($baseUrl.Replace('/wiki',''))/wiki$webui"
+        }
+    }
+    catch { Write-Warning "  [CONFLUENCE] Mirror failed: $($_.Exception.Message)" }
+    return $null
+}
+
+function Send-TeamsNotification {
+    param($MessageBlock)
+
+    $webhookUrl = (Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json).teams_webhook_url
+    if (-not $webhookUrl) { return }
+
+    $payload = @{
+        "@type" = "MessageCard"
+        "@context" = "http://schema.org/extensions"
+        "summary" = "Transcript Pipeline Update"
+        "themeColor" = "0078D7"
+        "title" = "Meeting Processed"
+        "text" = "<pre>$MessageBlock</pre>"
+    } | ConvertTo-Json -Depth 10
+
+    try {
+        Invoke-RestMethod -Uri $webhookUrl -Method Post -Body $payload -ContentType "application/json"
     } catch {
-        Write-Warning "  [CONFLUENCE] Failed to publish: $($_.Exception.Message)"
+        Write-Warning "  [TEAMS] Notification failed: $($_.Exception.Message)"
     }
 }
 
@@ -918,15 +971,15 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
                 # --- CONFLUENCE MIRRORING ---
                 $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
-                if ($config.enable_confluence_mirror -and $config.confluence_parent_url) {
+                $confluenceUrl = $null
+                if ($config.enable_confluence_mirror -and $config.confluence_space_key -and $config.confluence_parent_id -and $organiser -ne "carolynn@empoweringtech.com") {
                     $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
                     $pageTitle = "Executive Summary - $subject ($mId)"
-                    Publish-SummaryToConfluence -HtmlContent $confHtml -Title $pageTitle -ParentUrl $config.confluence_parent_url
+                    $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $pageTitle -SpaceKey $config.confluence_space_key -ParentPageId $config.confluence_parent_id
                 }
             }
             
             # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
-            # We record the file URLs BEFORE attempting metadata updates so they aren't lost if SharePoint is glitchy
             $logEntry = [pscustomobject]@{
                 RunId                    = $runId
                 Subject                  = $subject
@@ -939,13 +992,38 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 ClassificationConfidence = $cls.confidence
                 ClassificationSource     = $cls.source
                 AgentState               = "pending"
-                LastProcessed            = $null
+                LastProcessed            = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
                 RetryCount               = 0
-                File                     = $uploadedTranscript.webUrl
+                File                     = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $null }
                 SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
+                ConfluenceMirror         = $confluenceUrl
                 TopicRecords             = $topicRecords
+                MeetingId                = $mId
             }
             $log += $logEntry
+
+            # --- TEAMS NOTIFICATION ---
+            $hasTranscript = if ($logEntry.File) { "True" } else { "False" }
+            $mirrorLine = if ($logEntry.ConfluenceMirror) { "CONFLUENCE MIRROR: $($logEntry.ConfluenceMirror)`n" } else { "" }
+            
+            $teamsMsg = "MEETING ID: $($logEntry.MeetingId)`n" +
+                        "SUBJECT: $($logEntry.Subject)`n" +
+                        "ORGANISER: $($logEntry.Organiser)`n" +
+                        "EVENT DATE: $($logEntry.EventDate)`n" +
+                        "TYPE: $($logEntry.Type)`n" +
+                        "PRIORITY: $($logEntry.Priority)`n" +
+                        "MODE: $($logEntry.Classification)`n" +
+                        "MODE_CONFIDENCE: $($logEntry.ClassificationConfidence)`n" +
+                        "MODE_SOURCE: $($logEntry.ClassificationSource)`n" +
+                        "STATUS: $($logEntry.Status)`n" +
+                        "AGENT STATE: $($logEntry.AgentState)`n" +
+                        "HAS TRANSCRIPT: $hasTranscript`n" +
+                        "TRANSCRIPT FILE: $($logEntry.File)`n" +
+                        "SUMMARY FILE: $($logEntry.SummaryFile)`n" +
+                        $mirrorLine +
+                        "LAST UPDATED: $($logEntry.LastProcessed)"
+            
+            Send-TeamsNotification -MessageBlock $teamsMsg
 
             # Update SharePoint Columns for both files (Transcript and Summary)
             $filesToUpdate = New-Object System.Collections.Generic.List[Object]
@@ -1048,6 +1126,7 @@ foreach ($runEntry in $log) {
     # Preserve file URLs and topic data when re-run produces success but LLM/upload partial failure
     $transcriptFile = Get-StickyMasterLogValue -NewValue $runEntry.File -ExistingEntry $existingMatch -PropertyName "TranscriptFile"
     $summaryFile = Get-StickyMasterLogValue -NewValue $runEntry.SummaryFile -ExistingEntry $existingMatch -PropertyName "SummaryFile"
+    $confMirror = Get-StickyMasterLogValue -NewValue $runEntry.ConfluenceMirror -ExistingEntry $existingMatch -PropertyName "ConfluenceMirror"
     $topicRecords = Get-StickyMasterLogValue -NewValue $runEntry.TopicRecords -ExistingEntry $existingMatch -PropertyName "TopicRecords"
     $organiserValue = Get-StickyMasterLogValue -NewValue $runEntry.Organiser -ExistingEntry $existingMatch -PropertyName "Organiser"
 
@@ -1069,6 +1148,7 @@ foreach ($runEntry in $log) {
         HasTranscript            = ($runEntry.Status -eq "success") -or ($existingMatch -and $existingMatch.HasTranscript -and $transcriptFile)
         TranscriptFile           = $transcriptFile
         SummaryFile              = $summaryFile
+        ConfluenceMirror         = $confMirror
         Status                   = $runEntry.Status
         AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
         LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
@@ -1115,6 +1195,7 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
     $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"
     $txtContent += "TRANSCRIPT FILE: $($m.TranscriptFile)"
     $txtContent += "SUMMARY FILE: $($m.SummaryFile)"
+    if ($m.ConfluenceMirror) { $txtContent += "CONFLUENCE MIRROR: $($m.ConfluenceMirror)" }
     $txtContent += "LAST UPDATED: $($m.LastUpdated)"
     $txtContent += "" # Blank line separator
 }

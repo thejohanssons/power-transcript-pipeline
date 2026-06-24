@@ -2,6 +2,8 @@
   "enable_stable_topic_classification": true,
   "enable_confluence_mirror": true,
   "confluence_space_key": "PWMN",
-  "confluence_parent_id": "2100920335",
-  "confluence_base_url": "https://etpd.atlassian.net/wiki"
+  "confluence_parent_id": "2102919177",
+  "confluence_base_url": "https://etpd.atlassian.net/wiki",
+  "enable_teams_notifications": true,
+  "teams_webhook_url": ""
 }
