@@ -1,5 +1,7 @@
 {
   "enable_stable_topic_classification": true,
   "enable_confluence_mirror": true,
-  "confluence_parent_url": "https://etpd.atlassian.net/wiki/spaces/PWMN/pages/2100920335/Peter+Johansson+s+meeting+notes+-+bucket"
+  "confluence_space_key": "PWMN",
+  "confluence_parent_id": "2100920335",
+  "confluence_base_url": "https://etpd.atlassian.net/wiki"
 }
