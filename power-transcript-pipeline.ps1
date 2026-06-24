@@ -358,7 +358,12 @@ function Get-MeetingClassification {
             } | ConvertTo-Json -Depth 10
             
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-            $headers = @{ "api-key" = $llmKey }
+            
+            # Use Bearer token for Forge-based endpoints
+            $headers = @{ 
+                "Authorization" = "Bearer $llmKey" 
+                "Content-Type" = "application/json"
+            }
             
             $fullUri = if ($rules.LLMConfig.Endpoint -match "/v1/?$") {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
@@ -369,12 +374,7 @@ function Get-MeetingClassification {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             }
             
-            $response = try {
-                Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
-            } catch {
-                $headers = @{ "Authorization" = "Bearer $llmKey" }
-                Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody -ContentType "application/json"
-            }
+            $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody
             
             $rawContent = $response.choices[0].message.content
             $sanitizedContent = $rawContent -replace "(?s)^.*?\{", "{" -replace "\}.*?$", "}"
