@@ -551,22 +551,48 @@ function Publish-SummaryToConfluence {
 function Send-TeamsNotification {
     param($MessageBlock)
 
-    $webhookUrl = (Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json).teams_webhook_url
-    if (-not $webhookUrl) { return }
+    $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
+    $webhookUrl = $config.teams_webhook_url
+    
+    if (-not $webhookUrl) { 
+        Write-Output "  [TEAMS] Skip: No teams_webhook_url defined in pipeline_config.json."
+        return 
+    }
 
+    # Modern AdaptiveCard payload (required by new Teams Workflows)
     $payload = @{
-        "@type" = "MessageCard"
-        "@context" = "http://schema.org/extensions"
-        "summary" = "Transcript Pipeline Update"
-        "themeColor" = "0078D7"
-        "title" = "Meeting Processed"
-        "text" = "<pre>$MessageBlock</pre>"
+        "type" = "message"
+        "attachments" = @(
+            @{
+                "contentType" = "application/vnd.microsoft.card.adaptive"
+                "content" = @{
+                    "type" = "AdaptiveCard"
+                    "body" = @(
+                        @{
+                            "type" = "TextBlock"
+                            "size" = "Medium"
+                            "weight" = "Bolder"
+                            "text" = "Executive Intelligence Update"
+                        },
+                        @{
+                            "type" = "TextBlock"
+                            "text" = $MessageBlock
+                            "wrap" = $true
+                            "fontType" = "Monospace"
+                        }
+                    )
+                    "version" = "1.4"
+                }
+            }
+        )
     } | ConvertTo-Json -Depth 10
 
     try {
+        # Force TLS 1.2 for Teams compatibility
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-RestMethod -Uri $webhookUrl -Method Post -Body $payload -ContentType "application/json"
     } catch {
-        Write-Warning "  [TEAMS] Notification failed: $($_.Exception.Message)"
+        Write-Warning "  [TEAMS] Notification failed: $($_.Exception.Message). Ensure your webhook supports AdaptiveCards."
     }
 }
 
@@ -975,7 +1001,8 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $confluenceUrl = $null
                 if ($config.enable_confluence_mirror -and $config.confluence_space_key -and $config.confluence_parent_id -and $organiser -ne "carolynn@empoweringtech.com") {
                     $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
-                    $pageTitle = "Executive Summary - $subject ($mId)"
+                    # Tweak: Use only MeetingId as the Confluence Page Title
+                    $pageTitle = $mId
                     $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $pageTitle -SpaceKey $config.confluence_space_key -ParentPageId $config.confluence_parent_id
                 }
             }
