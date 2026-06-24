@@ -994,6 +994,8 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     if ($confSpace -and $confParent) {
                         $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
                         $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
+                    } else {
+                        Write-Output "  [CONFLUENCE] Skip: Missing Space Key ($confSpace) or Parent ID ($confParent)."
                     }
                 }
             }
