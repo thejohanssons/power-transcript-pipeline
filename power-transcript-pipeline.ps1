@@ -306,7 +306,7 @@ function Enrich-Summary {
         $finalSummary += "CONTENT:`n" + $rec.Content.Trim() + "`n`n"
     }
 
-    return @{ Summary = $finalSummary; Records = $topicRecords }
+    return @{ Summary = $finalSummary; Records = $topicRecords; Trends = $trends }
 }
 
 function Get-StalledWork {
@@ -417,79 +417,53 @@ function Get-MeetingClassification {
 # --- CONFLUENCE UTILITIES ---
 
 function Convert-SummaryToConfluenceHtml {
-    param($SummaryText, $Subject, $MeetingId, $EventDate, $Organiser)
+    param($TopicRecords, $Trends, $Subject, $MeetingId, $EventDate, $Organiser)
 
     # 1. Start HTML
     $html = "<h1>$Subject</h1>"
     $html += "<p><strong>Meeting ID:</strong> $MeetingId | <strong>Date:</strong> $EventDate | <strong>Organiser:</strong> $Organiser</p>"
     $html += "<hr />"
 
-    # 2. Parse Topics
-    $topicSections = [regex]::Split($SummaryText, "(?m)^## Topic: ")
-    foreach ($section in $topicSections) {
-        if (-not $section.Trim() -or $section -match "^---") { continue }
-        
-        $lines = $section -split "`n"
-        $title = $lines[0].Trim()
-        
-        $domain = "N/A"; if ($section -match "DOMAIN:\s+(.*)") { $domain = $matches[1].Trim() }
-        $signal = "Neutral"; if ($section -match "SIGNAL:\s+(.*)") { $signal = $matches[1].Trim() }
-        $trajectory = "Stable"; if ($section -match "TRAJECTORY:\s+(.*)") { $trajectory = $matches[1].Trim() }
-        
-        # Map Signal to Confluence Lozenge Color
-        $lozengeColor = switch ($signal) {
+    # 2. Topic Sections
+    foreach ($rec in $TopicRecords) {
+        $lozengeColor = switch ($rec.Signal) {
             "Positive" { "green" }
             "Negative" { "red" }
             "Mixed"    { "yellow" }
             default    { "neutral" }
         }
 
-        $html += "<h2>$title</h2>"
-        $html += "<p><span data-type='status' data-color='$lozengeColor'>$signal</span> | <span style='color: #4c9aff'>$domain</span> | <em>$trajectory</em></p>"
+        $html += "<h2>$($rec.DisplayLabel)</h2>"
+        $html += "<p><span data-type='status' data-color='$lozengeColor'>$($rec.Signal)</span> | <span style='color: #4c9aff'>$($rec.Domain)</span> | <em>$($rec.Trajectory)</em></p>"
         
-        # Extract Content Bullets
-        if ($section -match "(?s)Content:\n(.*?)(?=\n##|$)") {
-            $bullets = $matches[1].Trim()
-            $html += "<ul>"
-            foreach ($b in ($bullets -split "`n")) {
-                $cleanB = $b -replace "^\s*-\s+", ""
-                if ($cleanB.Trim()) {
-                    $html += "<li>$cleanB</li>"
-                }
+        # Convert bullets to HTML list
+        $html += "<ul>"
+        foreach ($line in ($rec.Content -split "`n")) {
+            $cleanLine = $line -replace "^\s*-\s+", ""
+            if ($cleanLine.Trim()) {
+                $html += "<li>$($cleanLine.Trim())</li>"
             }
-            $html += "</ul>"
         }
+        $html += "</ul>"
     }
 
-    # 3. Parse Trends
-    if ($SummaryText -match "(?s)## TOPIC TRENDS & PERSISTENCE\n(.*?)(?=\n##|$)") {
-        $trends = $matches[1].Trim()
+    # 3. Trends Section
+    if ($Trends -and $Trends.Count -gt 0) {
         $html += "<div data-type='panel-info'><p><strong>Executive Trends & Persistence</strong></p><ul>"
-        foreach ($t in ($trends -split "`n")) {
-            if ($t.Trim()) {
-                $html += "<li>$($t.Trim().TrimStart('- '))</li>"
-            }
+        foreach ($t in $Trends) {
+            $status = if ($t.IsStalled) { "Stalled" } else { $t.TrendType }
+            $html += "<li>$($t.TopicName): $status (Last seen: $($t.LastSeen))</li>"
         }
         $html += "</ul></div>"
     }
 
-    # 4. Parse Internal Records Table
-    if ($SummaryText -match "(?s)## Topic Records \(Internal\)\n\n(.*?)$") {
-        $recordsBlock = $matches[1].Trim()
+    # 4. Internal Records Table
+    if ($TopicRecords -and $TopicRecords.Count -gt 0) {
         $html += "<h2>Internal Topic Records</h2>"
         $html += "<table><thead><tr><th>Topic ID</th><th>Signal</th><th>Trajectory</th><th>Content Preview</th></tr></thead><tbody>"
-        
-        $records = [regex]::Split($recordsBlock, "(?m)^\[Record: ")
-        foreach ($rec in $records) {
-            if (-not $rec.Trim()) { continue }
-            $tid = "N/A"; if ($rec -match "TOPIC_ID:\s+(.*)") { $tid = $matches[1].Trim() }
-            $rsig = "N/A"; if ($rec -match "SIGNAL:\s+(.*)") { $rsig = $matches[1].Trim() }
-            $rtraj = "N/A"; if ($rec -match "TRAJECTORY:\s+(.*)") { $rtraj = $matches[1].Trim() }
-            
-            $contentMatch = "N/A"; if ($rec -match "(?s)CONTENT:\n(.*)") { $contentMatch = $matches[1].Trim() }
-            $preview = if ($contentMatch.Length -gt 50) { $contentMatch.Substring(0, 50) + "..." } else { $contentMatch }
-            
-            $html += "<tr><td>$tid</td><td>$rsig</td><td>$rtraj</td><td>$preview</td></tr>"
+        foreach ($rec in $TopicRecords) {
+            $preview = if ($rec.Content.Length -gt 50) { $rec.Content.Substring(0, 50) + "..." } else { $rec.Content }
+            $html += "<tr><td>$($rec.TopicId)</td><td>$($rec.Signal)</td><td>$($rec.Trajectory)</td><td>$($preview.Trim())</td></tr>"
         }
         $html += "</tbody></table>"
     }
@@ -500,7 +474,7 @@ function Convert-SummaryToConfluenceHtml {
 function Publish-SummaryToConfluence {
     param($HtmlContent, $Title, $SpaceKey, $ParentPageId)
 
-    Write-Output "  [CONFLUENCE] Attempting to mirror summary: $Title"
+    Write-Host "  [CONFLUENCE] Attempting to mirror summary: $Title"
 
     $config = $null; if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json }
 
@@ -527,7 +501,7 @@ function Publish-SummaryToConfluence {
         $targetPage = $null
         try {
             $targetPage = Invoke-RestMethod -Uri "$baseUrl/api/v2/pages" -Headers $headers -Method Post -Body $body
-            Write-Output "  [CONFLUENCE] Created new page: $($targetPage.id)"
+            Write-Host "  [CONFLUENCE] Created new page: $($targetPage.id)"
         }
         catch {
             if ($_.Exception.Message -match "400" -or $_.Exception.Message -match "Already exists") {
@@ -536,7 +510,7 @@ function Publish-SummaryToConfluence {
                 if ($existing) {
                     $updateBody = @{ id = $existing.id; status = "current"; title = $Title; spaceId = $spaceId; version = @{ number = $existing.version.number + 1 }; body = @{ representation = "storage"; value = $HtmlContent } } | ConvertTo-Json -Depth 10
                     $targetPage = Invoke-RestMethod -Uri "$baseUrl/api/v2/pages/$($existing.id)" -Headers $headers -Method Put -Body $updateBody
-                    Write-Output "  [CONFLUENCE] Updated page to v$($targetPage.version.number)"
+                    Write-Host "  [CONFLUENCE] Updated page to v$($targetPage.version.number)"
                 }
             } else { throw $_.Exception }
         }
@@ -992,7 +966,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $config.confluence_parent_id }
                     
                     if ($confSpace -and $confParent) {
-                        $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
+                        $confHtml = Convert-SummaryToConfluenceHtml -TopicRecords $enrichResult.Records -Trends $enrichResult.Trends -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
                         $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
                     } else {
                         Write-Output "  [CONFLUENCE] Skip: Missing Space Key ($confSpace) or Parent ID ($confParent)."
@@ -1223,6 +1197,33 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
 
 $txtContent | Out-File -FilePath $masterLogTxtLocalPath -Encoding utf8
 Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogTxtLocalPath | Out-Null
+
+# --- BATCH TEAMS NOTIFICATION ---
+if ($log -and $log.Count -gt 0) {
+    Write-Host "Sending batch Teams notification..."
+    $batchMsg = ""
+    foreach ($entry in $log) {
+        $hasTranscript = if ($entry.File) { "True" } else { "False" }
+        
+        $batchMsg += "MEETING ID: $($entry.MeetingId)`n"
+        $batchMsg += "SUBJECT: $($entry.Subject)`n"
+        $batchMsg += "ORGANISER: $($entry.Organiser)`n"
+        $batchMsg += "EVENT DATE: $($entry.EventDate)`n"
+        $batchMsg += "TYPE: $($entry.Type)`n"
+        $batchMsg += "PRIORITY: $($entry.Priority)`n"
+        $batchMsg += "MODE: $($entry.Classification)`n"
+        $batchMsg += "MODE_CONFIDENCE: $($entry.ClassificationConfidence)`n"
+        $batchMsg += "MODE_SOURCE: $($entry.ClassificationSource)`n"
+        $batchMsg += "STATUS: $($entry.Status)`n"
+        $batchMsg += "AGENT STATE: $($entry.AgentState)`n"
+        $batchMsg += "HAS TRANSCRIPT: $hasTranscript`n"
+        $batchMsg += "TRANSCRIPT FILE: $($entry.File)`n"
+        $batchMsg += "SUMMARY FILE: $($entry.SummaryFile)`n"
+        if ($entry.ConfluenceMirror) { $batchMsg += "CONFLUENCE MIRROR: $($entry.ConfluenceMirror)`n" }
+        $batchMsg += "LAST UPDATED: $($entry.LastProcessed)`n`n"
+    }
+    Send-TeamsNotification -MessageBlock $batchMsg.Trim()
+}
 
 Write-Host "Master Log (.json and .txt) updated and uploaded ✅"
 
