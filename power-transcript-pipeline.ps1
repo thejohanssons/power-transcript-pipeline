@@ -502,12 +502,14 @@ function Publish-SummaryToConfluence {
 
     Write-Output "  [CONFLUENCE] Attempting to mirror summary: $Title"
 
-    $user = $env:CONFLUENCE_USER
-    $token = $env:CONFLUENCE_TOKEN
-    $baseUrl = $env:CONFLUENCE_BASE_URL 
+    $config = $null; if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json }
+
+    $user = if ($env:CONFLUENCE_USER) { $env:CONFLUENCE_USER } else { $config.confluence_user }
+    $token = if ($env:CONFLUENCE_TOKEN) { $env:CONFLUENCE_TOKEN } else { $config.confluence_token }
+    $baseUrl = if ($env:CONFLUENCE_BASE_URL) { $env:CONFLUENCE_BASE_URL } else { $config.confluence_base_url }
     
     if (-not $user -or -not $token -or -not $baseUrl) {
-        Write-Warning "  [CONFLUENCE] Skipping: Missing CONFLUENCE credentials."
+        Write-Warning "  [CONFLUENCE] Skipping: Missing CONFLUENCE credentials in environment or config."
         return $null
     }
 
@@ -551,11 +553,16 @@ function Publish-SummaryToConfluence {
 function Send-TeamsNotification {
     param($MessageBlock)
 
-    $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
-    $webhookUrl = $config.teams_webhook_url
+    $webhookUrl = $env:TEAMS_WEBHOOK_URL
+    if (-not $webhookUrl) {
+        if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) {
+            $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
+            $webhookUrl = $config.teams_webhook_url
+        }
+    }
     
     if (-not $webhookUrl) { 
-        Write-Output "  [TEAMS] Skip: No teams_webhook_url defined in pipeline_config.json."
+        Write-Output "  [TEAMS] Skip: No teams_webhook_url defined in environment or config."
         return 
     }
 
