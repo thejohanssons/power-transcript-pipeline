@@ -1044,10 +1044,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         $mirrorLine +
                         "LAST UPDATED: $($logEntry.LastProcessed)"
             
-            $hasTeamsWebhook = ($env:TEAMS_WEBHOOK_URL -or ($config -and $config.teams_webhook_url))
-            if ($hasTeamsWebhook) {
-                Send-TeamsNotification -MessageBlock $teamsMsg
-            }
+            # Teams notification is now batched at the end of the run
 
             # Update SharePoint Columns for both files (Transcript and Summary)
             $filesToUpdate = New-Object System.Collections.Generic.List[Object]
