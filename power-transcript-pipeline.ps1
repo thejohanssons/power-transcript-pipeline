@@ -354,6 +354,7 @@ function Get-MeetingClassification {
                     @{ role = "user"; content = "Transcript to analyze:`n`n$transcriptContent" }
                 )
                 temperature = 0
+                max_completion_tokens = 4000
             } | ConvertTo-Json -Depth 10
             
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
