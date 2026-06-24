@@ -974,13 +974,20 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
 
                 # --- CONFLUENCE MIRRORING ---
-                $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
+                $config = $null; if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json }
+                
                 $confluenceUrl = $null
-                if ($config.enable_confluence_mirror -and $config.confluence_space_key -and $config.confluence_parent_id -and $organiser -ne "carolynn@empoweringtech.com") {
-                    $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
-                    # Tweak: Use only MeetingId as the Confluence Page Title
-                    $pageTitle = $mId
-                    $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $pageTitle -SpaceKey $config.confluence_space_key -ParentPageId $config.confluence_parent_id
+                $hasConfluenceCreds = ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
+                $isMirrorEnabled = ($config -and $config.enable_confluence_mirror) -or $hasConfluenceCreds
+                
+                if ($isMirrorEnabled -and $organiser -ne "carolynn@empoweringtech.com") {
+                    $confSpace = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $config.confluence_space_key }
+                    $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $config.confluence_parent_id }
+                    
+                    if ($confSpace -and $confParent) {
+                        $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
+                        $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
+                    }
                 }
             }
             
@@ -1028,7 +1035,10 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         $mirrorLine +
                         "LAST UPDATED: $($logEntry.LastProcessed)"
             
-            Send-TeamsNotification -MessageBlock $teamsMsg
+            $hasTeamsWebhook = ($env:TEAMS_WEBHOOK_URL -or ($config -and $config.teams_webhook_url))
+            if ($hasTeamsWebhook) {
+                Send-TeamsNotification -MessageBlock $teamsMsg
+            }
 
             # Update SharePoint Columns for both files (Transcript and Summary)
             $filesToUpdate = New-Object System.Collections.Generic.List[Object]
