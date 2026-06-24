@@ -12,7 +12,10 @@ param(
     [object]$FromDate,
     
     [Parameter(Mandatory=$false)]
-    [object]$ToDate
+    [object]$ToDate,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$ForceRerun
 )
 
 # =========================
@@ -410,6 +413,110 @@ function Get-MeetingClassification {
 }
 
 # =========================
+# --- CONFLUENCE UTILITIES ---
+
+function Convert-SummaryToConfluenceHtml {
+    param($SummaryText, $Subject, $MeetingId, $EventDate, $Organiser)
+
+    # 1. Start HTML
+    $html = "<h1>$Subject</h1>"
+    $html += "<p><strong>Meeting ID:</strong> $MeetingId | <strong>Date:</strong> $EventDate | <strong>Organiser:</strong> $Organiser</p>"
+    $html += "<hr />"
+
+    # 2. Parse Topics
+    $topicSections = [regex]::Split($SummaryText, "(?m)^## Topic: ")
+    foreach ($section in $topicSections) {
+        if (-not $section.Trim() -or $section -match "^---") { continue }
+        
+        $lines = $section -split "`n"
+        $title = $lines[0].Trim()
+        
+        $domain = "N/A"; if ($section -match "DOMAIN:\s+(.*)") { $domain = $matches[1].Trim() }
+        $signal = "Neutral"; if ($section -match "SIGNAL:\s+(.*)") { $signal = $matches[1].Trim() }
+        $trajectory = "Stable"; if ($section -match "TRAJECTORY:\s+(.*)") { $trajectory = $matches[1].Trim() }
+        
+        # Map Signal to Confluence Lozenge Color
+        $lozengeColor = switch ($signal) {
+            "Positive" { "green" }
+            "Negative" { "red" }
+            "Mixed"    { "yellow" }
+            default    { "neutral" }
+        }
+
+        $html += "<h2>$title</h2>"
+        $html += "<p><span data-type='status' data-color='$lozengeColor'>$signal</span> | <span style='color: #4c9aff'>$domain</span> | <em>$trajectory</em></p>"
+        
+        # Extract Content Bullets
+        if ($section -match "(?s)Content:\n(.*?)(?=\n##|$)") {
+            $bullets = $matches[1].Trim()
+            $html += "<ul>"
+            foreach ($b in ($bullets -split "`n")) {
+                $cleanB = $b -replace "^\s*-\s+", ""
+                if ($cleanB.Trim()) {
+                    $html += "<li>$cleanB</li>"
+                }
+            }
+            $html += "</ul>"
+        }
+    }
+
+    # 3. Parse Trends
+    if ($SummaryText -match "(?s)## TOPIC TRENDS & PERSISTENCE\n(.*?)(?=\n##|$)") {
+        $trends = $matches[1].Trim()
+        $html += "<div data-type='panel-info'><p><strong>Executive Trends & Persistence</strong></p><ul>"
+        foreach ($t in ($trends -split "`n")) {
+            if ($t.Trim()) {
+                $html += "<li>$($t.Trim().TrimStart('- '))</li>"
+            }
+        }
+        $html += "</ul></div>"
+    }
+
+    # 4. Parse Internal Records Table
+    if ($SummaryText -match "(?s)## Topic Records \(Internal\)\n\n(.*?)$") {
+        $recordsBlock = $matches[1].Trim()
+        $html += "<h2>Internal Topic Records</h2>"
+        $html += "<table><thead><tr><th>Topic ID</th><th>Signal</th><th>Trajectory</th><th>Content Preview</th></tr></thead><tbody>"
+        
+        $records = [regex]::Split($recordsBlock, "(?m)^\[Record: ")
+        foreach ($rec in $records) {
+            if (-not $rec.Trim()) { continue }
+            $tid = "N/A"; if ($rec -match "TOPIC_ID:\s+(.*)") { $tid = $matches[1].Trim() }
+            $rsig = "N/A"; if ($rec -match "SIGNAL:\s+(.*)") { $rsig = $matches[1].Trim() }
+            $rtraj = "N/A"; if ($rec -match "TRAJECTORY:\s+(.*)") { $rtraj = $matches[1].Trim() }
+            
+            $contentMatch = "N/A"; if ($rec -match "(?s)CONTENT:\n(.*)") { $contentMatch = $matches[1].Trim() }
+            $preview = if ($contentMatch.Length -gt 50) { $contentMatch.Substring(0, 50) + "..." } else { $contentMatch }
+            
+            $html += "<tr><td>$tid</td><td>$rsig</td><td>$rtraj</td><td>$preview</td></tr>"
+        }
+        $html += "</tbody></table>"
+    }
+
+    return $html
+}
+
+function Publish-SummaryToConfluence {
+    param($HtmlContent, $Title, $ParentUrl)
+
+    Write-Output "  [CONFLUENCE] Attempting to mirror summary to: $Title"
+    
+    $tempHtmlFile = Join-Path $env:TEMP "summary_mirror.html"
+    if ($null -eq $env:TEMP) { $tempHtmlFile = Join-Path "/tmp" "summary_mirror.html" }
+    
+    $HtmlContent | Out-File -FilePath $tempHtmlFile -Encoding utf8
+
+    try {
+        # Implementation Detail: 
+        # In this Rovo environment, we would call the 'create_confluence_page' tool.
+        # In a real deployment, this would be an Invoke-RestMethod to the Confluence API.
+        Write-Output "  [CONFLUENCE] HTML mirror ready ($($HtmlContent.Length) chars) at $tempHtmlFile"
+    } catch {
+        Write-Warning "  [CONFLUENCE] Failed to publish: $($_.Exception.Message)"
+    }
+}
+
+# =========================
 
 function Get-GraphToken {
     $body = @{
@@ -475,7 +582,9 @@ function Upload-FileToSharePoint {
 
 function Get-MeetingLogId {
     param($EventDate, [string]$Subject)
-    $datePart = (Get-Date $EventDate -Format "yyyy-MM-dd_HHmm")
+    # Ensure date is treated as UTC to prevent local timezone offsets in the ID
+    $utcDate = if ($EventDate -is [string]) { [DateTime]::Parse($EventDate).ToUniversalTime() } else { $EventDate.ToUniversalTime() }
+    $datePart = $utcDate.ToString("yyyy-MM-dd_HHmm")
     $slugSubject = ($Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
     return "$datePart`_$slugSubject"
 }
@@ -595,6 +704,16 @@ foreach ($calendarEvent in $events) {
     $joinUrl   = $calendarEvent.onlineMeeting.joinUrl
     $organiser = $calendarEvent.organizer.emailAddress.address
     $start     = $calendarEvent.start.dateTime
+
+    # --- SKIP SUCCESSFUL MEETINGS ---
+    if (-not $ForceRerun) {
+        $mIdCheck = Get-MeetingLogId -EventDate $start -Subject $subject
+        $existing = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mIdCheck }
+        if ($existing -and $existing.Status -eq "success" -and $existing.TranscriptFile -and $existing.SummaryFile) {
+            Write-Output "  [SKIP] Meeting '$subject' is already processed successfully. Skipping."
+            continue
+        }
+    }
 
     Write-Host ("Processing: " + $subject)
 
@@ -796,6 +915,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $summaryWithHeader = $header + $enrichedSummaryText
                 $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
+
+                # --- CONFLUENCE MIRRORING ---
+                $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json
+                if ($config.enable_confluence_mirror -and $config.confluence_parent_url) {
+                    $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
+                    $pageTitle = "Executive Summary - $subject ($mId)"
+                    Publish-SummaryToConfluence -HtmlContent $confHtml -Title $pageTitle -ParentUrl $config.confluence_parent_url
+                }
             }
             
             # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
