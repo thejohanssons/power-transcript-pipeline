@@ -419,12 +419,17 @@ function Get-MeetingClassification {
 function Convert-SummaryToConfluenceHtml {
     param($TopicRecords, $Trends, $Subject, $MeetingId, $EventDate, $Organiser)
 
-    # 1. Start HTML
+    # 1. Header Metadata
     $html = "<h1>$Subject</h1>"
-    $html += "<p><strong>Meeting ID:</strong> $MeetingId | <strong>Date:</strong> $EventDate | <strong>Organiser:</strong> $Organiser</p>"
+    $html += "<p><strong>MEETING ID:</strong> $MeetingId<br />"
+    $html += "<strong>SUBJECT:</strong> $Subject<br />"
+    $html += "<strong>ORGANISER:</strong> $Organiser<br />"
+    $html += "<strong>EVENT DATE:</strong> $EventDate</p>"
     $html += "<hr />"
 
-    # 2. Topic Sections
+    # 2. Section 1: Topics / Context
+    $html += "<h1>1. Topics / Context</h1>"
+
     foreach ($rec in $TopicRecords) {
         $lozengeColor = switch ($rec.Signal) {
             "Positive" { "green" }
@@ -433,10 +438,15 @@ function Convert-SummaryToConfluenceHtml {
             default    { "neutral" }
         }
 
+        # Mirroring the .txt structure exactly
         $html += "<h2>$($rec.DisplayLabel)</h2>"
-        $html += "<p><span data-type='status' data-color='$lozengeColor'>$($rec.Signal)</span> | <span style='color: #4c9aff'>$($rec.Domain)</span> | <em>$($rec.Trajectory)</em></p>"
+        $html += "<p><strong>DOMAIN:</strong> $($rec.Domain)<br />"
+        $html += "<strong>TOPIC_ID:</strong> $($rec.TopicId)<br />"
+        $html += "<strong>CANONICAL_TOPIC:</strong> $($rec.TopicName)<br />" # Using TopicName as canonical
+        $html += "<strong>SIGNAL:</strong> <span data-type='status' data-color='$lozengeColor'>$($rec.Signal)</span><br />"
+        $html += "<strong>TRAJECTORY:</strong> $($rec.Trajectory)</p>"
         
-        # Convert bullets to HTML list
+        $html += "<p><strong>Content:</strong></p>"
         $html += "<ul>"
         foreach ($line in ($rec.Content -split "`n")) {
             $cleanLine = $line -replace "^\s*-\s+", ""
@@ -447,25 +457,32 @@ function Convert-SummaryToConfluenceHtml {
         $html += "</ul>"
     }
 
-    # 3. Trends Section
+    # 3. Section 2: TOPIC TRENDS & PERSISTENCE
     if ($Trends -and $Trends.Count -gt 0) {
-        $html += "<div data-type='panel-info'><p><strong>Executive Trends & Persistence</strong></p><ul>"
+        $html += "<h1>2. TOPIC TRENDS & PERSISTENCE</h1>"
+        $html += "<ul>"
         foreach ($t in $Trends) {
             $status = if ($t.IsStalled) { "Stalled" } else { $t.TrendType }
             $html += "<li>$($t.TopicName): $status (Last seen: $($t.LastSeen))</li>"
         }
-        $html += "</ul></div>"
+        $html += "</ul>"
     }
 
-    # 4. Internal Records Table
+    # 4. Section 3: Topic Records (Internal)
     if ($TopicRecords -and $TopicRecords.Count -gt 0) {
-        $html += "<h2>Internal Topic Records</h2>"
-        $html += "<table><thead><tr><th>Topic ID</th><th>Signal</th><th>Trajectory</th><th>Content Preview</th></tr></thead><tbody>"
+        $html += "<h1>3. Topic Records (Internal)</h1>"
         foreach ($rec in $TopicRecords) {
-            $preview = if ($rec.Content.Length -gt 50) { $rec.Content.Substring(0, 50) + "..." } else { $rec.Content }
-            $html += "<tr><td>$($rec.TopicId)</td><td>$($rec.Signal)</td><td>$($rec.Trajectory)</td><td>$($preview.Trim())</td></tr>"
+            $html += "<p><strong>[Record: $($rec.RecordId)]</strong><br />"
+            $html += "<strong>DOMAIN:</strong> $($rec.Domain)<br />"
+            $html += "<strong>TOPIC_ID:</strong> $($rec.TopicId)<br />"
+            $html += "<strong>CANONICAL_TOPIC:</strong> $($rec.TopicName)<br />"
+            $html += "<strong>DISPLAY_LABEL:</strong> $($rec.DisplayLabel)<br />"
+            $html += "<strong>SIGNAL:</strong> $($rec.Signal)<br />"
+            $html += "<strong>TRAJECTORY:</strong> $($rec.Trajectory)<br />"
+            $html += "<strong>CONTENT:</strong><br />"
+            $html += "$($rec.Content.Trim())</p>"
+            $html += "<hr />"
         }
-        $html += "</tbody></table>"
     }
 
     return $html
