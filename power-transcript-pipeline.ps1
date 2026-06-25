@@ -357,9 +357,11 @@ function Get-MeetingClassification {
                 max_completion_tokens = 4000
             } | ConvertTo-Json -Depth 10
             
+            $keySource = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
             
             # Use Bearer token for Forge-based endpoints
+            $authMode = "Bearer"
             $headers = @{ 
                 "Authorization" = "Bearer $llmKey" 
                 "Content-Type" = "application/json"
@@ -373,6 +375,11 @@ function Get-MeetingClassification {
             } else {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             }
+
+            Write-Host "  [LLM DIAG] Endpoint: $fullUri"
+            Write-Host "  [LLM DIAG] Model: $($rules.LLMConfig.Model)"
+            Write-Host "  [LLM DIAG] Key source: $keySource"
+            Write-Host "  [LLM DIAG] Auth mode: $authMode"
             
             $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody
             
@@ -417,72 +424,87 @@ function Get-MeetingClassification {
 # --- CONFLUENCE UTILITIES ---
 
 function Convert-SummaryToConfluenceHtml {
-    param($TopicRecords, $Trends, $Subject, $MeetingId, $EventDate, $Organiser)
+    param($SummaryText, $Subject, $MeetingId, $EventDate, $Organiser)
 
-    # 1. Header Metadata
-    $html = "<h1>$Subject</h1>"
-    $html += "<p><strong>MEETING ID:</strong> $MeetingId<br />"
-    $html += "<strong>SUBJECT:</strong> $Subject<br />"
-    $html += "<strong>ORGANISER:</strong> $Organiser<br />"
-    $html += "<strong>EVENT DATE:</strong> $EventDate</p>"
-    $html += "<hr />"
+    $html = ""
+    $lines = $SummaryText -split "`n"
 
-    # 2. Section 1: Topics / Context
-    $html += "<h1>1. Topics / Context</h1>"
-
-    foreach ($rec in $TopicRecords) {
-        $lozengeColor = switch ($rec.Signal) {
-            "Positive" { "green" }
-            "Negative" { "red" }
-            "Mixed"    { "yellow" }
-            default    { "neutral" }
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed) {
+            $html += "<br />"
+            continue
         }
 
-        # Mirroring the .txt structure exactly
-        $html += "<h2>$($rec.DisplayLabel)</h2>"
-        $html += "<p><strong>DOMAIN:</strong> $($rec.Domain)<br />"
-        $html += "<strong>TOPIC_ID:</strong> $($rec.TopicId)<br />"
-        $html += "<strong>CANONICAL_TOPIC:</strong> $($rec.TopicName)<br />" # Using TopicName as canonical
-        $html += "<strong>SIGNAL:</strong> <span data-type='status' data-color='$lozengeColor'>$($rec.Signal)</span><br />"
-        $html += "<strong>TRAJECTORY:</strong> $($rec.Trajectory)</p>"
-        
-        $html += "<p><strong>Content:</strong></p>"
-        $html += "<ul>"
-        foreach ($line in ($rec.Content -split "`n")) {
-            $cleanLine = $line -replace "^\s*-\s+", ""
-            if ($cleanLine.Trim()) {
-                $html += "<li>$($cleanLine.Trim())</li>"
+        # H2: numbered main sections like 1. Topics / Context, 2. Signals, ... 9. Trend / Trajectory
+        if ($trimmed -match '^\d+\.\s+.*') {
+            $html += "<h2>$trimmed</h2>"
+            continue
+        }
+
+        # H3: topic headings
+        if ($trimmed -match '^## Topic: (.*)') {
+            $html += "<h3>Topic: $($matches[1])</h3>"
+            continue
+        }
+
+        # H3: subsection labels inside executive sections
+        if ($trimmed -match '^(Positive|Negative|Unknowns|Decision|Rationale|Action|Owner|Deadline|Product|Delivery|Quality|Overall direction|Justification|Gaps / inconsistencies|Known risks|Emerging concerns):') {
+            $html += "<h3>$trimmed</h3>"
+            continue
+        }
+
+        # SIGNAL with lozenge, but same paragraph metadata style
+        if ($trimmed -match '^SIGNAL: (.*)') {
+            $val = $matches[1].Trim()
+            $color = switch ($val) {
+                'Positive' { 'green' }
+                'Negative' { 'red' }
+                'Mixed'    { 'yellow' }
+                default    { 'neutral' }
             }
+            $html += "<p><strong>SIGNAL:</strong> <span data-type='status' data-color='$color'>$val</span></p>"
+            continue
         }
-        $html += "</ul>"
-    }
 
-    # 3. Section 2: TOPIC TRENDS & PERSISTENCE
-    if ($Trends -and $Trends.Count -gt 0) {
-        $html += "<h1>2. TOPIC TRENDS & PERSISTENCE</h1>"
-        $html += "<ul>"
-        foreach ($t in $Trends) {
-            $status = if ($t.IsStalled) { "Stalled" } else { $t.TrendType }
-            $html += "<li>$($t.TopicName): $status (Last seen: $($t.LastSeen))</li>"
+        # Metadata lines
+        if ($trimmed -match '^(DOMAIN|TOPIC_ID|CANONICAL_TOPIC|TRAJECTORY|DISPLAY_LABEL|MEETING ID|SUBJECT|ORGANISER|EVENT DATE|TYPE|PRIORITY|MODE|MODE_SOURCE|MODE_CONFIDENCE|PIPELINE_VERSION|TAXONOMY_VERSION|MAPPING_RULES_VERSION|ROLES_CONFIG_VERSION|SENTIMENT_RULES_VERSION|PROCESSING_TIMESTAMP|STATUS|BACK-LINK \(MASTER LOG\)): (.*)') {
+            $html += "<p><strong>$($matches[1]):</strong> $($matches[2])</p>"
+            continue
         }
-        $html += "</ul>"
-    }
 
-    # 4. Section 3: Topic Records (Internal)
-    if ($TopicRecords -and $TopicRecords.Count -gt 0) {
-        $html += "<h1>3. Topic Records (Internal)</h1>"
-        foreach ($rec in $TopicRecords) {
-            $html += "<p><strong>[Record: $($rec.RecordId)]</strong><br />"
-            $html += "<strong>DOMAIN:</strong> $($rec.Domain)<br />"
-            $html += "<strong>TOPIC_ID:</strong> $($rec.TopicId)<br />"
-            $html += "<strong>CANONICAL_TOPIC:</strong> $($rec.TopicName)<br />"
-            $html += "<strong>DISPLAY_LABEL:</strong> $($rec.DisplayLabel)<br />"
-            $html += "<strong>SIGNAL:</strong> $($rec.Signal)<br />"
-            $html += "<strong>TRAJECTORY:</strong> $($rec.Trajectory)<br />"
-            $html += "<strong>CONTENT:</strong><br />"
-            $html += "$($rec.Content.Trim())</p>"
-            $html += "<hr />"
+        # Content label
+        if ($trimmed -eq 'Content:') {
+            $html += "<h3>Content:</h3>"
+            continue
         }
+
+        # Topic records section header must be H1
+        if ($trimmed -match '^## Topic Records \(Internal\)') {
+            $html += "<h1>## Topic Records (Internal)</h1>"
+            continue
+        }
+
+        # Individual record block
+        if ($trimmed -match '^\[Record: (.*)\]') {
+            $html += "<h3>[Record: $($matches[1])]</h3>"
+            continue
+        }
+
+        # CONTENT label in records block
+        if ($trimmed -eq 'CONTENT:') {
+            $html += "<h3>CONTENT:</h3>"
+            continue
+        }
+
+        # Bullet lines
+        if ($trimmed -match '^[-*]\s+(.*)') {
+            $html += "<ul><li>$($matches[1])</li></ul>"
+            continue
+        }
+
+        # Fallback plain paragraph
+        $html += "<p>$trimmed</p>"
     }
 
     return $html
@@ -983,7 +1005,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $config.confluence_parent_id }
                     
                     if ($confSpace -and $confParent) {
-                        $confHtml = Convert-SummaryToConfluenceHtml -TopicRecords $enrichResult.Records -Trends $enrichResult.Trends -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
+                        $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
                         $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
                     } else {
                         Write-Output "  [CONFLUENCE] Skip: Missing Space Key ($confSpace) or Parent ID ($confParent)."
