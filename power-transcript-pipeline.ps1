@@ -843,7 +843,19 @@ function Upload-FileToSharePoint {
     $fileName = [System.IO.Path]::GetFileName($FilePath)
     $uploadUri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$FolderId`:/$fileName`:/content"
     $bytes = [System.IO.File]::ReadAllBytes($FilePath)
-    return Invoke-RestMethod -Method Put -Uri $uploadUri -Headers $authHeader -Body $bytes -ContentType "application/octet-stream"
+    
+    $maxRetries = 3
+    $retryCount = 0
+    while ($retryCount -lt $maxRetries) {
+        try {
+            return Invoke-RestMethod -Method Put -Uri $uploadUri -Headers $authHeader -Body $bytes -ContentType "application/octet-stream"
+        } catch {
+            $retryCount++
+            if ($retryCount -eq $maxRetries) { throw $_ }
+            Write-Warning "  [UPLOAD] Failed (attempt $retryCount/$maxRetries). Retrying in 2s..."
+            Start-Sleep -Seconds 2
+        }
+    }
 }
 
 function Get-MeetingLogId {
