@@ -174,12 +174,126 @@ function Classify-Topic {
     }
 
     $topicInfo = $taxonomy.Topics.$bestMatch
-    return @{
-        TopicId   = $bestMatch
-        TopicName = $topicInfo.Name
-        Domain    = $topicInfo.Domain
-        Score     = $maxDensity
+
+    $contextHints = @()
+    $ruleMatch = $mappingRules.Rules | Where-Object { $_.TopicId -eq $bestMatch } | Select-Object -First 1
+    if ($ruleMatch -and $ruleMatch.PSObject.Properties.Name -contains 'CategoryHints' -and $ruleMatch.CategoryHints) {
+        $contextHints = @($ruleMatch.CategoryHints)
     }
+
+    return @{
+        TopicId        = $bestMatch
+        TopicName      = $topicInfo.Name
+        Domain         = if ($topicInfo.PSObject.Properties.Name -contains 'Domain') { $topicInfo.Domain } else { $null }
+        CategoryHints  = $contextHints
+        Score          = $maxDensity
+    }
+}
+
+function Select-Category {
+    param(
+        $CandidateCategories,
+        [string]$SectionName,
+        [string]$Signal,
+        [string]$Trajectory,
+        [string]$Label,
+        [string]$Content
+    )
+
+    if (-not $CandidateCategories -or $CandidateCategories.Count -eq 0) { return $null }
+    if ($CandidateCategories.Count -eq 1) { return $CandidateCategories[0] }
+
+    $scores = @{}
+    foreach ($c in $CandidateCategories) { $scores[$c] = 0 }
+
+    $section = ($SectionName | ForEach-Object { $_.ToLower() })
+    $labelText = "$Label`n$Content".ToLower()
+
+    # 1. Section location (primary signal)
+    switch -Regex ($section) {
+        '^signals$' {
+            if ($scores.ContainsKey('Opportunity')) { $scores['Opportunity'] += 2 }
+            if ($scores.ContainsKey('Problem'))     { $scores['Problem'] += 2 }
+            if ($scores.ContainsKey('Risk'))        { $scores['Risk'] += 2 }
+        }
+        '^decisions$' {
+            if ($scores.ContainsKey('Governance'))  { $scores['Governance'] += 5 }
+            if ($scores.ContainsKey('Strategy'))    { $scores['Strategy'] += 1 }
+            if ($scores.ContainsKey('Execution'))   { $scores['Execution'] -= 1 }
+        }
+        '^actions$' {
+            if ($scores.ContainsKey('Execution'))   { $scores['Execution'] += 4 }
+        }
+        '^next direction$' {
+            if ($scores.ContainsKey('Strategy'))    { $scores['Strategy'] += 5 }
+            if ($scores.ContainsKey('Execution'))   { $scores['Execution'] -= 1 }
+        }
+        '^risks / issues$' {
+            if ($scores.ContainsKey('Risk'))        { $scores['Risk'] += 4 }
+            if ($scores.ContainsKey('Problem'))     { $scores['Problem'] += 2 }
+        }
+        '^implications$' {
+            if ($scores.ContainsKey('Strategy'))    { $scores['Strategy'] += 2 }
+            if ($scores.ContainsKey('Risk'))        { $scores['Risk'] += 1 }
+        }
+        '^alignment$' {
+            if ($scores.ContainsKey('Governance'))  { $scores['Governance'] += 2 }
+            if ($scores.ContainsKey('Strategy'))    { $scores['Strategy'] += 2 }
+        }
+        '^trend / trajectory$' {
+            if ($scores.ContainsKey('Learning'))    { $scores['Learning'] += 2 }
+            if ($scores.ContainsKey('Strategy'))    { $scores['Strategy'] += 1 }
+        }
+    }
+
+    # 2. Signal / trajectory (secondary signal)
+    if ($Signal -eq 'Negative') {
+        if ($scores.ContainsKey('Problem')) { $scores['Problem'] += 2 }
+        if ($scores.ContainsKey('Risk'))    { $scores['Risk'] += 2 }
+    }
+    if ($Signal -eq 'Positive') {
+        if ($scores.ContainsKey('Opportunity')) { $scores['Opportunity'] += 2 }
+    }
+    if ($Trajectory -eq 'Improving') {
+        if ($scores.ContainsKey('Opportunity')) { $scores['Opportunity'] += 1 }
+        if ($scores.ContainsKey('Learning'))    { $scores['Learning'] += 1 }
+    }
+    if ($Trajectory -eq 'Declining') {
+        if ($scores.ContainsKey('Risk'))        { $scores['Risk'] += 1 }
+        if ($scores.ContainsKey('Problem'))     { $scores['Problem'] += 1 }
+    }
+
+    # 3. Wording cues (supporting signal)
+    if ($labelText -match 'blocked|delay|constraint|stalled|dependency|issue|problem|failure') {
+        if ($scores.ContainsKey('Risk'))    { $scores['Risk'] += 2 }
+        if ($scores.ContainsKey('Problem')) { $scores['Problem'] += 2 }
+    }
+    if ($labelText -match 'decision|approve|owner|governance|policy|compliance') {
+        if ($scores.ContainsKey('Governance')) { $scores['Governance'] += 2 }
+    }
+    if ($labelText -match 'deliver|execute|implement|regression|build|milestone|rollout') {
+        if ($scores.ContainsKey('Execution')) { $scores['Execution'] += 2 }
+    }
+    if ($labelText -match 'strategy|direction|priority|objective|alignment|positioning') {
+        if ($scores.ContainsKey('Strategy')) { $scores['Strategy'] += 2 }
+    }
+    if ($labelText -match 'feedback|insight|learn|confidence|unknown') {
+        if ($scores.ContainsKey('Learning')) { $scores['Learning'] += 2 }
+    }
+    if ($labelText -match 'growth|upside|opportunity|expansion|market fit|tam') {
+        if ($scores.ContainsKey('Opportunity')) { $scores['Opportunity'] += 2 }
+    }
+
+    # Choose highest-scoring candidate; first in candidate order wins ties
+    $best = $CandidateCategories[0]
+    $bestScore = $scores[$best]
+    foreach ($c in $CandidateCategories) {
+        if ($scores[$c] -gt $bestScore) {
+            $best = $c
+            $bestScore = $scores[$c]
+        }
+    }
+    return $best
 }
 
 function Enrich-Summary {
@@ -191,24 +305,44 @@ function Enrich-Summary {
     if ($sections.Count -le 1) { return @{ Summary = $summaryText; Records = @() } } 
 
     $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
+    $currentSection = $sectionNames[0]
     
     # --- PHASE 1 & 2: BLOCK-LEVEL PARSING ---
-    $topicSection = $sections[1]
-    
-    # Identify topic blocks using '### Topic: <name>'
-    $blocks = [regex]::Split($topicSection, '(?m)^### Topic:\s+')
+    # Parse all numbered sections and attach section context to any topic blocks found within them
+    $parsedBlocks = @()
+    for ($sectionIndex = 1; $sectionIndex -lt $sections.Count; $sectionIndex++) {
+        $sectionBody = $sections[$sectionIndex]
+        if (-not $sectionBody.Trim()) { continue }
+
+        $sectionName = if ($sectionIndex -le $sectionNames.Count) { $sectionNames[$sectionIndex - 1] } else { "Topics / Context" }
+
+        # Identify topic blocks using '### Topic: <name>' inside this section
+        $blocks = [regex]::Split($sectionBody, '(?m)^### Topic:\s+')
+        for ($idx = 0; $idx -lt $blocks.Count; $idx++) {
+            $block = $blocks[$idx]
+            if (-not $block.Trim() -or $idx -eq 0) { continue } # Skip noise before first '### Topic'
+
+            $lines = $block -split "`n"
+            $label = $lines[0].Trim()
+            $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match "^\s*-\s+" }) -join "`n"
+
+            if (-not $bullets.Trim()) { continue }
+
+            $parsedBlocks += [pscustomobject]@{
+                SectionName = $sectionName
+                Label       = $label
+                Bullets     = $bullets
+            }
+        }
+    }
+
     $newTopicSection = ""
     $topicRecordsMap = @{} # Task 3.1: Topic Merge Dictionary
 
-    for ($idx = 0; $idx -lt $blocks.Count; $idx++) {
-        $block = $blocks[$idx]
-        if (-not $block.Trim() -or $idx -eq 0) { continue } # Skip noise before first '### Topic'
-        
-        $lines = $block -split "`n"
-        $label = $lines[0].Trim()
-        $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match "^\s*-\s+" }) -join "`n"
-        
-        if (-not $bullets.Trim()) { continue }
+    foreach ($parsed in $parsedBlocks) {
+        $currentSection = $parsed.SectionName
+        $label = $parsed.Label
+        $bullets = $parsed.Bullets
 
         $cls = & "Classify-Topic" ($label + "`n" + $bullets)
         
@@ -236,6 +370,19 @@ function Enrich-Summary {
             $finalTrajectory = "Improving"
         }
 
+        $selectedCategory = Select-Category -CandidateCategories $cls.CategoryHints -SectionName $currentSection -Signal $finalSignal -Trajectory $finalTrajectory -Label $label -Content $bullets
+        $selectedContextType = switch -Regex ($currentSection) {
+            '^Signals$' { 'Status Update'; break }
+            '^Decisions$' { 'Decision'; break }
+            '^Actions$' { 'Action'; break }
+            '^Next Direction$' { 'Next Direction'; break }
+            '^Risks / Issues$' { if (($label + " `n " + $bullets) -match '(?i)risk') { 'Risk' } else { 'Issue' }; break }
+            '^Implications$' { 'Implication'; break }
+            '^Alignment$' { 'Alignment'; break }
+            '^Trend / Trajectory$' { 'Trend / Trajectory'; break }
+            default { 'Discussion' }
+        }
+
         if ($topicRecordsMap.ContainsKey($cls.TopicId)) {
             $topicRecordsMap[$cls.TopicId].Content += "`n" + $bullets
             # Propagate "Negative" or "Mixed" as highest priority for merged records
@@ -243,16 +390,22 @@ function Enrich-Summary {
                 $topicRecordsMap[$cls.TopicId].Signal = $finalSignal
                 $topicRecordsMap[$cls.TopicId].Trajectory = $finalTrajectory
             }
+            if (-not $topicRecordsMap[$cls.TopicId].ContextType -and $selectedContextType) {
+                $topicRecordsMap[$cls.TopicId].ContextType = $selectedContextType
+            }
         } else {
             $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
-                RecordId   = $meetingId + "_" + $cls.TopicId
-                Domain     = $cls.Domain
-                TopicId    = $cls.TopicId
-                TopicName  = $cls.TopicName # Refinement B: Canonical Name
-                DisplayLabel = $label        # Refinement B: Human-friendly Name
-                Content    = $bullets
-                Signal     = $finalSignal
-                Trajectory = $finalTrajectory
+                RecordId       = $meetingId + "_" + $cls.TopicId
+                CategoryHints  = $cls.CategoryHints
+                Category       = $selectedCategory
+                ContextType    = $selectedContextType
+                Domain         = $cls.Domain
+                TopicId       = $cls.TopicId
+                TopicName     = $cls.TopicName # Refinement B: Canonical Name
+                DisplayLabel  = $label         # Refinement B: Human-friendly Name
+                Content       = $bullets
+                Signal        = $finalSignal
+                Trajectory    = $finalTrajectory
             }
         }
     }
@@ -260,12 +413,15 @@ function Enrich-Summary {
     # Construct Section with Refinement A separators and Refinement B Naming
     foreach ($tid in ($topicRecordsMap.Keys | Sort-Object)) {
         $rec = $topicRecordsMap[$tid]
-        $newTopicSection += "## Topic: " + $rec.DisplayLabel + "`n`n"
-        $newTopicSection += "DOMAIN: " + $rec.Domain + "`n"
+        $newTopicSection += "### Topic: " + $rec.DisplayLabel + "`n"
+        $selectedCategoryText = if ($rec.Category) { $rec.Category } elseif ($rec.CategoryHints -and $rec.CategoryHints.Count -gt 0) { ($rec.CategoryHints -join ', ') } else { "" }
+        $selectedContextTypeText = if ($rec.ContextType) { $rec.ContextType } else { 'Discussion' }
+        $newTopicSection += "CATEGORY: " + $selectedCategoryText + "`n"
+        $newTopicSection += "CONTEXT_TYPE: " + $selectedContextTypeText + "`n"
         $newTopicSection += "TOPIC_ID: " + $rec.TopicId + "`n"
         $newTopicSection += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
         $newTopicSection += "SIGNAL: " + $rec.Signal + "`n"
-        $newTopicSection += "TRAJECTORY: " + $rec.Trajectory + "`n`n"
+        $newTopicSection += "TRAJECTORY: " + $rec.Trajectory + "`n"
         $newTopicSection += "Content:`n" + $rec.Content.Trim() + "`n`n"
     }
 
@@ -297,7 +453,10 @@ function Enrich-Summary {
     $finalSummary += "## Topic Records (Internal)`n`n"
     foreach ($rec in $topicRecords) {
         $finalSummary += "[Record: " + $rec.RecordId + "]`n"
-        $finalSummary += "DOMAIN: " + $rec.Domain + "`n"
+        $selectedCategoryText = if ($rec.Category) { $rec.Category } elseif ($rec.CategoryHints -and $rec.CategoryHints.Count -gt 0) { ($rec.CategoryHints -join ', ') } else { "" }
+        $selectedContextTypeText = if ($rec.ContextType) { $rec.ContextType } else { 'Discussion' }
+        $finalSummary += "CATEGORY: " + $selectedCategoryText + "`n"
+        $finalSummary += "CONTEXT_TYPE: " + $selectedContextTypeText + "`n"
         $finalSummary += "TOPIC_ID: " + $rec.TopicId + "`n"
         $finalSummary += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
         $finalSummary += "DISPLAY_LABEL: " + $rec.DisplayLabel + "`n"
@@ -339,6 +498,35 @@ function Get-StalledWork {
         }
     }
     return $results
+}
+
+function Recover-LLMResult {
+    param([string]$RawContent)
+
+    $result = @{
+        classification = $null
+        confidence     = $null
+        summary        = $null
+    }
+
+    if ($RawContent -match '"classification"\s*:\s*"([^"]+)"') {
+        $result.classification = $matches[1]
+    }
+
+    if ($RawContent -match '"confidence"\s*:\s*"([^"]+)"') {
+        $result.confidence = $matches[1]
+    }
+
+    if ($RawContent -match '(?s)"summary"\s*:\s*"(.*)"\s*\}?\s*$') {
+        $summary = $matches[1]
+        $summary = $summary -replace '\\n', "`n"
+        $summary = $summary -replace '\\"', '"'
+        $summary = $summary -replace '```json', ''
+        $summary = $summary -replace '```', ''
+        $result.summary = $summary.Trim()
+    }
+
+    return $result
 }
 
 function Get-MeetingClassification {
@@ -385,13 +573,28 @@ function Get-MeetingClassification {
             
             $rawContent = $response.choices[0].message.content
             $sanitizedContent = $rawContent -replace "(?s)^.*?\{", "{" -replace "\}.*?$", "}"
-            $resultJson = $sanitizedContent | ConvertFrom-Json
             
-            return @{ 
-                classification = $resultJson.classification; 
-                confidence     = $resultJson.confidence; 
-                summary        = $resultJson.summary;
-                source         = "llm" 
+            try {
+                $resultJson = $sanitizedContent | ConvertFrom-Json
+                return @{ 
+                    classification = $resultJson.classification; 
+                    confidence     = $resultJson.confidence; 
+                    summary        = $resultJson.summary;
+                    source         = "llm" 
+                }
+            }
+            catch {
+                $recovered = Recover-LLMResult -RawContent $rawContent
+                if ($recovered.summary) {
+                    Write-Warning "LLM Analysis returned malformed JSON; using recovered summary fallback."
+                    return @{
+                        classification = if ($recovered.classification) { $recovered.classification } else { "CEO" }
+                        confidence     = if ($recovered.confidence) { $recovered.confidence } else { "Low" }
+                        summary        = $recovered.summary
+                        source         = "llm_recovered"
+                    }
+                }
+                Write-Warning "LLM Analysis failed: $_"
             }
         } catch {
             Write-Warning "LLM Analysis failed: $_"
@@ -914,6 +1117,18 @@ foreach ($calendarEvent in $events) {
 
             # --- CLASSIFICATION & SUMMARY LOGIC ---
             $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
+            $repairReason = $null
+            $repairAttempted = $false
+
+            # Reliable repair: if summary is missing or unusable, retry once in the same run
+            if (-not $cls.summary) {
+                Write-Warning "  [REPAIR] Summary generation failed. Retrying once in same run..."
+                $repairAttempted = $true
+                $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
+                if (-not $cls.summary) {
+                    $repairReason = "llm_summary_missing_after_retry"
+                }
+            }
 
             # --- EIP ENHANCEMENT LAYER ---
             # Pre-extract history for Enrichment function
@@ -1014,20 +1229,25 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             }
             
             # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
+            $effectiveStatus = if ($uploadedTranscript -and -not $uploadedSummary) { "repair_needed" } else { "success" }
+            $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { "pending" }
+            $effectiveRetryCount = if ($repairAttempted) { 1 } else { 0 }
+
             $logEntry = [pscustomobject]@{
                 RunId                    = $runId
                 Subject                  = $subject
                 Organiser                = $organiser
                 EventDate                = $start
-                Status                   = "success"
+                Status                   = $effectiveStatus
                 Type                     = $meetingType
                 Priority                 = $priority
                 Classification           = $cls.classification
                 ClassificationConfidence = $cls.confidence
                 ClassificationSource     = $cls.source
-                AgentState               = "pending"
+                AgentState               = $effectiveAgentState
                 LastProcessed            = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
-                RetryCount               = 0
+                RetryCount               = $effectiveRetryCount
+                RepairReason             = $repairReason
                 File                     = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $null }
                 SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
                 ConfluenceMirror         = $confluenceUrl
@@ -1186,7 +1406,8 @@ foreach ($runEntry in $log) {
         Status                   = $runEntry.Status
         AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
         LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
-        RetryCount               = if ($existingMatch) { $existingMatch.RetryCount } else { 0 }
+        RetryCount               = if ($existingMatch -and $runEntry.Status -eq 'repair_needed') { ([int]$existingMatch.RetryCount + 1) } elseif ($existingMatch) { $existingMatch.RetryCount } else { 0 }
+        RepairReason             = if ($runEntry.PSObject.Properties.Name -contains 'RepairReason') { $runEntry.RepairReason } else { $null }
         LastRunId                = $runId
         LastUpdated              = $now
     }
@@ -1226,6 +1447,7 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
     $txtContent += "MODE_SOURCE: $modeSource"
     $txtContent += "STATUS: $($m.Status)"
     $txtContent += "AGENT STATE: $($m.AgentState)"
+    if ($m.RepairReason) { $txtContent += "REPAIR REASON: $($m.RepairReason)" }
     $txtContent += "HAS TRANSCRIPT: $($m.HasTranscript)"
     $txtContent += "TRANSCRIPT FILE: $($m.TranscriptFile)"
     $txtContent += "SUMMARY FILE: $($m.SummaryFile)"

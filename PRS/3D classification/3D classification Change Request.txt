@@ -1,0 +1,304 @@
+# 3D Classification Change Request
+
+## 1. Purpose
+
+This change request formalises the target classification model for the meeting intelligence pipeline.
+
+The end-goal is to improve classification from the current two-variable model to a three-variable model.
+
+The three variables are:
+
+| Dimension | Purpose | Example |
+|---|---|---|
+| Topic | What it is about | Product Performance |
+| Category | Why it matters | Risk |
+| ContextType | What kind of statement it is | Status Update |
+
+This model is intended to make the summaries more analytically useful, more consistent, and more scalable.
+
+---
+
+## 2. Target Model
+
+### 2.1 Topic
+
+**Definition:** What the content is about.
+
+This is the subject-matter dimension.
+
+Examples:
+- Product Performance
+- Delivery / Launch / Timing
+- Revenue / Commercial Performance
+- Resource / Capacity
+- Market Fit / Positioning
+
+**Constraint:**
+Topic MUST be selected from `taxonomy.json` (controlled vocabulary).
+Free-form topic labels are not allowed as canonical output.
+
+This dimension should be represented by:
+- `TOPIC_ID`
+- `CANONICAL_TOPIC`
+
+---
+
+### 2.2 Category
+
+**Definition:** Why the content matters.
+
+This is the significance / evaluative lens.
+
+Examples:
+- Risk
+- Opportunity
+- Problem
+- Governance
+- Execution
+- Learning
+- Strategy
+
+This dimension should be selected from a controlled set of valid values.
+
+**Constraint Rule:**
+- Category MUST represent semantic meaning (impact / importance)
+- Category MUST NOT encode structural form (e.g. Decision, Action)
+- Category MUST be exactly one value per record
+
+In the current dev implementation, this dimension is represented by:
+- `ContextHints` in `mapping_rules.json` (candidate values)
+- a selected value derived deterministically in code
+
+---
+
+### 2.3 ContextType
+
+**Definition:** What kind of statement the content represents.
+
+This is the statement / rhetorical function dimension.
+
+ContextType is divided into two layers:
+
+**1. Core ContextType (MANDATORY, deterministic, used in pipeline logic):**
+- Decision
+- Action
+- Issue
+- Risk
+- Status Update
+- Discussion (fallback)
+
+**2. Extended ContextType (OPTIONAL, enrichment only, not used for core logic):**
+- Rationale
+- Implication
+- Alignment
+- Trend / Trajectory
+- Next Direction
+
+**Constraint Rule:**
+- ContextType MUST be derived from structural form (section or syntax)
+- ContextType MUST NOT encode semantic meaning (e.g. Risk, Opportunity)
+- ContextType MUST be exactly one value (core enum)
+- Extended ContextTypes MUST NOT override Core ContextType
+
+**Clarification:**
+ContextType values such as `Issue` and `Risk` reflect the structural form of a statement (i.e. how the statement is expressed), not its final evaluative meaning.
+Category remains the authoritative semantic classification.
+
+---
+
+## 3. Design Principle
+
+These three dimensions must remain conceptually distinct.
+
+### Topic
+asks:
+> What is this about?
+
+### Category
+asks:
+> Why does this matter?
+
+### ContextType
+asks:
+> What kind of statement is this?
+
+These should not be collapsed into one another.
+
+**Hard Separation Rule:**
+- Topic = subject matter (“what”)
+- Category = semantic significance (“why it matters”)
+- ContextType = structural form (“what kind of statement”)
+
+These dimensions MUST NOT overlap.
+
+---
+
+## 4. Implication for the current dev state
+
+The current dev branch already includes the foundations of this model:
+
+- `ContextHints` in `mapping_rules.json`
+- deterministic selection of a single candidate contextual value
+- summary / record output designed to carry additional classification dimensions
+- emerging separation between topic identity and contextual interpretation
+
+Because of that, this proposal should be treated as a continuation and formalization of the current development direction, not as a conceptual departure.
+
+**Note:**
+Current dev usage of ContextType partially overlaps with Category.
+This must be corrected during implementation of the target model.
+
+---
+
+## 5. Proposed production interpretation
+
+### Topic
+Stable, taxonomy-driven subject classification.
+
+### Category
+Selected from valid Category candidates associated with the topic.
+
+Category should answer the question:
+> Why is this important?
+
+### ContextType
+Derived from the section / statement form.
+
+ContextType should answer the question:
+> What kind of statement is this?
+
+---
+
+## 6. Controlled values
+
+### 6.1 Topic
+Controlled by taxonomy (`taxonomy.json`) and mapping rules (`mapping_rules.json`).
+
+### 6.2 Category
+Controlled by valid values currently represented in taxonomy as context-like dimensions:
+- Strategy
+- Execution
+- Problem
+- Risk
+- Opportunity
+- Governance
+- Learning
+
+Category constraints (guideline mapping):
+- Decision → Strategy, Governance
+- Action → Execution
+- Issue → Problem
+- Risk → Risk
+- Status Update → Execution
+- Next Direction / Idea → Opportunity
+- Learning → Learning
+
+Deviations should be logged but not blocked.
+
+### 6.3 ContextType
+
+**Core ContextType values (strict enum):**
+- Decision
+- Action
+- Issue
+- Risk
+- Status Update
+- Discussion (default fallback)
+
+**Extended ContextTypes (optional, enrichment layer):**
+- Rationale
+- Implication
+- Alignment
+- Trend / Trajectory
+- Next Direction
+
+---
+
+## 7. Proposed rule model
+
+### 7.1 Topic selection
+Topic is assigned using existing mapping logic and taxonomy rules.
+
+### 7.2 Category selection
+Category is selected from allowed candidate values using deterministic scoring based on:
+- section location
+- wording cues
+- signal / trajectory
+- optional future tie-break logic if ambiguity remains
+
+**Constraint:**
+Category selection MUST occur after ContextType assignment to reduce ambiguity.
+
+### 7.3 ContextType selection
+ContextType assignment priority:
+
+1. Section-based mapping (if structured summary exists)
+2. Pattern-based mapping (regex / keyword rules)
+3. Fallback = Discussion
+
+Examples (section-based mapping):
+- Section `Signals` → Status Update
+- Section `Decisions` → Decision
+- Section `Actions` → Action
+- Section `Next Direction` → Action (core) + optional Extended tag
+- Section `Risks / Issues` → Risk or Issue (based on wording)
+
+**Notes:**
+- Section mapping takes precedence over wording cues
+- Wording cues are required for non-structured inputs (raw transcripts)
+
+### 7.4 Processing Order (MANDATORY)
+1. ContextType assignment
+2. Topic assignment
+3. Category selection
+
+**Rationale:**
+ContextType reduces ambiguity and improves determinism in downstream classification.
+
+---
+
+## 8. Risks / Mitigations
+
+| Risk | Description | Mitigation |
+|---|---|---|
+| Regex false positives | Rule-based wording cues may match text that does not carry the intended meaning | Add negation / exclusion filter layer and test against real summary outputs |
+| Over-classification | The system may emit more than one final `ContextType` or blur Topic/Category/ContextType boundaries | Enforce single selected `ContextType` in output |
+| Drift over time | Business language and meaning may evolve, making current mappings less accurate | Keep mappings and scoring config-driven and regularly reviewed |
+| LLM override issues | If LLM is later used for ambiguous cases, it may conflict with deterministic logic | Enforce precedence rules so deterministic logic remains primary unless explicitly overridden |
+| ContextType precedence conflicts | Category and ContextType rules may compete, especially when section meaning and wording cues diverge | Define and document precedence order between dimensions and scoring layers |
+| Section misclassification | If the parser assigns the wrong section, Category selection may be distorted | Make section parsing explicit and validate against real summaries |
+| Candidate pool too narrow | Correct semantic value may be unavailable because candidate Category values are too restrictive | Review and broaden candidate pools selectively where needed |
+| Candidate pool too broad | Too many candidate values may weaken deterministic scoring and increase arbitrary outcomes | Keep candidate sets constrained and topic-specific |
+| Semantic inconsistency across topics | Similar meeting content may classify differently under different topics | Use controlled vocabularies and regression tests across representative meetings |
+| Backward compatibility confusion | Legacy fields such as `DOMAIN` may be interpreted inconsistently during transition | Mark legacy fields explicitly and define transition rules |
+| Dimension overlap | Category and ContextType drift into each other | Enforce hard separation rules and validation checks |
+
+---
+
+## 9. Recommendation
+
+Adopt the following target model as the formal direction:
+- **Topic** = what it is about
+- **Category** = why it matters
+- **ContextType** = what kind of statement it is
+
+Use the current dev implementation as the basis for:
+- Topic selection
+- Category candidate definition and deterministic selection
+- future ContextType formalisation from statement structure
+
+This gives a cleaner, more defensible model than continuing to overload a single taxonomy axis.
+
+---
+
+## 10. Summary
+
+The proposed three-variable model is:
+
+| Dimension | Meaning |
+|---|---|
+| Topic | What it is about |
+| Category | Why it matters |
+| ContextType | What kind of statement it is |
+
+This should be the conceptual foundation for the next iteration of the classification model.

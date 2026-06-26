@@ -1,0 +1,238 @@
+# PROJECT: Change request - 3d classification
+
+# ✅ Risk Assessment & Mitigation Plan
+
+**Scope:** 3D taxonomy implementation (Topic + Category + ContextType)  
+**Context:** Executive Intelligence Pipeline (summary-first, deterministic pre-processing)
+
+***
+
+# 1. Risk Register (CPO‑level view)
+
+| ID  | Risk                                               | Impact                                          | Likelihood | Mitigation                                                       | Residual Risk |
+| --- | -------------------------------------------------- | ----------------------------------------------- | ---------- | ---------------------------------------------------------------- | ------------- |
+| R1  | Dimension overlap (Category vs ContextType)        | Inconsistent classification, unusable analytics | Medium     | Enforce hard separation rules + validation checks                | Low           |
+| R2  | ContextType misclassification (rules insufficient) | Loss of decision/action extraction accuracy     | High       | Add section-first + pattern fallback + tie-break rules           | Medium        |
+| R3  | Topic drift (free-form or inconsistent mapping)    | Breakdown in reporting and trend analysis       | Medium     | Enforce taxonomy-only Topics + reject free-text                  | Low           |
+| R4  | Over-reliance on pattern rules (false positives)   | Incorrect classification (e.g. false “Risk”)    | Medium     | Add negation layer + regression testing                          | Medium        |
+| R5  | Category inconsistency across teams                | Poor comparability between meetings/products    | High       | Introduce constraint matrix + monitoring logs                    | Medium        |
+| R6  | Section parsing errors                             | Incorrect ContextType assignment                | Medium     | Validate section parsing + fallback to pattern rules             | Medium        |
+| R7  | Pipeline sequencing errors                         | Non-deterministic output                        | High       | Enforce strict processing order (ContextType → Topic → Category) | Low           |
+| R8  | Backward compatibility issues                      | Broken reporting on historical data             | Medium     | Default ContextType = Discussion for legacy data                 | Low           |
+| R9  | Silent degradation over time                       | Gradual loss of model quality                   | High       | Logging + periodic taxonomy/mapping review                       | Medium        |
+| R10 | Developer misinterpretation of spec                | Incorrect implementation                        | Medium     | Provide clear constraints + validation + test cases              | Low           |
+
+***
+
+# 2. Risk Breakdown (what actually matters)
+
+## A. Structural Risks (most critical)
+
+### R1 — Dimension overlap
+
+* **Why it matters**
+  * Breaks your core design principle (3 distinct axes)
+  * Leads directly to **agent inconsistency (you already see this)**
+* **Mitigation focus**
+  * Hard constraints (already in spec)
+  * Validation layer later (CANON phase)
+
+***
+
+### R2 — ContextType misclassification
+
+* **Why it matters**
+  * This dimension drives:
+    * decision extraction
+    * action tracking
+    * exec insights
+
+* **Observed risk from your system**
+  * Current summaries already show drift:
+    * e.g. `CONTEXT_TYPE: Strategy`, `Problem` used inconsistently [\[\[Confluenc...ting notes \| Outlook\]](https://outlook.office365.com/owa/?ItemID=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgBGAAAAAAAHYcXuaPewTZEeHLLoXcPMBwDjEFigaJTYSZ43tOk2FrjSAAAAAAE2AADjEFigaJTYSZ43tOk2FrjSAAiYV8yqAAA%3d&exvsurl=1&viewmodel=ReadMessageItem)
+
+* **Mitigation focus**
+  * Section-first mapping ✅
+  * Pattern fallback ✅
+  * Tie-break rules ✅ (**you added this—good decision**)
+
+***
+
+## B. Data Integrity Risks
+
+### R3 — Topic drift
+
+* **Why it matters**
+  * Breaks longitudinal analysis (master\_log, trends)
+
+* **Relevant system dependency**
+  * Your [master\_log.json](https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.json?web=1\&EntityRepresentationId=0e866e0a-0903-46e9-a704-7a4a56fbf533) relies on consistent Topic IDs for history tracking [\[scanningpe...epoint.com\]](https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.json?web=1)
+
+* **Mitigation**
+  * Strict taxonomy enforcement
+  * Reject or map invalid Topics
+
+***
+
+### R5 — Category inconsistency
+
+* **Why it matters**
+  * This is your **semantic layer**
+  * If unstable → dashboards become meaningless
+
+* **Mitigation**
+  * Category constraint matrix (you added this ✅)
+  * Logging + review loop
+
+***
+
+## C. Pipeline Risks
+
+### R7 — Incorrect processing order
+
+* **Failure mode**
+
+```
+Topic → Category → ContextType   (WRONG)
+```
+
+* **Impact**
+  * Increased ambiguity
+  * LLM dependency increases
+  * Reduced determinism
+
+* ✅ Your mitigation is correct:
+
+```
+ContextType → Topic → Category
+```
+
+***
+
+### R6 — Section parsing errors
+
+* **Why this is important**
+  * Your model depends heavily on:
+    * structured summaries
+    * section-driven classification
+
+* **Observation**
+  * Your system already relies on structured summaries from EIP [\[\[Confluenc...eprocessor \| Outlook\]](https://outlook.office365.com/owa/?ItemID=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgBGAAAAAAAHYcXuaPewTZEeHLLoXcPMBwDjEFigaJTYSZ43tOk2FrjSAAAAAAE2AADjEFigaJTYSZ43tOk2FrjSAAiKKGZWAAA%3d&exvsurl=1&viewmodel=ReadMessageItem)
+
+* **Mitigation**
+  * Always include fallback:
+    * Pattern matching
+    * Default = Discussion
+
+***
+
+## D. Operational Risks
+
+### R9 — Silent degradation (BIG risk for you)
+
+* **This directly links to your concern:**
+
+> “If you don’t update CANON + agent instructions → system will silently degrade”
+
+* **Why it happens**
+  * Language evolves
+  * New use cases emerge
+  * Mapping rules become outdated
+
+* **Mitigation**
+  * Introduce:
+    * logging (fallbacks, conflicts)
+    * periodic review (monthly aligns well with your [Risk review and management](https://teams.microsoft.com/l/meeting/details?eventId=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgFRAAgI3tu6sDdAAEYAAAAAB2HF7mj3sE2RHhyy6F3DzAcA4xBYoGiU2EmeN7TpNha40gAAAAABDQAA4xBYoGiU2EmeN7TpNha40gAB_AQKUgAAEA%3d%3d\&EntityRepresentationId=b4e1cbb4-1bb3-4ef6-8379-18750e99bad4) cadence)
+
+***
+
+# 3. Mitigation Plan (what to actually implement)
+
+## Immediate (Phase 1 — must have)
+
+* ✅ ContextType rule engine (section + pattern + fallback)
+* ✅ Processing order enforcement
+* ✅ Taxonomy-controlled Topics
+* ✅ Category constraint matrix
+* ✅ Conflict logging
+
+***
+
+## Short-term (Phase 2 — stabilisation)
+
+* Add:
+  * Negation handling (“not a risk”)
+  * Regression test set (sample meetings)
+  * Drift detection (e.g. % fallback usage)
+
+***
+
+## Medium-term (Phase 3 — optimisation)
+
+* Add:
+  * Classification confidence scoring (you discussed this)
+  * Outlier detection
+  * Automatic mapping rule suggestions (already hinted in EIP spec) [\[\[Confluenc...eprocessor \| Outlook\]](https://outlook.office365.com/owa/?ItemID=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgBGAAAAAAAHYcXuaPewTZEeHLLoXcPMBwDjEFigaJTYSZ43tOk2FrjSAAAAAAE2AADjEFigaJTYSZ43tOk2FrjSAAiKKGZWAAA%3d&exvsurl=1&viewmodel=ReadMessageItem)
+
+***
+
+# 4. Governance Model (important for you as CPO)
+
+### Monthly (fits your existing cadence)
+
+Use:
+
+* [Risk review and management](https://teams.microsoft.com/l/meeting/details?eventId=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgFRAAgI3tu6sDdAAEYAAAAAB2HF7mj3sE2RHhyy6F3DzAcA4xBYoGiU2EmeN7TpNha40gAAAAABDQAA4xBYoGiU2EmeN7TpNha40gAB_AQKUgAAEA%3d%3d\&EntityRepresentationId=b4e1cbb4-1bb3-4ef6-8379-18750e99bad4) sessions [\[Risk revie...management \| Meeting\]](https://teams.microsoft.com/l/meeting/details?eventId=AAMkADcyMTNlZjQyLTBhNzEtNGM4ZS1iN2RjLTFlNTdhYTZiNDIzMgFRAAgI3tu6sDdAAEYAAAAAB2HF7mj3sE2RHhyy6F3DzAcA4xBYoGiU2EmeN7TpNha40gAAAAABDQAA4xBYoGiU2EmeN7TpNha40gAB_AQKUgAAEA%3d%3d)
+
+Review:
+
+* Classification drift logs
+* Fallback rates
+* Category inconsistencies
+
+***
+
+### Ownership (clear and simple)
+
+| Area                        | Owner                   |
+| --------------------------- | ----------------------- |
+| Taxonomy (Topic)            | CPO                     |
+| Mapping rules (ContextType) | R\&D / Pre-processor    |
+| Category logic              | Shared (Product + Data) |
+| Validation (CANON)          | Future phase            |
+
+***
+
+# 5. Key success indicators
+
+You’ll know this is working if:
+
+* Decisions (CTX01) can be extracted reliably across meetings
+* Actions (CTX03) map cleanly to owners/tasks
+* Same input → same classification across environments
+* Topic trends in [master\_log.json](https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.json?web=1\&EntityRepresentationId=0e866e0a-0903-46e9-a704-7a4a56fbf533) remain consistent over time [\[scanningpe...epoint.com\]](https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.json?web=1)
+
+***
+
+# ✅ Bottom line
+
+### Biggest risks for your system:
+
+1. **Dimension overlap (Category vs ContextType)**
+2. **ContextType inconsistency**
+3. **Silent drift over time**
+
+### Your mitigation approach is now:
+
+* structurally correct ✅
+* operationally aligned ✅
+* scalable ✅
+
+***
+
+## If you want next step
+
+I recommend:
+→ **Define a “classification quality dashboard” (what to track weekly)**
+
+That will turn this from a design into a **managed system**, not just a pipeline.
