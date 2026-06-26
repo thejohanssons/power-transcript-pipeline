@@ -305,48 +305,58 @@ function Enrich-Summary {
     if ($sections.Count -le 1) { return @{ Summary = $summaryText; Records = @() } } 
 
     $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
-    $currentSection = $sectionNames[0]
     
-    # --- PHASE 1 & 2: BLOCK-LEVEL PARSING ---
-    # Parse all numbered sections and attach section context to any topic blocks found within them
-    $parsedBlocks = @()
-    for ($sectionIndex = 1; $sectionIndex -lt $sections.Count; $sectionIndex++) {
+    # --- PHASE 1: PARSING SECTIONS 2-9 ---
+    $statementObjects = @()
+    for ($sectionIndex = 2; $sectionIndex -lt $sections.Count; $sectionIndex++) {
         $sectionBody = $sections[$sectionIndex]
         if (-not $sectionBody.Trim()) { continue }
+        $sectionName = if ($sectionIndex -le $sectionNames.Count) { $sectionNames[$sectionIndex - 1] } else { "Section $sectionIndex" }
 
-        $sectionName = if ($sectionIndex -le $sectionNames.Count) { $sectionNames[$sectionIndex - 1] } else { "Topics / Context" }
+        $defaultType = switch ($sectionName) {
+            'Signals' { 'Status Update' }
+            'Decisions' { 'Decision' }
+            'Actions' { 'Action' }
+            'Next Direction' { 'Next Direction' }
+            'Risks / Issues' { 'Risk' }
+            default { 'Discussion' }
+        }
 
-        # Identify topic blocks using '### Topic: <name>' inside this section
-        $blocks = [regex]::Split($sectionBody, '(?m)^### Topic:\s+')
-        for ($idx = 0; $idx -lt $blocks.Count; $idx++) {
-            $block = $blocks[$idx]
-            if (-not $block.Trim() -or $idx -eq 0) { continue } # Skip noise before first '### Topic'
-
-            $lines = $block -split "`n"
-            $label = $lines[0].Trim()
-            $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match "^\s*-\s+" }) -join "`n"
-
-            if (-not $bullets.Trim()) { continue }
-
-            $parsedBlocks += [pscustomobject]@{
-                SectionName = $sectionName
-                Label       = $label
-                Bullets     = $bullets
+        $currentSubtype = $null
+        foreach ($line in ($sectionBody -split "`n")) {
+            $t = $line.Trim()
+            if (-not $t) { continue }
+            if ($t -match '^[-*]\s*(Positive|Negative|Unknowns|Decision|Rationale|Action|Owner|Deadline|Product|Delivery|Quality|Overall direction|Justification|Gaps / inconsistencies|Known risks|Emerging concerns):\s*$') {
+                $currentSubtype = $matches[1]
+                continue
+            }
+            if ($t -match '^[-*]\s+(.*)$') {
+                $statementObjects += [pscustomobject]@{
+                    SectionName = $sectionName
+                    StatementType = $defaultType
+                    StatementSubtype = $currentSubtype
+                    Text = $matches[1].Trim()
+                }
             }
         }
     }
 
-    $newTopicSection = ""
-    $topicRecordsMap = @{} # Task 3.1: Topic Merge Dictionary
-
-    foreach ($parsed in $parsedBlocks) {
-        $currentSection = $parsed.SectionName
-        $label = $parsed.Label
-        $bullets = $parsed.Bullets
+    # --- PHASE 2: PARSING TOPIC REGISTRY (SECTION 1) ---
+    $topicRecordsMap = @{}
+    $topicSection = $sections[1]
+    $blocks = [regex]::Split($topicSection, '(?m)^### Topic:\s+')
+    
+    foreach ($block in $blocks) {
+        if (-not $block.Trim() -or $block -match '^\d+\.\s+') { continue }
+        
+        $lines = $block -split "`n"
+        $label = $lines[0].Trim()
+        $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match '^\s*-\s+' }) -join "`n"
+        if (-not $bullets.Trim()) { continue }
 
         $cls = & "Classify-Topic" ($label + "`n" + $bullets)
         
-        # Refinement D: Nuanced Signal Aggregation (Mixed State)
+        # Aggregate Signal
         $posCount = 0; $negCount = 0
         foreach ($line in ($bullets -split "`n")) {
             if ($line -match "^\s*-\s+(.+)") {
@@ -355,69 +365,38 @@ function Enrich-Summary {
                 if ($sent.Signal -eq "Negative") { $negCount++ }
             }
         }
-        
-        $finalSignal = "Neutral"
-        $finalTrajectory = "Stable"
+        $finalSignal = "Neutral"; $finalTrajectory = "Stable"
+        if ($posCount -gt 0 -and $negCount -gt 0) { $finalSignal = "Mixed"; $finalTrajectory = "Stabilising / Improving" }
+        elseif ($negCount -gt $posCount) { $finalSignal = "Negative"; $finalTrajectory = "Declining" }
+        elseif ($posCount -gt $negCount) { $finalSignal = "Positive"; $finalTrajectory = "Improving" }
 
-        if ($posCount -gt 0 -and $negCount -gt 0) {
-            $finalSignal = "Mixed"
-            $finalTrajectory = "Stabilising / Improving"
-        } elseif ($negCount -gt $posCount) {
-            $finalSignal = "Negative"
-            $finalTrajectory = "Declining"
-        } elseif ($posCount -gt $negCount) {
-            $finalSignal = "Positive"
-            $finalTrajectory = "Improving"
-        }
+        # --- 3D SELECTION ---
+        $selectedCategory = Select-Category -CandidateCategories $cls.CategoryHints -SectionName 'Topics / Context' -Signal $finalSignal -Trajectory $finalTrajectory -Label $label -Content $bullets
+        $selectedContextType = 'Discussion' # Topic Registry default
 
-        $selectedCategory = Select-Category -CandidateCategories $cls.CategoryHints -SectionName $currentSection -Signal $finalSignal -Trajectory $finalTrajectory -Label $label -Content $bullets
-        $selectedContextType = switch -Regex ($currentSection) {
-            '^Signals$' { 'Status Update'; break }
-            '^Decisions$' { 'Decision'; break }
-            '^Actions$' { 'Action'; break }
-            '^Next Direction$' { 'Next Direction'; break }
-            '^Risks / Issues$' { if (($label + " `n " + $bullets) -match '(?i)risk') { 'Risk' } else { 'Issue' }; break }
-            '^Implications$' { 'Implication'; break }
-            '^Alignment$' { 'Alignment'; break }
-            '^Trend / Trajectory$' { 'Trend / Trajectory'; break }
-            default { 'Discussion' }
-        }
+        Write-Host "  [3D DIAG] Topic=$($cls.TopicId) / $($cls.TopicName) | Section=Topics / Context | Category=$selectedCategory | ContextType=$selectedContextType"
 
-        if ($topicRecordsMap.ContainsKey($cls.TopicId)) {
-            $topicRecordsMap[$cls.TopicId].Content += "`n" + $bullets
-            # Propagate "Negative" or "Mixed" as highest priority for merged records
-            if ($finalSignal -eq "Mixed" -or ($finalSignal -eq "Negative" -and $topicRecordsMap[$cls.TopicId].Signal -ne "Mixed")) {
-                $topicRecordsMap[$cls.TopicId].Signal = $finalSignal
-                $topicRecordsMap[$cls.TopicId].Trajectory = $finalTrajectory
-            }
-            if (-not $topicRecordsMap[$cls.TopicId].ContextType -and $selectedContextType) {
-                $topicRecordsMap[$cls.TopicId].ContextType = $selectedContextType
-            }
-        } else {
-            $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
-                RecordId       = $meetingId + "_" + $cls.TopicId
-                CategoryHints  = $cls.CategoryHints
-                Category       = $selectedCategory
-                ContextType    = $selectedContextType
-                Domain         = $cls.Domain
-                TopicId       = $cls.TopicId
-                TopicName     = $cls.TopicName # Refinement B: Canonical Name
-                DisplayLabel  = $label         # Refinement B: Human-friendly Name
-                Content       = $bullets
-                Signal        = $finalSignal
-                Trajectory    = $finalTrajectory
-            }
+        $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
+            RecordId      = $meetingId + "_" + $cls.TopicId
+            TopicId       = $cls.TopicId
+            TopicName     = $cls.TopicName
+            DisplayLabel  = $label
+            Category      = $selectedCategory
+            ContextType   = $selectedContextType
+            CategoryHints = $cls.CategoryHints
+            Content       = $bullets
+            Signal        = $finalSignal
+            Trajectory    = $finalTrajectory
         }
     }
 
-    # Construct Section with Refinement A separators and Refinement B Naming
+    # --- PHASE 3: ASSEMBLY ---
+    $newTopicSection = ""
     foreach ($tid in ($topicRecordsMap.Keys | Sort-Object)) {
         $rec = $topicRecordsMap[$tid]
         $newTopicSection += "### Topic: " + $rec.DisplayLabel + "`n"
-        $selectedCategoryText = if ($rec.Category) { $rec.Category } elseif ($rec.CategoryHints -and $rec.CategoryHints.Count -gt 0) { ($rec.CategoryHints -join ', ') } else { "" }
-        $selectedContextTypeText = if ($rec.ContextType) { $rec.ContextType } else { 'Discussion' }
-        $newTopicSection += "CATEGORY: " + $selectedCategoryText + "`n"
-        $newTopicSection += "CONTEXT_TYPE: " + $selectedContextTypeText + "`n"
+        $newTopicSection += "CATEGORY: " + $rec.Category + "`n"
+        $newTopicSection += "CONTEXT_TYPE: " + $rec.ContextType + "`n"
         $newTopicSection += "TOPIC_ID: " + $rec.TopicId + "`n"
         $newTopicSection += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
         $newTopicSection += "SIGNAL: " + $rec.Signal + "`n"
@@ -425,44 +404,51 @@ function Enrich-Summary {
         $newTopicSection += "Content:`n" + $rec.Content.Trim() + "`n`n"
     }
 
-    $finalSummary = ""
-    for ($i = 1; $i -lt $sections.Count; $i++) {
-        $name = if ($i -le $sectionNames.Count) { $sectionNames[$i-1] } else { "Section " + $i }
-        if ($i -eq 1) {
-            $finalSummary += $i.ToString() + ". " + $name + "`n" + $newTopicSection.Trim() + "`n`n"
-        } else {
-            $cLines = $sections[$i] -split "`n"
-            $actualContent = if ($cLines[0] -match $name) { ($cLines | Select-Object -Skip 1) -join "`n" } else { $sections[$i] }
-            $finalSummary += $i.ToString() + ". " + $name + "`n" + $actualContent.Trim() + "`n`n"
+    $finalSummary = "1. Topics / Context`n" + $newTopicSection.Trim() + "`n`n"
+    
+    # Rebuild Sections 2-9
+    for ($i = 2; $i -le 9; $i++) {
+        $name = $sectionNames[$i-1]
+        $stmts = $statementObjects | Where-Object { $_.SectionName -eq $name }
+        if (-not $stmts) { continue }
+
+        $finalSummary += "$i. $name`n`n"
+        $groups = $stmts | Group-Object StatementSubtype
+        foreach ($group in $groups) {
+            $sublabel = if ($group.Name) { $group.Name } else { $stmts[0].StatementType }
+            $finalSummary += "- ${sublabel}:`n"
+            foreach ($s in $group.Group) {
+                $sCls = & "Classify-Topic" $s.Text
+                $finalSummary += "  - [$($sCls.TopicId)] $($s.Text)`n"
+            }
+            $finalSummary += "`n"
         }
     }
 
-    # --- TREND & STALLED WORK DETECTION ---
+    # Trends & Persistence
     $topicRecords = $topicRecordsMap.Values | ForEach-Object { $_ }
     $trends = & "Get-StalledWork" $topicRecords $historyRecords
     if ($trends.Count -gt 0) {
         $finalSummary += "## TOPIC TRENDS & PERSISTENCE`n"
-        foreach ($t in $trends) { 
+        foreach ($t in $trends) {
             $status = if ($t.IsStalled) { "Stalled" } else { $t.TrendType }
-            $finalSummary += "- " + $t.TopicName + ": " + $status + " (Last seen: " + $t.LastSeen + ")`n"
+            $finalSummary += "- $($t.TopicName): $status (Last seen: $($t.LastSeen))`n"
         }
         $finalSummary += "`n"
     }
 
-    # Clean Topic Record Section (Task 3.2)
+    # Record Footer
     $finalSummary += "## Topic Records (Internal)`n`n"
     foreach ($rec in $topicRecords) {
-        $finalSummary += "[Record: " + $rec.RecordId + "]`n"
-        $selectedCategoryText = if ($rec.Category) { $rec.Category } elseif ($rec.CategoryHints -and $rec.CategoryHints.Count -gt 0) { ($rec.CategoryHints -join ', ') } else { "" }
-        $selectedContextTypeText = if ($rec.ContextType) { $rec.ContextType } else { 'Discussion' }
-        $finalSummary += "CATEGORY: " + $selectedCategoryText + "`n"
-        $finalSummary += "CONTEXT_TYPE: " + $selectedContextTypeText + "`n"
-        $finalSummary += "TOPIC_ID: " + $rec.TopicId + "`n"
-        $finalSummary += "CANONICAL_TOPIC: " + $rec.TopicName + "`n"
-        $finalSummary += "DISPLAY_LABEL: " + $rec.DisplayLabel + "`n"
-        $finalSummary += "SIGNAL: " + $rec.Signal + "`n"
-        $finalSummary += "TRAJECTORY: " + $rec.Trajectory + "`n"
-        $finalSummary += "CONTENT:`n" + $rec.Content.Trim() + "`n`n"
+        $finalSummary += "[Record: $($rec.RecordId)]`n"
+        $finalSummary += "CATEGORY: $($rec.Category)`n"
+        $finalSummary += "CONTEXT_TYPE: $($rec.ContextType)`n"
+        $finalSummary += "TOPIC_ID: $($rec.TopicId)`n"
+        $finalSummary += "CANONICAL_TOPIC: $($rec.TopicName)`n"
+        $finalSummary += "DISPLAY_LABEL: $($rec.DisplayLabel)`n"
+        $finalSummary += "SIGNAL: $($rec.Signal)`n"
+        $finalSummary += "TRAJECTORY: $($rec.Trajectory)`n"
+        $finalSummary += "CONTENT:`n$($rec.Content.Trim())`n`n"
     }
 
     return @{ Summary = $finalSummary; Records = $topicRecords; Trends = $trends }
@@ -1490,8 +1476,7 @@ Write-Host "Master Log (.json and .txt) updated and uploaded ✅"
 
 Write-Host "Done ✅"
 
-# Clean up local temporary files (for cloud maintenance)
+# Local dev-mode preservation: keep TranscriptExport for inspection
 if (Test-Path $outDir) {
-    Remove-Item -Path $outDir -Recurse -Force
-    Write-Host "Local temp folder cleaned up ✅"
+    Write-Host "Local temp folder preserved for inspection ✅"
 }
