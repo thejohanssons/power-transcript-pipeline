@@ -784,6 +784,9 @@ function Send-TeamsNotification {
 
 # =========================
 
+$global:GraphTokenInfo = $null
+$global:authHeader = $null
+
 function Get-GraphToken {
     $body = @{
         client_id     = $clientId
@@ -792,11 +795,27 @@ function Get-GraphToken {
         grant_type    = "client_credentials"
     }
     $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Body $body
-    return $tokenResponse.access_token
+    
+    # Typically expires in 3600 seconds. Set expiration with 5 min safety margin.
+    $expiresIn = if ($tokenResponse.expires_in) { $tokenResponse.expires_in } else { 3600 }
+    $expiration = [DateTime]::Now.AddSeconds($expiresIn - 300) 
+    
+    return [PSCustomObject]@{
+        Token      = $tokenResponse.access_token
+        Expiration = $expiration
+    }
 }
 
-$accessToken = Get-GraphToken
-$authHeader = @{ Authorization = "Bearer $accessToken" }
+function Ensure-GraphToken {
+    if ($null -eq $global:GraphTokenInfo -or [DateTime]::Now -ge $global:GraphTokenInfo.Expiration) {
+        $global:GraphTokenInfo = Get-GraphToken
+        $global:authHeader = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+        Write-Host "Microsoft Graph Session Refreshed ✅"
+    }
+}
+
+# Initial Connection
+Ensure-GraphToken
 Write-Host "Connected to Microsoft Graph (REST) ✅"
 
 # =========================
@@ -840,6 +859,10 @@ function Ensure-DriveFolder {
 
 function Upload-FileToSharePoint {
     param($DriveId, $FolderId, $FilePath)
+    
+    # Ensure token is valid for upload
+    Ensure-GraphToken
+    
     $fileName = [System.IO.Path]::GetFileName($FilePath)
     $uploadUri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$FolderId`:/$fileName`:/content"
     $bytes = [System.IO.File]::ReadAllBytes($FilePath)
@@ -978,6 +1001,9 @@ $events = $uniqueMeetings.Values
 $log = @()
 
 foreach ($calendarEvent in $events) {
+    # Ensure token is valid for this iteration
+    Ensure-GraphToken
+    
     $subject   = $calendarEvent.subject
     $joinUrl   = $calendarEvent.onlineMeeting.joinUrl
     $organiser = $calendarEvent.organizer.emailAddress.address
