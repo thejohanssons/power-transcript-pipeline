@@ -5,8 +5,9 @@ obj
 appsettings.json
 local.settings.json
 
-# Local secrets - contains API keys, do not commit
+# Local secrets - contains API keys and credentials, do not commit
 classification_rules.json
+pipeline_config.json
 
 # Azurite artifacts
 __blobstorage__
