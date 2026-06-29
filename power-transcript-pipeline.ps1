@@ -15,7 +15,14 @@ param(
     [object]$ToDate,
 
     [Parameter(Mandatory=$false)]
-    [switch]$ForceRerun
+    [switch]$ForceRerun,
+
+    # VTT direct-file mode: bypass calendar lookup and process a local .vtt file directly
+    [Parameter(Mandatory=$false)]
+    [string]$VttFile,
+
+    [Parameter(Mandatory=$false)]
+    [string]$Participant
 )
 
 # =========================
@@ -91,6 +98,48 @@ $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
 $sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
 $pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { @{ enable_stable_topic_classification = $false } }
+
+# =========================
+# VTT HELPER: Strip WebVTT timestamps and cue markers, return clean transcript text
+# =========================
+function ConvertFrom-Vtt {
+    param([string]$VttContent)
+
+    $lines = $VttContent -split "`r?`n"
+    $output = [System.Collections.Generic.List[string]]::new()
+    $lastSpeaker = $null
+
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+
+        # Skip header, blank lines, cue IDs, and timestamp lines
+        if ($trimmed -eq "WEBVTT") { continue }
+        if ($trimmed -eq "") { continue }
+        if ($trimmed -match "^\d+$") { continue }  # cue index number
+        if ($trimmed -match "^\d{2}:\d{2}[:\d{2}]*\s*-->\s*\d{2}:\d{2}") { continue }  # timestamp arrow
+        if ($trimmed -match "^NOTE\s") { continue }  # NOTE blocks
+        if ($trimmed -match "^STYLE\s*$") { continue }  # STYLE blocks
+
+        # Detect "Speaker Name: dialogue" format and deduplicate consecutive same-speaker lines
+        if ($trimmed -match "^([^:]+):\s+(.+)$") {
+            $speaker  = $matches[1].Trim()
+            $dialogue = $matches[2].Trim()
+            if ($speaker -eq $lastSpeaker) {
+                # Append to previous line instead of repeating speaker name
+                $idx = $output.Count - 1
+                if ($idx -ge 0) { $output[$idx] = $output[$idx] + " " + $dialogue; continue }
+            }
+            $lastSpeaker = $speaker
+            $output.Add("$speaker`: $dialogue")
+        } else {
+            # Plain dialogue line without speaker prefix
+            $lastSpeaker = $null
+            $output.Add($trimmed)
+        }
+    }
+
+    return ($output -join "`n")
+}
 
 function Assign-Mode {
     param($type, $organiser, $topicRecords)
@@ -887,8 +936,6 @@ function Send-TeamsNotification {
     }
 }
 
-# =========================
-
 $global:GraphTokenInfo = $null
 $global:authHeader = $null
 
@@ -1044,6 +1091,189 @@ try {
     Write-Host "Master Log loaded ($($masterLogData.Meetings.Count) meetings) ✅"
 } catch {
     Write-Host "No existing Master Log found or could not parse. Starting fresh."
+}
+
+# =========================
+# VTT DIRECT-FILE MODE
+# Bypasses calendar lookup and transcript fetch — processes a local .vtt file directly.
+# Usage: pwsh -File ./power-transcript-pipeline.ps1 -VttFile "path/to/file.vtt" -Participant "Theo Davis"
+# =========================
+if ($VttFile) {
+    if (-not (Test-Path $VttFile)) {
+        Write-Error "VTT file not found: $VttFile"
+        exit 1
+    }
+
+    Write-Host "VTT Mode: Processing file '$VttFile'"
+
+    # --- Parse filename for date and subject ---
+    # Supports: YYYY-MM-DD_HHMM-Meeting_Title.vtt  or  YYYY-MM-DD-Meeting_Title.vtt
+    $vttBaseName = [System.IO.Path]::GetFileNameWithoutExtension($VttFile)
+    $eventDate   = $null
+    $subject     = $null
+
+    if ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
+        $eventDate = [datetime]::ParseExact("$($matches[1]) $($matches[2])", "yyyy-MM-dd HHmm", $null)
+        $subject   = $matches[3] -replace "_", " "
+    } elseif ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})-(.+)$") {
+        $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
+        $subject   = $matches[2] -replace "_", " "
+    } else {
+        $eventDate = Get-Date
+        $subject   = $vttBaseName -replace "_", " "
+        Write-Warning "  [VTT] Could not parse date from filename. Using today: $($eventDate.ToString('yyyy-MM-dd'))"
+    }
+
+    $timestamp    = $eventDate.ToString("yyyy-MM-dd_HHmm")
+    $cleanSubject = $subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
+    $mId          = Get-MeetingLogId -EventDate $eventDate -Subject $subject
+    $organiser    = if ($Participant) { $Participant } else { "Unknown" }
+    $meetingType  = "Work"
+
+    Write-Host "  [VTT] Subject    : $subject"
+    Write-Host "  [VTT] Date       : $($eventDate.ToString('yyyy-MM-dd HH:mm'))"
+    Write-Host "  [VTT] Participant: $organiser"
+
+    # --- Convert VTT to plain text ---
+    $vttRaw    = Get-Content -Path $VttFile -Raw -Encoding utf8
+    $plainText = ConvertFrom-Vtt -VttContent $vttRaw
+    Write-Host "  [VTT] Transcript length: $($plainText.Length) chars"
+
+    # --- Classify and summarise ---
+    $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $plainText
+    if (-not $cls.summary) {
+        Write-Warning "  [VTT] Summary generation failed. Retrying once..."
+        $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $plainText
+    }
+
+    # --- EIP Enrichment ---
+    $historyTopicRecords = @()
+    if ($masterLogData -and $masterLogData.Meetings) {
+        $historyTopicRecords = $masterLogData.Meetings | Where-Object { $_.TopicRecords } | ForEach-Object { $_.TopicRecords } | Where-Object { $_ }
+    }
+    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
+    $enrichedSummaryText = if ($enrichResult.Summary) { $enrichResult.Summary } else { $cls.summary }
+    $topicRecords3D      = if ($enrichResult.Records) { $enrichResult.Records } else { @() }
+    $modeResult          = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
+
+    foreach ($rec in $topicRecords3D) {
+        Write-Host "  [3D DIAG] Topic=$($rec.TopicId) / $($rec.TopicName) | Section=$($rec.Section) |Category=$($rec.Category) | ContextType=$($rec.ContextType)"
+    }
+    Write-Host "  [VALIDATION] Topics detected: $(($topicRecords3D | Select-Object -Property TopicId -Unique).Count)"
+    Write-Host "  [VALIDATION] Mode Assigned: $($modeResult.mode) ($($modeResult.source))"
+
+    # --- Build header ---
+    $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
+    $header = @"
+MEETING ID: $mId
+SUBJECT: $subject
+ORGANISER: $organiser
+EVENT DATE: $($eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+TYPE: $meetingType
+PRIORITY: normal
+MODE: $($modeResult.mode)
+MODE_SOURCE: $($modeResult.source)
+MODE_CONFIDENCE: $($modeResult.confidence)
+PIPELINE_VERSION: $PIPELINE_VERSION
+PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
+STATUS: success
+BACK-LINK (MASTER LOG): $masterLogUrl
+---
+
+"@
+
+    # --- Save transcript .txt ---
+    if (-not (Test-Path $outDir)) { $null = New-Item -ItemType Directory -Path $outDir -Force }
+    $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
+    ($header + $plainText) | Out-File -FilePath $localFile -Encoding utf8
+    Write-Host "  [VTT] Transcript saved: $localFile"
+
+    # --- Save summary .txt ---
+    $localSummaryFile = $null
+    if ($cls.summary) {
+        $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
+        ($header + $enrichedSummaryText) | Out-File -FilePath $localSummaryFile -Encoding utf8
+        Write-Host "  [VTT] Summary saved   : $localSummaryFile"
+    }
+
+    # --- SharePoint upload ---
+    $uploadedTranscript = $null
+    $uploadedSummary    = $null
+    try {
+        $eventFolderPath    = "$spTranscriptRootFolder/$($eventDate.ToString('yyyy-MM'))"
+        $eventFolderId      = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
+        $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
+        Write-Host "  [VTT] Transcript uploaded to SharePoint"
+        if ($localSummaryFile) {
+            $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
+            Write-Host "  [VTT] Summary uploaded to SharePoint"
+        }
+    } catch {
+        Write-Warning "  [VTT] SharePoint upload failed: $_"
+    }
+
+    # --- Confluence mirroring ---
+    $confluenceUrl = $null
+    if ($cls.summary) {
+        $vttConfig       = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { $null }
+        $isMirrorEnabled = ($vttConfig -and $vttConfig.enable_confluence_mirror) -or ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
+        if ($isMirrorEnabled) {
+            $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $vttConfig.confluence_space_key }
+            $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $vttConfig.confluence_parent_id }
+            if ($confSpace -and $confParent) {
+                $confHtml      = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $organiser
+                $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
+            }
+        }
+    }
+
+    # --- Master Log entry ---
+    $now         = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+    $vttLogEntry = @{
+        MeetingId                = $mId
+        Subject                  = $subject
+        Organiser                = $organiser
+        EventDate                = $eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        Type                     = $meetingType
+        Priority                 = "normal"
+        Mode                     = $modeResult.mode
+        ModeConfidence           = $modeResult.confidence
+        ModeSource               = $modeResult.source
+        Classification           = $modeResult.mode
+        ClassificationConfidence = $modeResult.confidence
+        ClassificationSource     = $modeResult.source
+        PipelineVersion          = $PIPELINE_VERSION
+        TopicRecords             = $topicRecords3D
+        HasTranscript            = $true
+        TranscriptFile           = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile }
+        SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $localSummaryFile }
+        ConfluenceMirror         = $confluenceUrl
+        Status                   = "success"
+        AgentState               = "processed_vtt"
+        LastProcessed            = $now
+        RetryCount               = 0
+        LastRunId                = "vtt_direct"
+        LastUpdated              = $now
+    }
+
+    $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
+    if ($existingMatch) {
+        $idx = [array]::IndexOf($masterLogData.Meetings, $existingMatch)
+        $masterLogData.Meetings[$idx] = $vttLogEntry
+    } else {
+        $masterLogData.Meetings += $vttLogEntry
+    }
+
+    $masterLogLocalPath = Join-Path $outDir $masterLogFileName
+    $masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
+    try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogLocalPath | Out-Null } catch { Write-Warning "  [VTT] Master log upload failed: $_" }
+
+    Write-Host ""
+    Write-Host "VTT Mode complete ✅"
+    Write-Host "  Transcript : $localFile"
+    if ($localSummaryFile) { Write-Host "  Summary    : $localSummaryFile" }
+    if ($confluenceUrl)    { Write-Host "  Confluence : $confluenceUrl" }
+    exit 0
 }
 
 # =========================
