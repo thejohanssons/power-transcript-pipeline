@@ -503,12 +503,22 @@ function Recover-LLMResult {
         $result.confidence = $matches[1]
     }
 
-    if ($RawContent -match '(?s)"summary"\s*:\s*"(.*)"\s*\}?\s*$') {
+    # Aggressive salvage: find everything after the opening quote of the summary
+    # Handles unterminated strings, unescaped quotes, and truncation.
+    if ($RawContent -match '(?s)"summary"\s*:\s*"(.*)$') {
         $summary = $matches[1]
-        $summary = $summary -replace '\\n', "`n"
-        $summary = $summary -replace '\\"', '"'
+        
+        # 1. Strip trailing JSON fragments and markdown fences
+        $summary = $summary -replace '(?s)"\s*\}?.*?$', '' 
         $summary = $summary -replace '```json', ''
         $summary = $summary -replace '```', ''
+        
+        # 2. Convert escaped sequences to real characters
+        $summary = $summary -replace '\\n', "`n"
+        $summary = $summary -replace '\\r', ""
+        $summary = $summary -replace '\\"', '"'
+        $summary = $summary -replace '\\t', "`t"
+        
         $result.summary = $summary.Trim()
     }
 
@@ -534,18 +544,21 @@ function Get-MeetingClassification {
             $keySource = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
             $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
             
-            # Use Bearer token for Forge-based endpoints
-            $authMode = "Bearer"
-            $headers = @{ 
-                "Authorization" = "Bearer $llmKey" 
-                "Content-Type" = "application/json"
+            # Azure OpenAI uses api-key header; Forge/OpenAI-compatible endpoints use Bearer
+            $authMode = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+            $headers = if ($authMode -eq "api-key") {
+                @{ "api-key" = $llmKey; "Content-Type" = "application/json" }
+            } else {
+                @{ "Authorization" = "Bearer $llmKey"; "Content-Type" = "application/json" }
             }
             
-            $fullUri = if ($rules.LLMConfig.Endpoint -match "/v1/?$") {
-                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
-            } elseif ($rules.LLMConfig.Endpoint -match "openai.azure.com") {
-                $base = $rules.LLMConfig.Endpoint -replace "/$", ""
+            # Azure OpenAI must be checked first — its endpoint may also contain "/v1"
+            $fullUri = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+                # Strip any trailing /v1 or /openai/v1 path and build proper deployment URL
+                $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                 "$base/openai/deployments/$($rules.LLMConfig.Model)/chat/completions?api-version=2024-02-15-preview"
+            } elseif ($rules.LLMConfig.Endpoint -match "/v1/?$") {
+                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             } else {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             }

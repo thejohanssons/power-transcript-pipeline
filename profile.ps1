@@ -20,3 +20,7 @@ if ($env:MSI_SECRET) {
 # Enable-AzureRmAlias
 
 # You can also define functions or aliases that can be referenced in any of your PowerShell functions.
+
+# LLM API Key for transcript classification (Azure OpenAI endpoint)
+# Set this to your Azure OpenAI key - do NOT commit the actual key to source control
+# $env:FOUNDRY_API_KEY = "your-azure-openai-key-here"
