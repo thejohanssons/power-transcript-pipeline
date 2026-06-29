@@ -572,7 +572,14 @@ function Get-MeetingClassification {
             $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody
             
             $rawContent = $response.choices[0].message.content
-            $sanitizedContent = $rawContent -replace "(?s)^.*?\{", "{" -replace "\}.*?$", "}"
+
+            # Step 1: Strip markdown code fences (e.g. ```json ... ``` or ``` ... ```)
+            $sanitizedContent = $rawContent -replace "(?s)^\s*```(?:json)?\s*", "" -replace "(?s)\s*```\s*$", ""
+
+            # Step 2: Extract the outermost JSON object (handles any leading/trailing text)
+            if ($sanitizedContent -match "(?s)(\{.*\})") {
+                $sanitizedContent = $matches[1]
+            }
             
             try {
                 $resultJson = $sanitizedContent | ConvertFrom-Json
