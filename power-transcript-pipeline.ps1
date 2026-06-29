@@ -1472,7 +1472,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $vttLlmUri     = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
                     $vttBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                     "$vttBase/openai/deployments/$vttDeployment/chat/completions?api-version=2024-02-15-preview"
-                } else { "$($rules.LLMConfig.Endpoint -replace "/$","")/chat/completions" }
+                } else { "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
 
                 $vttPeopleRaw = Get-PeopleIntelligence `
                     -TranscriptText $plainText `
@@ -1886,7 +1886,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         $pUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
                             $pBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                             "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
-                        } else { "$($rules.LLMConfig.Endpoint -replace "/$","")/chat/completions" }
+                        } else { "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
 
                         $peopleRaw = Get-PeopleIntelligence `
                             -TranscriptText $transcriptContent `
