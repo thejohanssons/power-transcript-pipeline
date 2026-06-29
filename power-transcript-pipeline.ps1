@@ -486,6 +486,77 @@ function Get-StalledWork {
     return $results
 }
 
+# =========================
+# LLM HELPER: Split transcript into overlapping chunks
+# =========================
+function Split-TranscriptIntoChunks {
+    param(
+        [string]$Text,
+        [int]$ChunkSize = 32000,
+        [int]$Overlap   = 500
+    )
+    $chunks = @()
+    $start  = 0
+    while ($start -lt $Text.Length) {
+        $end    = [Math]::Min($start + $ChunkSize, $Text.Length)
+        $chunks += $Text.Substring($start, $end - $start)
+        if ($end -eq $Text.Length) { break }
+        $start  = $end - $Overlap
+    }
+    return $chunks
+}
+
+# =========================
+# LLM HELPER: Single LLM call — returns raw content string or $null on failure
+# =========================
+function Invoke-LLM {
+    param(
+        [string]$SystemPrompt,
+        [string]$UserContent,
+        [string]$FullUri,
+        [hashtable]$Headers,
+        [string]$Model,
+        [int]$MaxTokens = 16000
+    )
+    $body = @{
+        model    = $Model
+        messages = @(
+            @{ role = "system"; content = $SystemPrompt },
+            @{ role = "user";   content = $UserContent  }
+        )
+        temperature           = 0
+        max_completion_tokens = $MaxTokens
+    } | ConvertTo-Json -Depth 10
+
+    try {
+        $response     = Invoke-RestMethod -Method Post -Uri $FullUri -Headers $Headers -Body $body
+        $finishReason = $response.choices[0].finish_reason
+        if ($finishReason -ne "stop") {
+            Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
+        }
+        return $response.choices[0].message.content
+    } catch {
+        Write-Warning "  [LLM] Call failed: $_"
+        return $null
+    }
+}
+
+# =========================
+# LLM HELPER: Parse and sanitise JSON from LLM response
+# =========================
+function ConvertFrom-LLMJson {
+    param([string]$RawContent)
+    # Strip markdown code fences
+    $clean = $RawContent -replace "(?s)^\s*``````(?:json)?\s*", "" -replace "(?s)\s*``````\s*$", ""
+    # Extract outermost JSON object
+    if ($clean -match "(?s)(\{.*\})") { $clean = $matches[1] }
+    try {
+        return $clean | ConvertFrom-Json
+    } catch {
+        return $null
+    }
+}
+
 function Recover-LLMResult {
     param([string]$RawContent)
 
@@ -528,34 +599,20 @@ function Recover-LLMResult {
 function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
-    # --- Case 1: Transcript exists - Always call LLM for summary and classification ---
+    # --- Case 1: Transcript exists - Use LLM with map-reduce chunking ---
     if ($transcriptContent -and $rules.LLMConfig.Endpoint) {
         try {
-            $llmBody = @{
-                model = $rules.LLMConfig.Model
-                messages = @(
-                    @{ role = "system"; content = $rules.LLMConfig.Prompt },
-                    @{ role = "user"; content = "Transcript to analyze:`n`n$transcriptContent" }
-                )
-                temperature = 0
-                max_completion_tokens = 16000
-            } | ConvertTo-Json -Depth 10
-            
-            $keySource = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
-            $llmKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-            
-            # Azure OpenAI uses api-key header; Forge/OpenAI-compatible endpoints use Bearer
-            $authMode = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-            $headers = if ($authMode -eq "api-key") {
+            # --- Build shared LLM connection config ---
+            $keySource     = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
+            $llmKey        = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
+            $authMode      = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+            $llmHeaders    = if ($authMode -eq "api-key") {
                 @{ "api-key" = $llmKey; "Content-Type" = "application/json" }
             } else {
                 @{ "Authorization" = "Bearer $llmKey"; "Content-Type" = "application/json" }
             }
-            
-            # Azure OpenAI must be checked first — its endpoint may also contain "/v1"
             $deploymentName = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-            $fullUri = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                # Strip any trailing /v1 or /openai/v1 path and build proper deployment URL
+            $fullUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
                 $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                 "$base/openai/deployments/$deploymentName/chat/completions?api-version=2024-02-15-preview"
             } elseif ($rules.LLMConfig.Endpoint -match "/v1/?$") {
@@ -568,44 +625,67 @@ function Get-MeetingClassification {
             Write-Host "  [LLM DIAG] Model: $($rules.LLMConfig.Model)"
             Write-Host "  [LLM DIAG] Key source: $keySource"
             Write-Host "  [LLM DIAG] Auth mode: $authMode"
-            
-            $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody
-            
-            $rawContent = $response.choices[0].message.content
-            $finishReason = $response.choices[0].finish_reason
-            if ($finishReason -ne "stop") {
-                Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
+
+            # --- Chunk config (configurable via LLMConfig, with safe defaults) ---
+            $chunkSize = if ($rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
+            $overlap   = if ($rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
+
+            # --- Split transcript into chunks ---
+            $chunks = Split-TranscriptIntoChunks -Text $transcriptContent -ChunkSize $chunkSize -Overlap $overlap
+            Write-Host "  [LLM DIAG] Chunks: $($chunks.Count) (chunk size: $chunkSize chars)"
+
+            # --- PASS 1: Summarise each chunk (lightweight prompt) ---
+            $chunkSummaryPrompt = @"
+You are summarising a section of a meeting transcript.
+Extract key points, decisions, actions, risks, and topics discussed in this section.
+Be concise but complete. Use plain text bullet points. Do not add headings or JSON.
+"@
+            $chunkSummaries = @()
+            $chunkNum = 0
+            foreach ($chunk in $chunks) {
+                $chunkNum++
+                Write-Host "  [LLM DIAG] Processing chunk $chunkNum/$($chunks.Count)..."
+                $raw = Invoke-LLM -SystemPrompt $chunkSummaryPrompt `
+                                  -UserContent "Transcript section $chunkNum/$($chunks.Count):`n`n$chunk" `
+                                  -FullUri $fullUri -Headers $llmHeaders `
+                                  -Model $rules.LLMConfig.Model -MaxTokens 4000
+                if ($raw) { $chunkSummaries += "### Section $chunkNum`n$raw" }
             }
 
-            # Step 1: Strip markdown code fences (e.g. ```json ... ``` or ``` ... ```)
-            $sanitizedContent = $rawContent -replace "(?s)^\s*```(?:json)?\s*", "" -replace "(?s)\s*```\s*$", ""
+            if ($chunkSummaries.Count -eq 0) {
+                Write-Warning "LLM Analysis failed: all chunk passes returned empty."
+            } else {
+                # --- PASS 2: Synthesise all chunk summaries into final structured JSON ---
+                $combinedSummaries = $chunkSummaries -join "`n`n"
+                $userContent = "Meeting transcript summaries (from $($chunks.Count) sections):`n`n$combinedSummaries"
+                $rawContent  = Invoke-LLM -SystemPrompt $rules.LLMConfig.Prompt `
+                                          -UserContent $userContent `
+                                          -FullUri $fullUri -Headers $llmHeaders `
+                                          -Model $rules.LLMConfig.Model -MaxTokens 16000
 
-            # Step 2: Extract the outermost JSON object (handles any leading/trailing text)
-            if ($sanitizedContent -match "(?s)(\{.*\})") {
-                $sanitizedContent = $matches[1]
-            }
-            
-            try {
-                $resultJson = $sanitizedContent | ConvertFrom-Json
-                return @{ 
-                    classification = $resultJson.classification; 
-                    confidence     = $resultJson.confidence; 
-                    summary        = $resultJson.summary;
-                    source         = "llm" 
-                }
-            }
-            catch {
-                $recovered = Recover-LLMResult -RawContent $rawContent
-                if ($recovered.summary) {
-                    Write-Warning "LLM Analysis returned malformed JSON; using recovered summary fallback."
-                    return @{
-                        classification = if ($recovered.classification) { $recovered.classification } else { "CEO" }
-                        confidence     = if ($recovered.confidence) { $recovered.confidence } else { "Low" }
-                        summary        = $recovered.summary
-                        source         = "llm_recovered"
+                if ($rawContent) {
+                    $resultJson = ConvertFrom-LLMJson -RawContent $rawContent
+                    if ($resultJson) {
+                        return @{
+                            classification = $resultJson.classification
+                            confidence     = $resultJson.confidence
+                            summary        = $resultJson.summary
+                            source         = "llm"
+                        }
+                    }
+                    # JSON parse failed — try regex recovery
+                    $recovered = Recover-LLMResult -RawContent $rawContent
+                    if ($recovered.summary) {
+                        Write-Warning "LLM Analysis returned malformed JSON; using recovered summary fallback."
+                        return @{
+                            classification = if ($recovered.classification) { $recovered.classification } else { "CEO" }
+                            confidence     = if ($recovered.confidence) { $recovered.confidence } else { "Low" }
+                            summary        = $recovered.summary
+                            source         = "llm_recovered"
+                        }
                     }
                 }
-                Write-Warning "LLM Analysis failed: $_"
+                Write-Warning "LLM Analysis failed: synthesis pass returned no usable content."
             }
         } catch {
             Write-Warning "LLM Analysis failed: $_"
