@@ -9,6 +9,10 @@ local.settings.json
 classification_rules.json
 pipeline_config.json
 
+# People config contains PII (names, emails) - do not commit
+config/people_config.json
+config/people_recommendations.json
+
 # Azurite artifacts
 __blobstorage__
 __queuestorage__

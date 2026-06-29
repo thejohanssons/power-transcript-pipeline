@@ -98,6 +98,9 @@ $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
 $sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
 $pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { @{ enable_stable_topic_classification = $false } }
+$peopleConfigPath = Join-Path $configDir "people_config.json"
+$peopleConfig = if (Test-Path $peopleConfigPath) { Get-Content -Path $peopleConfigPath | ConvertFrom-Json } else { $null }
+if ($peopleConfig) { Write-Host "People config loaded ($($peopleConfig.people.Count) people) ✅" } else { Write-Warning "people_config.json not found — people intelligence disabled" }
 
 # =========================
 # VTT HELPER: Strip WebVTT timestamps and cue markers, return clean transcript text
@@ -645,6 +648,220 @@ function Recover-LLMResult {
     return $result
 }
 
+# =========================
+# PEOPLE INTELLIGENCE: Resolve speaker names against people_config.json
+# =========================
+function Resolve-People {
+    param(
+        [string[]]$Names,
+        [object]$PeopleConfig
+    )
+    if (-not $PeopleConfig -or -not $Names -or $Names.Count -eq 0) { return @() }
+
+    $resolved   = [System.Collections.Generic.List[object]]::new()
+    $unresolved = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($name in ($Names | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique)) {
+        $nameLower = $name.Trim().ToLower()
+        $match = $PeopleConfig.people | Where-Object {
+            ($_.canonical_name.ToLower() -eq $nameLower) -or
+            ($_.aliases | Where-Object { $_.ToLower() -eq $nameLower })
+        } | Select-Object -First 1
+
+        if ($match) {
+            $resolved.Add($match)
+        } else {
+            $unresolved.Add($name.Trim())
+        }
+    }
+
+    if ($unresolved.Count -gt 0) {
+        $recPath = Join-Path $PSScriptRoot "config/people_recommendations.json"
+        $existing = if (Test-Path $recPath) { Get-Content $recPath | ConvertFrom-Json } else { [PSCustomObject]@{ unresolved = @() } }
+        foreach ($u in $unresolved) {
+            $found = $existing.unresolved | Where-Object { $_.name -eq $u }
+            if (-not $found) {
+                $existing.unresolved += [PSCustomObject]@{ name = $u; first_seen = (Get-Date -Format "yyyy-MM-dd"); count = 1 }
+            } else {
+                $found.count++
+            }
+        }
+        $existing | ConvertTo-Json -Depth 5 | Set-Content -Path $recPath -Encoding utf8
+        Write-Warning "  [PEOPLE] Unresolved names: $($unresolved -join ', ') — flagged to people_recommendations.json"
+    }
+
+    return $resolved.ToArray()
+}
+
+# =========================
+# PEOPLE INTELLIGENCE: Extract speaker names from transcript text
+# Returns array of distinct first-word speaker names found before ": " pattern
+# =========================
+function Get-TranscriptSpeakers {
+    param([string]$TranscriptText)
+    $speakers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in ($TranscriptText -split "`n")) {
+        if ($line -match "^([A-Z][a-zA-Z\s\-\.]{1,40}):\s") {
+            $null = $speakers.Add($matches[1].Trim())
+        }
+    }
+    return @($speakers)
+}
+
+# =========================
+# PEOPLE INTELLIGENCE: LLM pass — extract per-person attribution
+# =========================
+function Get-PeopleIntelligence {
+    param(
+        [string]$TranscriptText,
+        [string]$ChunkSummaries,
+        [object[]]$ResolvedPeople,
+        [object[]]$TopicRecords,
+        [string]$MeetingId,
+        [string]$Subject,
+        [string]$FullUri,
+        [hashtable]$Headers,
+        [string]$Model
+    )
+
+    if (-not $ResolvedPeople -or $ResolvedPeople.Count -eq 0) { return $null }
+
+    $peopleLines = $ResolvedPeople | ForEach-Object {
+        "- $($_.canonical_name) | $($_.role) | $($_.org_id -replace 'org_','') | seniority=$($_.seniority_level) | authority=$($_.decision_authority -join ',')"
+    }
+    $peopleContext = $peopleLines -join "`n"
+
+    $topicLines = if ($TopicRecords -and $TopicRecords.Count -gt 0) {
+        ($TopicRecords | Group-Object TopicId | ForEach-Object { "$($_.Name): $($_.Group[0].TopicName)" }) -join ", "
+    } else { "No topics detected" }
+
+    $systemPromptLines = @(
+        "You are an expert at extracting structured people intelligence from meeting transcripts and summaries.",
+        "",
+        "For each person listed, analyse the meeting content and produce a structured record.",
+        "Use ONLY evidence from the transcript and summaries. Do not invent or infer beyond what is stated.",
+        "",
+        "For each person output this structure (repeat for each person, separated by ---):",
+        "",
+        "PERSON: [canonical name]",
+        "ATTENDANCE: [Present | Discussed - not present | Expected - not present]",
+        "EVIDENCE: [First-person | Third-person only]",
+        "",
+        "CONTRIBUTIONS:",
+        "- [bullet per distinct contribution, or None observed]",
+        "",
+        "ACTIONS ASSIGNED TO THIS PERSON:",
+        "- [action] [<- assigned by Name | TopicID | due date or no due date]",
+        "- (or None)",
+        "",
+        "ACTIONS ASSIGNED BY THIS PERSON:",
+        "- [action] [-> assigned to Name | TopicID | due date or no due date]",
+        "- (or None)",
+        "",
+        "DECISIONS OWNED:",
+        "- [decision] [TopicID]",
+        "- (or None)",
+        "",
+        "RISKS RAISED:",
+        "- [risk] [TopicID | HIGH/MEDIUM/LOW]",
+        "- (or None)",
+        "",
+        "TOPICS REFERENCED: [comma-separated TopicIDs]",
+        "STANCE: [TopicID=word e.g. T08=concerned | or None]",
+        "",
+        "SUMMARY: [one sentence - primary focus or contribution in this meeting]",
+        "",
+        "---",
+        "",
+        "Rules:",
+        "- If ATTENDANCE is Discussed - not present or Expected - not present: EVIDENCE must be Third-person only. Leave CONTRIBUTIONS, DECISIONS OWNED, RISKS RAISED, STANCE as None.",
+        "- Do not fabricate names, roles, or actions.",
+        "- Use exact canonical names provided.",
+        "- Topic IDs must come from the provided list only."
+    )
+    $systemPrompt = $systemPromptLines -join "`n"
+
+    $safeTranscript = $TranscriptText.Substring(0, [Math]::Min($TranscriptText.Length, 40000))
+
+    $userLines = @(
+        "MEETING: $Subject ($MeetingId)",
+        "",
+        "KNOWN TOPIC IDs FOR THIS MEETING:",
+        $topicLines,
+        "",
+        "KNOWN PARTICIPANTS (resolve against these only):",
+        $peopleContext,
+        "",
+        "MEETING TRANSCRIPT SUMMARIES:",
+        $ChunkSummaries,
+        "",
+        "FULL TRANSCRIPT (for evidence):",
+        $safeTranscript
+    )
+    $userContent = $userLines -join "`n"
+
+    Write-Host "  [PEOPLE] Running people intelligence extraction ($($ResolvedPeople.Count) people)..."
+    $raw = Invoke-LLM -SystemPrompt $systemPrompt -UserContent $userContent `
+                      -FullUri $FullUri -Headers $Headers -Model $Model -MaxTokens 8000
+    return $raw
+}
+
+# =========================
+# PEOPLE INTELLIGENCE: Format LLM output into *-People.txt file content
+# =========================
+function Format-PeopleFile {
+    param(
+        [string]$LLMOutput,
+        [string]$MeetingId,
+        [string]$Subject,
+        [string]$EventDate,
+        [string]$PipelineVersion
+    )
+    $headerLines = @(
+        "MEETING ID: $MeetingId",
+        "SUBJECT: $Subject",
+        "EVENT DATE: $EventDate",
+        "PIPELINE_VERSION: $PipelineVersion",
+        "GENERATED: $([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ssZ'))",
+        "TYPE: People Intelligence",
+        "---",
+        ""
+    )
+    return ($headerLines -join "`n") + $LLMOutput.Trim()
+}
+
+# =========================
+# PEOPLE INTELLIGENCE: Update master_people_log data structure
+# =========================
+function Update-MasterPeopleLog {
+    param(
+        [object]$MasterPeopleLogData,
+        [string]$MeetingId,
+        [string]$Subject,
+        [string]$EventDate,
+        [string]$PeopleFileUrl,
+        [object[]]$ResolvedPeople
+    )
+    $now   = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+    $entry = [PSCustomObject]@{
+        MeetingId      = $MeetingId
+        Subject        = $Subject
+        EventDate      = $EventDate
+        PeopleFile     = $PeopleFileUrl
+        PeopleResolved = @($ResolvedPeople | ForEach-Object { $_.id })
+        GeneratedAt    = $now
+    }
+    $existing = $MasterPeopleLogData.Entries | Where-Object { $_.MeetingId -eq $MeetingId }
+    if ($existing) {
+        $idx = [array]::IndexOf($MasterPeopleLogData.Entries, $existing)
+        $MasterPeopleLogData.Entries[$idx] = $entry
+    } else {
+        $MasterPeopleLogData.Entries += $entry
+    }
+    return $MasterPeopleLogData
+}
+
+
 function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
@@ -1093,6 +1310,20 @@ try {
     Write-Host "No existing Master Log found or could not parse. Starting fresh."
 }
 
+# Load master_people_log.json
+$masterPeopleLogFileName = "master_people_log.json"
+$masterPeopleLogData = @{ Entries = @() }
+try {
+    $existingPeopleFileUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$rootFolderId`:/$masterPeopleLogFileName"
+    $existingPeopleFile = Invoke-RestMethod -Method Get -Uri $existingPeopleFileUri -Headers $authHeader
+    $downloadPeopleUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($existingPeopleFile.id)/content"
+    $rawPeopleData = Invoke-RestMethod -Method Get -Uri $downloadPeopleUri -Headers $authHeader
+    if ($rawPeopleData.Entries) { $masterPeopleLogData.Entries = @($rawPeopleData.Entries) }
+    Write-Host "Master People Log loaded ($($masterPeopleLogData.Entries.Count) entries) ✅"
+} catch {
+    Write-Host "No existing Master People Log found. Starting fresh."
+}
+
 # =========================
 # VTT DIRECT-FILE MODE
 # Bypasses calendar lookup and transcript fetch — processes a local .vtt file directly.
@@ -1227,6 +1458,49 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     }
 
+    # --- VTT People Intelligence ---
+    $vttUploadedPeopleFile = $null
+    if ($peopleConfig -and $cls.summary -and $plainText) {
+        try {
+            $vttSpeakerNames   = Get-TranscriptSpeakers -TranscriptText $plainText
+            $vttResolvedPeople = Resolve-People -Names $vttSpeakerNames -PeopleConfig $peopleConfig
+            if ($vttResolvedPeople -and $vttResolvedPeople.Count -gt 0) {
+                $vttLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
+                $vttAuthMode   = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+                $vttLlmHeaders = if ($vttAuthMode -eq "api-key") { @{ "api-key" = $vttLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $vttLlmKey"; "Content-Type" = "application/json" } }
+                $vttDeployment = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
+                $vttLlmUri     = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+                    $vttBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+                    "$vttBase/openai/deployments/$vttDeployment/chat/completions?api-version=2024-02-15-preview"
+                } else { "$($rules.LLMConfig.Endpoint -replace "/$","")/chat/completions" }
+
+                $vttPeopleRaw = Get-PeopleIntelligence `
+                    -TranscriptText $plainText `
+                    -ChunkSummaries $enrichedSummaryText `
+                    -ResolvedPeople $vttResolvedPeople `
+                    -TopicRecords $topicRecords3D `
+                    -MeetingId $mId `
+                    -Subject $subject `
+                    -FullUri $vttLlmUri `
+                    -Headers $vttLlmHeaders `
+                    -Model $rules.LLMConfig.Model
+
+                if ($vttPeopleRaw) {
+                    $vttPeopleContent = Format-PeopleFile -LLMOutput $vttPeopleRaw -MeetingId $mId -Subject $subject -EventDate $eventDate -PipelineVersion $PIPELINE_VERSION
+                    $vttLocalPeopleFile = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
+                    $vttPeopleContent | Out-File -FilePath $vttLocalPeopleFile -Encoding utf8
+                    $vttUploadedPeopleFile = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $vttLocalPeopleFile
+                    Write-Host "  [VTT] People file uploaded: $($vttUploadedPeopleFile.webUrl)"
+                    $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $vttUploadedPeopleFile.webUrl -ResolvedPeople $vttResolvedPeople
+                }
+            } else {
+                Write-Warning "  [VTT] No resolved people found — skipping people file"
+            }
+        } catch {
+            Write-Warning "  [VTT] People intelligence failed: $_"
+        }
+    }
+
     # --- Master Log entry ---
     $now         = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
     $vttLogEntry = @{
@@ -1248,6 +1522,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         TranscriptFile           = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile }
         SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $localSummaryFile }
         ConfluenceMirror         = $confluenceUrl
+        PeopleFile               = if ($vttUploadedPeopleFile) { $vttUploadedPeopleFile.webUrl } else { $null }
         Status                   = "success"
         AgentState               = "processed_vtt"
         LastProcessed            = $now
@@ -1271,8 +1546,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     Write-Host ""
     Write-Host "VTT Mode complete ✅"
     Write-Host "  Transcript : $localFile"
-    if ($localSummaryFile) { Write-Host "  Summary    : $localSummaryFile" }
-    if ($confluenceUrl)    { Write-Host "  Confluence : $confluenceUrl" }
+    if ($localSummaryFile)        { Write-Host "  Summary    : $localSummaryFile" }
+    if ($confluenceUrl)           { Write-Host "  Confluence : $confluenceUrl" }
+    if ($vttUploadedPeopleFile)   { Write-Host "  People     : $($vttUploadedPeopleFile.webUrl)" }
+
+    # Save master_people_log in VTT mode
+    $masterPeopleLogLocalPath = Join-Path $outDir $masterPeopleLogFileName
+    $masterPeopleLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterPeopleLogLocalPath -Encoding utf8
+    try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterPeopleLogLocalPath | Out-Null } catch {}
     exit 0
 }
 
@@ -1587,6 +1868,61 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 }
             }
             
+            # --- PEOPLE INTELLIGENCE ---
+            $uploadedPeopleFile = $null
+            if ($peopleConfig -and $cls.summary -and $transcriptContent) {
+                try {
+                    # 1. Extract speaker names from transcript and resolve against people_config
+                    $speakerNames = Get-TranscriptSpeakers -TranscriptText $transcriptContent
+                    $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $peopleConfig
+
+                    if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
+                        # 2. Run LLM people intelligence extraction (Pass 3)
+                        # Build LLM connection for people pass (same config as classification)
+                        $pLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
+                        $pAuthMode   = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+                        $pHeaders    = if ($pAuthMode -eq "api-key") { @{ "api-key" = $pLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $pLlmKey"; "Content-Type" = "application/json" } }
+                        $pDeployment = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
+                        $pUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+                            $pBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+                            "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
+                        } else { "$($rules.LLMConfig.Endpoint -replace "/$","")/chat/completions" }
+
+                        $peopleRaw = Get-PeopleIntelligence `
+                            -TranscriptText $transcriptContent `
+                            -ChunkSummaries $enrichedSummaryText `
+                            -ResolvedPeople $resolvedPeople `
+                            -TopicRecords $topicRecords `
+                            -MeetingId $mId `
+                            -Subject $subject `
+                            -FullUri $pUri `
+                            -Headers $pHeaders `
+                            -Model $rules.LLMConfig.Model
+
+                        if ($peopleRaw) {
+                            # 3. Format and save *-People.txt
+                            $peopleFileContent = Format-PeopleFile `
+                                -LLMOutput $peopleRaw `
+                                -MeetingId $mId `
+                                -Subject $subject `
+                                -EventDate $start `
+                                -PipelineVersion $PIPELINE_VERSION
+                            $localPeopleFile = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
+                            $peopleFileContent | Out-File -FilePath $localPeopleFile -Encoding utf8
+
+                            # 4. Upload to SharePoint (same folder as transcript and summary)
+                            $uploadedPeopleFile = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localPeopleFile
+                            Write-Host "  [PEOPLE] People file uploaded: $($uploadedPeopleFile.webUrl)"
+                            $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $start -PeopleFileUrl $uploadedPeopleFile.webUrl -ResolvedPeople $resolvedPeople
+                        }
+                    } else {
+                        Write-Warning "  [PEOPLE] No resolved people found in transcript — skipping people file"
+                    }
+                } catch {
+                    Write-Warning "  [PEOPLE] People intelligence failed: $_"
+                }
+            }
+
             # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
             $effectiveStatus = if ($uploadedTranscript -and -not $uploadedSummary) { "repair_needed" } else { "success" }
             $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { "pending" }
@@ -1612,6 +1948,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 ConfluenceMirror         = $confluenceUrl
                 TopicRecords             = $topicRecords
                 MeetingId                = $mId
+                PeopleFile               = if ($uploadedPeopleFile) { $uploadedPeopleFile.webUrl } else { $null }
             }
             $log += $logEntry
 
@@ -1762,6 +2099,7 @@ foreach ($runEntry in $log) {
         TranscriptFile           = $transcriptFile
         SummaryFile              = $summaryFile
         ConfluenceMirror         = $confMirror
+        PeopleFile               = Get-StickyMasterLogValue -NewValue $runEntry.PeopleFile -ExistingEntry $existingMatch -PropertyName "PeopleFile"
         Status                   = $runEntry.Status
         AgentState               = if ($existingMatch) { $existingMatch.AgentState } else { $runEntry.AgentState }
         LastProcessed            = if ($existingMatch) { $existingMatch.LastProcessed } else { $null }
@@ -1784,6 +2122,27 @@ foreach ($runEntry in $log) {
 # 4. Save and Upload updated Master Log (JSON for deduplication source)
 $masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
 Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogLocalPath | Out-Null
+
+# Save and Upload Master People Log (JSON)
+$masterPeopleLogLocalPath = Join-Path $outDir $masterPeopleLogFileName
+$masterPeopleLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterPeopleLogLocalPath -Encoding utf8
+try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterPeopleLogLocalPath | Out-Null } catch { Write-Warning "Master People Log JSON upload failed: $_" }
+
+# Save and Upload Master People Log (TXT)
+$masterPeopleLogTxtName = "master_people_log.txt"
+$masterPeopleLogTxtPath = Join-Path $outDir $masterPeopleLogTxtName
+$peopleTxtContent = @()
+foreach ($pe in ($masterPeopleLogData.Entries | Sort-Object EventDate -Descending)) {
+    $peopleTxtContent += "MEETING ID: $($pe.MeetingId)"
+    $peopleTxtContent += "SUBJECT: $($pe.Subject)"
+    $peopleTxtContent += "EVENT DATE: $($pe.EventDate)"
+    $peopleTxtContent += "PEOPLE FILE: $($pe.PeopleFile)"
+    $peopleTxtContent += "PEOPLE RESOLVED: $($pe.PeopleResolved -join ", ")"
+    $peopleTxtContent += "GENERATED AT: $($pe.GeneratedAt)"
+    $peopleTxtContent += ""
+}
+$peopleTxtContent | Out-File -FilePath $masterPeopleLogTxtPath -Encoding utf8
+try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterPeopleLogTxtPath | Out-Null } catch { Write-Warning "Master People Log TXT upload failed: $_" }
 
 # 5. Generate and Upload Human-Readable Master Log (.txt)
 $masterLogTxtName = "master_log.txt"
@@ -1811,6 +2170,7 @@ foreach ($m in ($masterLogData.Meetings | Sort-Object EventDate -Descending)) {
     $txtContent += "TRANSCRIPT FILE: $($m.TranscriptFile)"
     $txtContent += "SUMMARY FILE: $($m.SummaryFile)"
     if ($m.ConfluenceMirror) { $txtContent += "CONFLUENCE MIRROR: $($m.ConfluenceMirror)" }
+    if ($m.PeopleFile) { $txtContent += "PEOPLE FILE: $($m.PeopleFile)" }
     $txtContent += "LAST UPDATED: $($m.LastUpdated)"
     $txtContent += "" # Blank line separator
 }
