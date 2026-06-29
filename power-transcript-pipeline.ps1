@@ -553,10 +553,11 @@ function Get-MeetingClassification {
             }
             
             # Azure OpenAI must be checked first — its endpoint may also contain "/v1"
+            $deploymentName = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
             $fullUri = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
                 # Strip any trailing /v1 or /openai/v1 path and build proper deployment URL
                 $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-                "$base/openai/deployments/$($rules.LLMConfig.Model)/chat/completions?api-version=2024-02-15-preview"
+                "$base/openai/deployments/$deploymentName/chat/completions?api-version=2024-02-15-preview"
             } elseif ($rules.LLMConfig.Endpoint -match "/v1/?$") {
                 "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
             } else {
