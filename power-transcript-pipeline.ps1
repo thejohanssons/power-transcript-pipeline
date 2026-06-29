@@ -662,7 +662,9 @@ function Resolve-People {
     $unresolved = [System.Collections.Generic.List[string]]::new()
 
     foreach ($name in ($Names | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique)) {
-        $nameLower = $name.Trim().ToLower()
+        # Strip org suffix in parentheses e.g. "Peter Johansson (Empowering Tech)" -> "Peter Johansson"
+        $cleanName = ($name.Trim() -replace '\s*\([^)]*\)\s*$', '').Trim()
+        $nameLower = $cleanName.ToLower()
         $match = $PeopleConfig.people | Where-Object {
             ($_.canonical_name.ToLower() -eq $nameLower) -or
             ($_.aliases | Where-Object { $_.ToLower() -eq $nameLower })
@@ -701,7 +703,12 @@ function Get-TranscriptSpeakers {
     param([string]$TranscriptText)
     $speakers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($line in ($TranscriptText -split "`n")) {
-        if ($line -match "^([A-Z][a-zA-Z\s\-\.]{1,40}):\s") {
+        # VTT format: <v Speaker Name>dialogue</v>
+        if ($line -match "<v ([^>]+)>") {
+            $null = $speakers.Add($matches[1].Trim())
+        }
+        # Plain text format: Speaker Name: dialogue
+        elseif ($line -match "^([A-Z][a-zA-Z\s\-\.]{1,40}):\s") {
             $null = $speakers.Add($matches[1].Trim())
         }
     }
