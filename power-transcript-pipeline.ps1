@@ -1870,10 +1870,10 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             
             # --- PEOPLE INTELLIGENCE ---
             $uploadedPeopleFile = $null
-            if ($peopleConfig -and $cls.summary -and $transcriptContent) {
+            if ($peopleConfig -and $cls.summary -and $content) {
                 try {
                     # 1. Extract speaker names from transcript and resolve against people_config
-                    $speakerNames = Get-TranscriptSpeakers -TranscriptText $transcriptContent
+                    $speakerNames = Get-TranscriptSpeakers -TranscriptText $content
                     $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $peopleConfig
 
                     if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
@@ -1889,10 +1889,10 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         } else { "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
 
                         $peopleRaw = Get-PeopleIntelligence `
-                            -TranscriptText $transcriptContent `
+                            -TranscriptText $content `
                             -ChunkSummaries $enrichedSummaryText `
                             -ResolvedPeople $resolvedPeople `
-                            -TopicRecords $topicRecords `
+                            -TopicRecords $topicRecords3D `
                             -MeetingId $mId `
                             -Subject $subject `
                             -FullUri $pUri `
