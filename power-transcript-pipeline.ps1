@@ -538,7 +538,7 @@ function Get-MeetingClassification {
                     @{ role = "user"; content = "Transcript to analyze:`n`n$transcriptContent" }
                 )
                 temperature = 0
-                max_completion_tokens = 4000
+                max_completion_tokens = 16000
             } | ConvertTo-Json -Depth 10
             
             $keySource = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
@@ -572,6 +572,10 @@ function Get-MeetingClassification {
             $response = Invoke-RestMethod -Method Post -Uri $fullUri -Headers $headers -Body $llmBody
             
             $rawContent = $response.choices[0].message.content
+            $finishReason = $response.choices[0].finish_reason
+            if ($finishReason -ne "stop") {
+                Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
+            }
 
             # Step 1: Strip markdown code fences (e.g. ```json ... ``` or ``` ... ```)
             $sanitizedContent = $rawContent -replace "(?s)^\s*```(?:json)?\s*", "" -replace "(?s)\s*```\s*$", ""
