@@ -7,6 +7,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-06-29
+
+### Added
+- **People Intelligence Layer (Phase 1)**: Per-meeting `*-People.txt` files generated alongside transcript and summary. Covers attendance status, contributions, actions assigned to/by, decisions owned, risks raised, topic IDs referenced, stance, and focus summary per resolved person.
+- **`Get-TranscriptSpeakers`**: Extracts speaker names from both VTT `<v Name>` voice tags and plain `Name: dialogue` formats. Strips org suffixes (e.g. `(Empowering Tech)`) before matching.
+- **`Resolve-People`**: Case-insensitive alias matching against `people_config.json`. Unresolved names flagged to `config/people_recommendations.json` for review.
+- **`Get-PeopleIntelligence`**: LLM Pass 3 — structured per-person attribution extraction from transcript and chunk summaries.
+- **`Format-PeopleFile`**: Renders LLM output as `*-People.txt` with standard pipeline header.
+- **`Update-MasterPeopleLog`**: Maintains `master_people_log.json` and `master_people_log.txt` at SharePoint root.
+- **`master_people_log.json` + `master_people_log.txt`**: Dual-format running index of all people files, uploaded to SharePoint root alongside `master_log.*`. CoPilot-indexable.
+- **`PeopleFile` field**: Added to master log entries and run log entries.
+- People intelligence wired into both calendar pipeline and `-VttFile` direct mode.
+- `config/people_config.json` (active, based on v1.4) and `config/people_recommendations.json` added to `.gitignore` (PII).
+
+### Fixed
+- `config/people_config_v1_4.json` promoted to `config/people_config.json` as the active config.
+
+---
+
 ## [1.4.0] — 2026-06-29
 
 ### Added
