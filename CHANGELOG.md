@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — 2026-06-29
+
+### Added
+- **`-VttFile` direct processing mode**: Process a local `.vtt` file directly without calendar lookup or transcript fetch. Accepts `-VttFile "path/to/file.vtt"` and `-Participant "Name"`. Parses date and subject from filename (`YYYY-MM-DD_HHMM-Title.vtt`), runs full LLM classification, saves `.txt` and `-Summary.txt`, uploads to SharePoint, mirrors to Confluence, and adds to Master Log.
+- **`ConvertFrom-Vtt` function**: Strips WebVTT timestamps and cue markers, deduplicates consecutive same-speaker lines, returns clean plain text identical in format to calendar-sourced transcripts.
+
+---
+
 ## [1.3.0] — 2026-06-29
 
 ### Fixed
