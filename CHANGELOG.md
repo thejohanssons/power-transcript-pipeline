@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-07-01
+
+### Added
+- **Warning-focused Teams webhook notification**: End-of-run Teams message now reports warnings only — brand integrity conflicts, unresolved people, and pipeline errors. Clean runs receive a single "✅ Pipeline ran without warnings" message with a run summary line. Replaces the previous per-meeting metadata dump.
+- **`$global:PipelineWarnings` collector**: Centralised warning accumulator populated during the run by `Get-BrandConflicts` and `Resolve-People`, consumed at notification time.
+- **EIP brand/semantic model (CR implementation)**:
+  - `people_config.json` v1.7: `brand_affinity` and `brand_exclusions` on all 30 people and all 10 organisations; org `relationship` metadata; Abhijeet → Abhijeet Borah (full name resolved); Charlotte Bassat → `org_squid`; `brand` and `brand_conflict_severity` schema enums added
+  - `roles_config.json` v1.1: Stale `theo@wizcomtech.com` email corrected; Peter → CPO; Nick → COO; 7 new email mappings (Alison, Toby, Jack, Quin, Julia, Bhavesh, Ed); `FallbackMode`; extended `TypeMappings`
+  - `sentiment_rules.json` v1.1: Negation prefix list (21 terms); tiered `Negative` (Critical / Warning); `Neutral` in-progress state; NPI, compliance, and supplier domain vocabulary
+  - `taxonomy.json` v3.1: 4 new context types (Decision, Action, Commitment, Escalation); `ContextTypeDescriptions`; `TopicGroups` with 5 groups; topic descriptions for all 18 topics
+  - `mapping_rules.json` v2.1: Comprehensive keyword expansion across all T01–T18 topics; `suppress_keywords` per rule; 4 `SemanticIntegrityRules` (ProductBrandResolution, SupplierBrandConflict, PersonBrandConflict, BrandCastConflict); e-pens / NPI / supplier vocabulary
+- **`Get-BrandConflicts` function**: Evaluates topic text against `SemanticIntegrityRules`; emits typed conflict objects with severity (warning / info)
+- **`Test-NegatedInContext` helper**: Negation window check — detects if a matched sentiment keyword is preceded by a negation prefix within a configurable word window
+- **Suppress keyword support in `Classify-Topic`**: Rules with `suppress_keywords` are skipped when a suppress term matches, reducing false-positive topic classification
+- **Negation-aware `Get-TopicSentiment`**: All keyword matches now checked for negation context; tiered severity (Critical / Warning) returned; backward compatible with flat schema
+
+### Fixed
+- `organisations` list: `org_squid` (Squid, subsidiary_marketing) and `org_virrata` (Virrata AB, internal_partner) added — previously referenced by people entries but missing from the list
+- `people_config.json`: Canonical full name added to `aliases` for all 24 pre-v1.5 people entries (consistency fix); `identity_quality` corrected from `partial_name` → `complete` for Jackie Kaur, Penny Taylor, Johannes Blüml
+- `classification` enum: Missing comma after `"affiliate"` in `schema_enums` corrected
+
+---
+
 ## [1.5.0] — 2026-06-29
 
 ### Added

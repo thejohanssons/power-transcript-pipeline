@@ -1,14 +1,92 @@
 {
-  "Version": "1.0",
+  "Version": "1.1",
+  "Description": "Sentiment and resolution vocabulary for the EIP pipeline. Used by Step 3 (Semantic Extraction) Get-TopicSentiment to classify topic sentiment. Version 1.1 adds negation handling, severity tiers, neutral/in-progress state, and NPI/compliance domain vocabulary.",
+  "Changelog": [
+    {
+      "version": "1.1",
+      "date": "2026-07-01",
+      "changes": [
+        "Added NegationPrefixes for negation window handling in Get-TopicSentiment",
+        "Negative restructured into Critical and Warning severity tiers",
+        "Added Neutral list for in-progress / ambiguous state terms",
+        "Added NpiVocabulary for NPI-phase domain terms",
+        "Added ComplianceVocabulary for regulatory/certification domain terms",
+        "Added SupplierVocabulary for supply chain / OEM context terms",
+        "ResolutionPriority retained from v1.0"
+      ]
+    },
+    {
+      "version": "1.0",
+      "date": "2026-01-01",
+      "changes": ["Initial version — flat Positive / Negative / ResolutionPriority lists"]
+    }
+  ],
+  "NegationPrefixes": [
+    "not", "no", "never", "cannot", "can't", "won't", "didn't", "doesn't",
+    "haven't", "hasn't", "isn't", "aren't", "wasn't", "weren't", "hardly",
+    "barely", "scarcely", "without", "lack", "lacking", "absence of"
+  ],
+  "NegationWindowWords": 3,
   "Positive": [
     "fixed", "resolved", "improving", "ahead", "success", "on track", "complete", "positive",
     "stabilized", "optimized", "delivered", "agreed", "approved", "shipped", "validated",
-    "passed", "outperforming", "ready", "achieved", "gain"
+    "passed", "outperforming", "ready", "achieved", "gain", "confident", "progressing",
+    "cleared", "signed off", "certified", "released", "launched", "green", "healthy",
+    "recovered", "accelerating", "ahead of schedule", "under budget", "profitable"
   ],
-  "Negative": [
-    "issue", "blocker", "stalled", "delay", "risk", "declining", "behind", "negative", "drain",
-    "regression", "defect", "bottleneck", "drift", "rejected", "failed", "critical", "constraints",
-    "escalated", "missing", "overbudget", "unclear", "uncertain", "leak", "bug"
+  "Negative": {
+    "Critical": [
+      "blocker", "critical", "escalated", "failed", "rejected", "regression",
+      "overbudget", "halted", "suspended", "breach", "violation", "non-compliant",
+      "recall", "injunction", "legal action", "data loss", "security breach",
+      "NPI failure", "production halt", "factory stop"
+    ],
+    "Warning": [
+      "issue", "stalled", "delay", "risk", "declining", "behind", "negative", "drain",
+      "defect", "bottleneck", "drift", "constraints", "missing", "unclear", "uncertain",
+      "leak", "bug", "slipping", "overrun", "concern", "at risk", "flagged", "pending",
+      "unresolved", "deferred", "pushback", "disputed", "incomplete", "low confidence",
+      "ambiguous", "degraded", "underperforming", "shortfall", "gap"
+    ]
+  },
+  "Neutral": [
+    "in progress", "ongoing", "under review", "being investigated", "monitoring",
+    "tracking", "tbc", "to be confirmed", "awaiting", "pending review", "planned",
+    "scheduled", "on hold", "parked", "watching", "noted"
   ],
-  "ResolutionPriority": ["fixed", "resolved", "delivered", "shipped", "complete"]
+  "ResolutionPriority": [
+    "fixed", "resolved", "delivered", "shipped", "complete", "cleared", "signed off",
+    "certified", "released", "closed"
+  ],
+  "NpiVocabulary": {
+    "description": "Terms associated with NPI (New Product Introduction) phase — used to weight topic relevance in NPI-phase meeting context",
+    "terms": [
+      "NPI", "new product introduction", "EVT", "DVT", "PVT", "pilot build",
+      "mass production", "MP", "tooling", "proto", "prototype", "pre-production",
+      "factory acceptance", "FAT", "golden sample", "first article", "first off tool",
+      "yield", "ramp", "production ramp", "BOM", "bill of materials", "component",
+      "supplier qualification", "AVL", "approved vendor list", "lead time",
+      "long lead item", "PCB", "firmware release", "hardware freeze", "feature freeze"
+    ]
+  },
+  "ComplianceVocabulary": {
+    "description": "Regulatory, certification and safety terms — elevates topic to T02 Product Quality and Compliance",
+    "terms": [
+      "compliance", "UL", "REACH", "RoHS", "CE", "FCC", "UKCA", "certification",
+      "audit", "standard", "safety", "regulatory", "regulation", "approval",
+      "declaration of conformity", "DoC", "test report", "EN standard", "IEC standard",
+      "electromagnetic compatibility", "EMC", "SAR", "radio approval", "type approval",
+      "market surveillance", "enforcement", "product recall", "field safety notice"
+    ]
+  },
+  "SupplierVocabulary": {
+    "description": "Supply chain, OEM and manufacturing context terms — relevant to Nick/Supply and Operations and Hanwang/e-pens supplier relationships",
+    "terms": [
+      "supplier", "OEM", "ODM", "factory", "Hanwang", "e-pens", "EP-XP-S2",
+      "offline language pack", "pre-install", "firmware pre-load", "supply chain",
+      "logistics", "freight", "customs", "tariff", "MOQ", "minimum order quantity",
+      "purchase order", "PO", "delivery schedule", "shipment", "goods receipt",
+      "inbound", "stock", "inventory", "warehouse", "3PL", "fulfilment"
+    ]
+  }
 }

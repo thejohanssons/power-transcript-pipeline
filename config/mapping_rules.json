@@ -1,23 +1,362 @@
 {
-  "Version": "2.0",
+  "Version": "2.1",
+  "Description": "Topic keyword mapping rules for the EIP pipeline. Used by Step 3 (Semantic Extraction) to match transcript segments to taxonomy topics. Version 2.1 adds comprehensive keyword expansion for all 18 topics, suppress_keywords for noise reduction, semantic integrity rules for brand conflict detection, and e-pens / product-specific vocabulary.",
+  "Changelog": [
+    {
+      "version": "2.1",
+      "date": "2026-07-01",
+      "changes": [
+        "Comprehensive keyword expansion for all 18 topics (T01–T18)",
+        "suppress_keywords added per topic to reduce false-positive matches",
+        "SemanticIntegrityRules added: ProductBrandResolution, SupplierBrandConflict, PersonBrandConflict, BrandCastConflict",
+        "e-pens product vocabulary added (EP-XP-S2, offline language packs, pre-install, OEM)",
+        "NPI phase vocabulary integrated into T05 and T07",
+        "Brand-scoped keyword sets added for C-Pen, SuperPen, Wizcom, e-pens disambiguation"
+      ]
+    },
+    {
+      "version": "2.0",
+      "date": "2026-01-01",
+      "changes": ["Initial version — minimal keyword sets"]
+    }
+  ],
+
   "Rules": [
-    { "TopicId": "T01", "Keywords": ["scan", "scanning", "performance", "UX", "selection", "navigation", "accuracy", "touch", "speed", "battery", "thermal", "throttling"], "CategoryHints": ["Execution", "Problem", "Risk", "Opportunity", "Learning"] },
-    { "TopicId": "T02", "Keywords": ["compliance", "UL", "REACH", "RoHS", "certification", "quality", "defect", "bug", "standard", "safety", "testing"], "CategoryHints": ["Governance", "Risk", "Execution"] },
-    { "TopicId": "T03", "Keywords": ["value", "perception", "customer feedback", "usability", "appeal"], "CategoryHints": ["Opportunity", "Problem", "Learning"] },
-    { "TopicId": "T04", "Keywords": ["scope", "prioritisation", "feature list", "requirements", "MVP", "backlog"], "CategoryHints": ["Strategy", "Execution", "Governance"] },
-    { "TopicId": "T05", "Keywords": ["delivery", "readiness", "launch", "deployment", "rollout", "milestone", "rescheduling", "calendar", "timing"], "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"] },
-    { "TopicId": "T06", "Keywords": ["risk", "constraints", "blockers", "delay", "stalled", "bottleneck"], "CategoryHints": ["Problem", "Risk", "Execution"] },
-    { "TopicId": "T07", "Keywords": ["execution", "engineering", "sprint", "development", "build", "code"], "CategoryHints": ["Execution", "Learning", "Problem", "Risk"] },
-    { "TopicId": "T08", "Keywords": ["cash flow", "liquidity", "funding", "runway", "capital"], "CategoryHints": ["Risk", "Strategy", "Governance"] },
-    { "TopicId": "T09", "Keywords": ["cost"], "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"] },
-    { "TopicId": "T10", "Keywords": ["revenue"], "CategoryHints": ["Opportunity", "Risk", "Strategy", "Execution"] },
-    { "TopicId": "T11", "Keywords": ["exposure"], "CategoryHints": ["Risk", "Strategy", "Governance"] },
-    { "TopicId": "T12", "Keywords": ["organisation"], "CategoryHints": ["Governance", "Execution", "Learning", "Risk"] },
-    { "TopicId": "T13", "Keywords": ["resource"], "CategoryHints": ["Execution", "Risk", "Problem", "Governance"] },
-    { "TopicId": "T14", "Keywords": ["operational"], "CategoryHints": ["Execution", "Governance", "Problem", "Risk"] },
-    { "TopicId": "T15", "Keywords": ["strategy", "alignment", "vision", "direction", "priorities", "objectives"], "CategoryHints": ["Strategy", "Governance", "Opportunity", "Risk"] },
-    { "TopicId": "T16", "Keywords": ["market fit", "competitor", "Positioning", "TAM", "Segments"], "CategoryHints": ["Strategy", "Opportunity", "Learning"] },
-    { "TopicId": "T17", "Keywords": ["growth"], "CategoryHints": ["Opportunity", "Strategy", "Execution"] },
-    { "TopicId": "T18", "Keywords": ["confidence"], "CategoryHints": ["Learning", "Risk", "Strategy"] }
+    {
+      "TopicId": "T01",
+      "Name": "Product Performance",
+      "Keywords": [
+        "scan", "scanning", "performance", "UX", "selection", "navigation", "accuracy",
+        "touch", "speed", "battery", "thermal", "throttling", "latency", "responsiveness",
+        "frame rate", "lag", "dropout", "calibration", "highlight", "word selection",
+        "sentence mode", "full page", "scan mode", "reading mode", "dictionary",
+        "text to speech", "TTS", "audio quality", "speaker", "microphone",
+        "OCR", "recognition", "character recognition", "scanning accuracy",
+        "C-Pen performance", "SuperPen performance", "pen performance",
+        "EP-XP-S2 performance", "e-pens performance",
+        "boot time", "startup", "wake", "sleep mode", "power consumption",
+        "Wi-Fi", "Bluetooth", "connectivity", "pairing", "USB", "sync"
+      ],
+      "suppress_keywords": ["marketing performance", "sales performance", "financial performance", "operational performance"],
+      "CategoryHints": ["Execution", "Problem", "Risk", "Opportunity", "Learning"]
+    },
+    {
+      "TopicId": "T02",
+      "Name": "Product Quality & Compliance",
+      "Keywords": [
+        "compliance", "UL", "REACH", "RoHS", "CE", "FCC", "UKCA", "certification",
+        "quality", "defect", "bug", "standard", "safety", "testing", "regulatory",
+        "regulation", "approval", "declaration of conformity", "DoC", "test report",
+        "EN standard", "IEC standard", "electromagnetic compatibility", "EMC",
+        "SAR", "radio approval", "type approval", "market surveillance",
+        "enforcement", "product recall", "field safety notice", "audit",
+        "V&V", "verification", "validation", "DVT", "PVT", "EVT",
+        "QA", "quality assurance", "quality control", "QC", "failure rate",
+        "return rate", "RMA", "warranty", "out of spec", "tolerance",
+        "non-compliant", "pass rate", "test coverage", "regression test"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Governance", "Risk", "Execution"]
+    },
+    {
+      "TopicId": "T03",
+      "Name": "Product Value & Perception",
+      "Keywords": [
+        "value", "perception", "customer feedback", "usability", "appeal",
+        "user experience", "customer satisfaction", "NPS", "review", "rating",
+        "complaint", "return", "churn", "loyalty", "retention",
+        "accessibility", "dyslexia", "learning difficulty", "SEN", "special educational needs",
+        "education market", "student", "teacher", "classroom", "school",
+        "enterprise", "corporate", "B2B", "B2C", "consumer",
+        "unboxing", "first impression", "packaging", "design language",
+        "brand perception", "product perception", "market reception",
+        "feature request", "user research", "usability study", "beta feedback"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Opportunity", "Problem", "Learning"]
+    },
+    {
+      "TopicId": "T04",
+      "Name": "Product Scope & Prioritisation",
+      "Keywords": [
+        "scope", "prioritisation", "feature list", "requirements", "MVP", "backlog",
+        "roadmap", "product roadmap", "feature", "spec", "specification",
+        "PRD", "product requirements", "user story", "epics", "ticket",
+        "deprioritised", "cut", "descope", "must have", "nice to have",
+        "priority", "trade-off", "feasibility", "complexity",
+        "C-Pen roadmap", "SuperPen roadmap", "e-pens roadmap",
+        "next version", "v2", "hardware revision", "SKU", "variant",
+        "language support", "language pack", "dictionary expansion",
+        "new feature", "feature freeze", "scope change", "change request"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Strategy", "Execution", "Governance"]
+    },
+    {
+      "TopicId": "T05",
+      "Name": "Delivery Progress & Readiness",
+      "Keywords": [
+        "delivery", "readiness", "launch", "deployment", "rollout", "milestone",
+        "rescheduling", "calendar", "timing", "schedule", "timeline", "date",
+        "go live", "go to market", "GTM", "release", "ship date", "target date",
+        "NPI", "new product introduction", "EVT", "DVT", "PVT",
+        "pilot build", "mass production", "MP", "tooling", "proto", "prototype",
+        "pre-production", "factory acceptance", "FAT", "golden sample",
+        "first article", "first off tool", "production ramp", "ramp",
+        "on track", "behind schedule", "ahead of schedule", "slipping",
+        "delayed", "brought forward", "moved out", "Q1", "Q2", "Q3", "Q4",
+        "H1", "H2", "FY", "quarter", "half year", "year end",
+        "launch readiness", "launch plan", "launch review"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"]
+    },
+    {
+      "TopicId": "T06",
+      "Name": "Delivery Risk & Constraints",
+      "Keywords": [
+        "risk", "constraints", "blockers", "delay", "stalled", "bottleneck",
+        "dependency", "blocker", "blocked", "waiting on", "critical path",
+        "single point of failure", "SPOF", "resource constraint", "capacity constraint",
+        "technical risk", "supply risk", "component shortage", "long lead item",
+        "lead time", "EOL", "end of life", "obsolescence", "discontinuation",
+        "tariff", "customs", "geopolitical", "trade restriction",
+        "factory risk", "supplier risk", "sole source", "dual source",
+        "mitigation", "contingency", "fallback", "workaround",
+        "red flag", "amber flag", "escalation", "at risk"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Problem", "Risk", "Execution"]
+    },
+    {
+      "TopicId": "T07",
+      "Name": "Development Execution",
+      "Keywords": [
+        "execution", "engineering", "sprint", "development", "build", "code",
+        "firmware", "hardware", "software", "embedded", "app", "application",
+        "Android", "iOS", "Windows", "SDK", "API", "integration",
+        "pen software", "C-Pen software", "SuperPen firmware", "e-pens firmware",
+        "EP-XP-S2 firmware", "hardware revision", "PCB", "component",
+        "BOM", "bill of materials", "AVL", "approved vendor list",
+        "pull request", "PR", "merge", "branch", "commit", "CI", "CD",
+        "pipeline", "build system", "release candidate", "RC",
+        "bug fix", "patch", "hotfix", "sprint review", "demo",
+        "technical debt", "refactor", "architecture", "module"
+      ],
+      "suppress_keywords": ["pipeline strategy", "sales pipeline", "revenue pipeline"],
+      "CategoryHints": ["Execution", "Learning", "Problem", "Risk"]
+    },
+    {
+      "TopicId": "T08",
+      "Name": "Cash Flow & Liquidity",
+      "Keywords": [
+        "cash flow", "liquidity", "funding", "runway", "capital",
+        "cash position", "bank balance", "overdraft", "credit facility",
+        "investment", "investor", "raise", "fundraise", "grant",
+        "Innovate UK", "R&D tax credit", "SEIS", "EIS",
+        "working capital", "debtors", "creditors", "receivables", "payables",
+        "payment terms", "invoice", "overdue", "collection", "DSO",
+        "cash burn", "burn rate", "monthly burn", "forecast cash"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Risk", "Strategy", "Governance"]
+    },
+    {
+      "TopicId": "T09",
+      "Name": "Cost Structure & Margins",
+      "Keywords": [
+        "cost", "margin", "COGS", "gross margin", "net margin", "unit cost",
+        "BOM cost", "manufacturing cost", "overhead", "opex", "capex",
+        "fixed cost", "variable cost", "cost reduction", "efficiency",
+        "pricing", "price point", "ASP", "average selling price",
+        "discount", "rebate", "channel margin", "distributor margin",
+        "cost overrun", "budget", "over budget", "under budget",
+        "FX", "foreign exchange", "currency", "hedging",
+        "tariff impact", "duty", "import cost"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"]
+    },
+    {
+      "TopicId": "T10",
+      "Name": "Revenue & Commercial Performance",
+      "Keywords": [
+        "revenue", "sales", "units", "volume", "orders", "bookings",
+        "ARR", "MRR", "recurring revenue", "subscription", "licence",
+        "royalty", "TTS royalty", "ReadSpeaker", "licensing",
+        "channel", "distributor", "reseller", "retail", "Amazon",
+        "direct sales", "B2B sales", "enterprise sales", "education sales",
+        "pipeline", "forecast", "quota", "target", "attainment",
+        "conversion", "win rate", "deal size", "ACV", "TCV",
+        "upsell", "cross-sell", "attach rate", "renewal",
+        "C-Pen sales", "SuperPen sales", "e-pens sales", "Scanning Pens revenue"
+      ],
+      "suppress_keywords": ["development pipeline", "firmware pipeline"],
+      "CategoryHints": ["Opportunity", "Risk", "Strategy", "Execution"]
+    },
+    {
+      "TopicId": "T11",
+      "Name": "Financial Risk & Exposure",
+      "Keywords": [
+        "exposure", "financial risk", "contingency", "provision", "write-off",
+        "bad debt", "credit risk", "concentration risk", "single customer",
+        "FX risk", "currency risk", "interest rate", "covenant",
+        "audit", "statutory accounts", "HMRC", "tax", "VAT",
+        "legal exposure", "litigation", "dispute", "claim",
+        "insurance", "indemnity", "liability", "warranty claim",
+        "financial forecast", "sensitivity", "scenario planning", "stress test"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Risk", "Strategy", "Governance"]
+    },
+    {
+      "TopicId": "T12",
+      "Name": "Organisation & Capability",
+      "Keywords": [
+        "organisation", "headcount", "hiring", "recruitment", "onboarding",
+        "capability", "skills", "training", "development", "L&D",
+        "team structure", "org structure", "reporting line", "management",
+        "leadership", "succession", "retention", "attrition", "turnover",
+        "contractor", "consultant", "agency", "offshoring", "nearshoring",
+        "Wizcom team", "WebKorps team", "embedded team", "resourcing",
+        "skills gap", "competency", "performance review"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Governance", "Execution", "Learning", "Risk"]
+    },
+    {
+      "TopicId": "T13",
+      "Name": "Resource Allocation",
+      "Keywords": [
+        "resource", "allocation", "capacity", "bandwidth", "availability",
+        "competing priorities", "context switching", "utilisation",
+        "assigned to", "owner", "responsible", "RACI",
+        "team capacity", "sprint capacity", "velocity",
+        "shared resource", "dedicated resource", "part-time",
+        "prioritise", "deprioritise", "trade-off", "opportunity cost"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Execution", "Risk", "Problem", "Governance"]
+    },
+    {
+      "TopicId": "T14",
+      "Name": "Operational Effectiveness",
+      "Keywords": [
+        "operational", "operations", "process", "workflow", "efficiency",
+        "supply chain", "logistics", "freight", "fulfilment", "warehouse",
+        "3PL", "inbound", "outbound", "stock", "inventory", "MOQ",
+        "purchase order", "PO", "delivery schedule", "shipment",
+        "goods receipt", "customs", "import", "export",
+        "Hanwang", "e-pens OEM", "supplier", "vendor", "factory",
+        "EP-XP-S2", "offline language pack", "pre-install", "firmware pre-load",
+        "returns", "RMA process", "after-sales", "support",
+        "SLA", "KPI", "dashboard", "reporting", "metrics"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Execution", "Governance", "Problem", "Risk"]
+    },
+    {
+      "TopicId": "T15",
+      "Name": "Strategic Direction & Alignment",
+      "Keywords": [
+        "strategy", "alignment", "vision", "direction", "priorities", "objectives",
+        "OKR", "goal", "annual plan", "3-year plan", "5-year plan",
+        "strategic review", "board", "investor update", "shareholder",
+        "portfolio", "brand portfolio", "C-Pen strategy", "SuperPen strategy",
+        "e-pens strategy", "Wizcom strategy", "Empowering Tech strategy",
+        "market strategy", "go-to-market", "GTM strategy",
+        "competitive strategy", "differentiation", "positioning",
+        "make vs buy", "build vs buy", "partnership strategy",
+        "exit strategy", "M&A", "acquisition", "divestiture"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Strategy", "Governance", "Opportunity", "Risk"]
+    },
+    {
+      "TopicId": "T16",
+      "Name": "Product-Market Fit",
+      "Keywords": [
+        "market fit", "competitor", "positioning", "TAM", "segments",
+        "total addressable market", "SAM", "SOM", "market size",
+        "competition", "competitive analysis", "competitive intelligence",
+        "differentiation", "USP", "unique selling proposition",
+        "customer segment", "persona", "ICP", "ideal customer profile",
+        "education segment", "enterprise segment", "consumer segment",
+        "dyslexia market", "accessibility market", "SEN market",
+        "reading technology", "assistive technology", "AT",
+        "C-Pen market", "SuperPen market", "e-pens market",
+        "WizCom competitor", "scanning pen competitor", "alternative product"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Strategy", "Opportunity", "Learning"]
+    },
+    {
+      "TopicId": "T17",
+      "Name": "Growth & Opportunities",
+      "Keywords": [
+        "growth", "opportunity", "expansion", "new market", "new channel",
+        "partnership", "collaboration", "alliance", "JV", "joint venture",
+        "distribution agreement", "licensing opportunity", "white label",
+        "OEM opportunity", "new product", "product extension",
+        "geography", "international", "US market", "European market",
+        "Asia", "APAC", "MENA", "Latin America",
+        "government", "public sector", "tender", "bid", "framework",
+        "Innovate UK", "grant opportunity", "R&D project",
+        "upsell opportunity", "cross-sell opportunity", "adjacent market"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Opportunity", "Strategy", "Execution"]
+    },
+    {
+      "TopicId": "T18",
+      "Name": "Delivery Confidence",
+      "Keywords": [
+        "confidence", "overall confidence", "delivery confidence", "team confidence",
+        "on track", "comfortable", "concerned", "worried", "uncertain",
+        "mixed signals", "positive outlook", "negative outlook",
+        "risk appetite", "risk posture", "leadership posture",
+        "cross-portfolio", "portfolio health", "executive view",
+        "RAG", "red amber green", "status report", "dashboard",
+        "programme health", "portfolio review"
+      ],
+      "suppress_keywords": [],
+      "CategoryHints": ["Learning", "Risk", "Strategy"]
+    }
+  ],
+
+  "SemanticIntegrityRules": [
+    {
+      "id": "ProductBrandResolution",
+      "description": "Ensure product mentions are attributed to the correct brand. C-Pen, SuperPen, e-pens, and Wizcom are distinct products — conflating them in a summary is a semantic error.",
+      "trigger_keywords": ["C-Pen", "SuperPen", "e-pens", "Wizcom", "scanning pen", "EP-XP-S2"],
+      "validation": "When multiple brand names appear in the same segment, verify the context applies equally to all brands or flag as BRAND_CAST_CONFLICT",
+      "conflict_type": "BrandCastConflict",
+      "severity": "warning"
+    },
+    {
+      "id": "SupplierBrandConflict",
+      "description": "Supplier-side mentions (Hanwang, e-pens OEM, EP-XP-S2) must not be attributed to C-Pen engineering or Wizcom. Hanwang manufactures C-Pen hardware (ODM); e-pens OEM is a separate supply relationship.",
+      "trigger_keywords": ["Hanwang", "e-pens OEM", "EP-XP-S2", "OEM", "factory", "offline language pack", "pre-install"],
+      "validation": "Contributions in this context should be attributed to Supply Chain / Operations, not to Wizcom engineering or C-Pen product team",
+      "conflict_type": "SupplierBrandConflict",
+      "severity": "warning"
+    },
+    {
+      "id": "PersonBrandConflict",
+      "description": "Wizcom engineers have brand_exclusions for C-Pen and e-pens. If a Wizcom engineer is attributed to a C-Pen or e-pens decision, flag as a potential brand attribution error.",
+      "trigger_people_org": "org_wizcom",
+      "excluded_brands": ["C-Pen", "e-pens"],
+      "validation": "Check whether the contribution genuinely relates to Wizcom/SuperPen or has been incorrectly attributed to a cross-brand topic",
+      "conflict_type": "PersonBrandConflict",
+      "severity": "warning"
+    },
+    {
+      "id": "BrandCastConflict",
+      "description": "A summary or action that bundles all brands together ('across our product range', 'all pens') when the discussion was specific to one brand. This creates false cross-brand commitments.",
+      "trigger_patterns": ["all pens", "all products", "across the range", "all brands", "product portfolio", "our products"],
+      "validation": "Verify that the original discussion genuinely applied to all brands before casting a cross-brand conclusion",
+      "conflict_type": "BrandCastConflict",
+      "severity": "info"
+    }
   ]
 }

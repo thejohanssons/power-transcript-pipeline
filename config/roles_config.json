@@ -1,19 +1,59 @@
 {
-  "Version": "1.0",
+  "Version": "1.1",
+  "Description": "Role-to-mode mappings for the EIP pipeline. Used by Step 3 (Semantic Extraction) to select the appropriate reasoning mode when processing speaker contributions. Version 1.1 fixes stale Theo email, corrects Peter mode, adds 8 missing people, and adds FallbackMode and TypeMappings extensions.",
+  "Changelog": [
+    {
+      "version": "1.1",
+      "date": "2026-07-01",
+      "changes": [
+        "theo@wizcomtech.com corrected to theo@empoweringtech.com (stale email)",
+        "peter@empoweringtech.com: CEO → CPO (product/technology portfolio leadership)",
+        "nick@empoweringtech.com: CEO → COO (Head of Supply and Operations)",
+        "Added: alison@empoweringtech.com → COO",
+        "Added: toby@empoweringtech.com → CMO",
+        "Added: jack@empoweringtech.com → CSO",
+        "Added: quin@empoweringtech.com → CSO",
+        "Added: julia@empoweringtech.com → CPO (Head of Education)",
+        "Added: bhavesh@wizcomtech.com → CPO (Hardware Team Lead)",
+        "Added: ed@empoweringtech.com → CSO (US Sales Manager)",
+        "Added: FallbackMode for unresolved email mappings",
+        "Extended TypeMappings: Operations, Supply Chain, Engineering, Education, HR, Legal, Academic"
+      ]
+    },
+    {
+      "version": "1.0",
+      "date": "2026-01-01",
+      "changes": ["Initial version"]
+    }
+  ],
+  "FallbackMode": "CPO",
   "Mappings": [
-    { "Email": "carolynn@empoweringtech.com", "DefaultMode": "CEO" },
-    { "Email": "nick@empoweringtech.com", "DefaultMode": "CEO" },
-    { "Email": "theo@wizcomtech.com", "DefaultMode": "CPO" },
-    { "Email": "mangesh@wizcomtech.com", "DefaultMode": "CPO" },
-    { "Email": "mandar@wizcomtech.com", "DefaultMode": "CPO" },
-    { "Email": "peter@empoweringtech.com", "DefaultMode": "CEO" }
+    { "Email": "carolynn@empoweringtech.com", "DefaultMode": "CEO", "Notes": "CEO / co-founder" },
+    { "Email": "peter@empoweringtech.com",    "DefaultMode": "CPO", "Notes": "CPO / portfolio and product technology leadership" },
+    { "Email": "theo@empoweringtech.com",     "DefaultMode": "CPO", "Notes": "CPO / Chief Product Officer — corrected from stale wizcomtech.com address" },
+    { "Email": "nick@empoweringtech.com",     "DefaultMode": "COO", "Notes": "Head of Supply and Operations" },
+    { "Email": "alison@empoweringtech.com",   "DefaultMode": "COO", "Notes": "Operations Infrastructure" },
+    { "Email": "toby@empoweringtech.com",     "DefaultMode": "CMO", "Notes": "Marketing, Operations, Finance" },
+    { "Email": "jack@empoweringtech.com",     "DefaultMode": "CSO", "Notes": "Sales" },
+    { "Email": "quin@empoweringtech.com",     "DefaultMode": "CSO", "Notes": "GM Scanning Pens — sales execution and channel strategy" },
+    { "Email": "julia@empoweringtech.com",    "DefaultMode": "CPO", "Notes": "Head of Education — education product and GTM" },
+    { "Email": "ed@empoweringtech.com",       "DefaultMode": "CSO", "Notes": "US Sales Manager / Director" },
+    { "Email": "bhavesh@wizcomtech.com",      "DefaultMode": "CPO", "Notes": "Hardware Team Lead — engineering and product delivery" },
+    { "Email": "mangesh@wizcomtech.com",      "DefaultMode": "CPO", "Notes": "Wizcom engineering" },
+    { "Email": "mandar@wizcomtech.com",       "DefaultMode": "CPO", "Notes": "Wizcom engineering" }
   ],
   "TypeMappings": {
-    "ExCo": "CEO",
-    "Finance": "CFO",
-    "Sales": "CEO",
-    "Marketing": "CEO",
-    "Education": "CEO",
-    "Product Management": "CPO"
+    "ExCo":               "CEO",
+    "Finance":            "CFO",
+    "Sales":              "CSO",
+    "Marketing":          "CMO",
+    "Education":          "CPO",
+    "Product Management": "CPO",
+    "Engineering":        "CPO",
+    "Operations":         "COO",
+    "Supply Chain":       "COO",
+    "HR":                 "COO",
+    "Legal":              "CFO",
+    "Academic":           "CPO"
   }
 }

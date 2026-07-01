@@ -170,26 +170,154 @@ function Assign-Mode {
     return @{ mode = "CEO"; source = "default_fallback"; confidence = "Low" }
 }
 
+function Get-BrandConflicts {
+    # Evaluates a text segment against SemanticIntegrityRules in mapping_rules.json.
+    # Returns an array of conflict objects (may be empty).
+    param([string]$Text, [string]$SpeakerOrgId = $null)
+
+    $conflicts = @()
+    if (-not $mappingRules.PSObject.Properties.Name -contains 'SemanticIntegrityRules') { return $conflicts }
+    $rules = $mappingRules.SemanticIntegrityRules
+    if (-not $rules) { return $conflicts }
+
+    $lowerText = $Text.ToLower()
+
+    foreach ($rule in $rules) {
+        $triggered = $false
+
+        # Keyword-triggered rules
+        if ($rule.PSObject.Properties.Name -contains 'trigger_keywords' -and $rule.trigger_keywords) {
+            $matchedBrands = @()
+            foreach ($kw in $rule.trigger_keywords) {
+                if ($lowerText -match [regex]::Escape($kw.ToLower())) { $matchedBrands += $kw }
+            }
+            # BrandCastConflict: multiple distinct brands mentioned together
+            if ($rule.id -eq 'ProductBrandResolution' -and $matchedBrands.Count -gt 1) { $triggered = $true }
+            # SupplierBrandConflict: any supplier keyword present
+            elseif ($rule.id -eq 'SupplierBrandConflict' -and $matchedBrands.Count -gt 0) { $triggered = $true }
+        }
+
+        # Pattern-triggered rules (BrandCastConflict)
+        if ($rule.PSObject.Properties.Name -contains 'trigger_patterns' -and $rule.trigger_patterns) {
+            foreach ($pat in $rule.trigger_patterns) {
+                if ($lowerText -match [regex]::Escape($pat.ToLower())) { $triggered = $true; break }
+            }
+        }
+
+        # Org-triggered rules (PersonBrandConflict)
+        if ($rule.PSObject.Properties.Name -contains 'trigger_people_org' -and $rule.trigger_people_org -and $SpeakerOrgId) {
+            if ($SpeakerOrgId -eq $rule.trigger_people_org) {
+                $excludedBrands = if ($rule.PSObject.Properties.Name -contains 'excluded_brands') { $rule.excluded_brands } else { @() }
+                foreach ($brand in $excludedBrands) {
+                    if ($lowerText -match [regex]::Escape($brand.ToLower())) { $triggered = $true; break }
+                }
+            }
+        }
+
+        if ($triggered) {
+            $conflicts += [pscustomobject]@{
+                RuleId      = $rule.id
+                ConflictType = $rule.conflict_type
+                Severity    = $rule.severity
+                Description = $rule.description
+                Validation  = $rule.validation
+            }
+        }
+    }
+
+    return $conflicts
+}
+
+function Test-NegatedInContext {
+    # Returns $true if the keyword at $matchIndex is preceded by a negation word
+    # within a window of $windowWords words.
+    param([string]$Text, [int]$MatchIndex, [int]$WindowWords = 3)
+    if ($MatchIndex -le 0) { return $false }
+    $before = $Text.Substring(0, $MatchIndex).TrimEnd()
+    $words = $before -split '\s+'
+    $window = if ($words.Count -ge $WindowWords) { $words[-$WindowWords..-1] } else { $words }
+    $negationPrefixes = if ($sentimentRules.PSObject.Properties.Name -contains 'NegationPrefixes') {
+        $sentimentRules.NegationPrefixes
+    } else {
+        @("not","no","never","cannot","can't","won't","didn't","doesn't","haven't","hasn't","isn't","aren't","wasn't","weren't","without","lack","lacking")
+    }
+    foreach ($w in $window) {
+        if ($negationPrefixes -contains $w.ToLower().Trim('.,;:!?')) { return $true }
+    }
+    return $false
+}
+
 function Get-TopicSentiment {
     param($topicText)
     $txt = $topicText.ToLower()
-    
+
     $isPos = $false
     $isNeg = $false
+    $negWindow = if ($sentimentRules.PSObject.Properties.Name -contains 'NegationWindowWords') { [int]$sentimentRules.NegationWindowWords } else { 3 }
 
-    foreach ($p in $sentimentRules.Positive) { if ($txt -match "\b$([regex]::Escape($p.ToLower()))\b") { $isPos = $true } }
-    foreach ($n in $sentimentRules.Negative) { if ($txt -match "\b$([regex]::Escape($n.ToLower()))\b") { $isNeg = $true } }
-    
-    # Resolution Priority Logic (e.g., "fixed", "shipped")
+    # Resolution Priority — highest precedence, checked before Negative
     foreach ($r in $sentimentRules.ResolutionPriority) {
-        if ($txt -match "\b$([regex]::Escape($r.ToLower()))\b") {
+        $escaped = [regex]::Escape($r.ToLower())
+        $m = [regex]::Match($txt, "\b$escaped\b")
+        if ($m.Success -and -not (Test-NegatedInContext -Text $txt -MatchIndex $m.Index -WindowWords $negWindow)) {
             return @{ Signal = "Positive"; Trajectory = "Improving" }
         }
     }
 
+    # Positive keywords with negation check
+    foreach ($p in $sentimentRules.Positive) {
+        $escaped = [regex]::Escape($p.ToLower())
+        $m = [regex]::Match($txt, "\b$escaped\b")
+        if ($m.Success -and -not (Test-NegatedInContext -Text $txt -MatchIndex $m.Index -WindowWords $negWindow)) {
+            $isPos = $true
+        }
+    }
+
+    # Negative keywords — tiered (Critical / Warning) or flat list (backward compat)
+    $negTerms = @()
+    $isCritical = $false
+    $negObj = $sentimentRules.Negative
+    if ($negObj -is [System.Management.Automation.PSCustomObject] -or ($negObj -is [hashtable])) {
+        # Tiered structure: Negative.Critical and Negative.Warning
+        $criticalTerms = if ($negObj.PSObject.Properties.Name -contains 'Critical') { $negObj.Critical } else { @() }
+        $warningTerms  = if ($negObj.PSObject.Properties.Name -contains 'Warning')  { $negObj.Warning  } else { @() }
+        foreach ($n in $criticalTerms) {
+            $escaped = [regex]::Escape($n.ToLower())
+            $m = [regex]::Match($txt, "\b$escaped\b")
+            if ($m.Success -and -not (Test-NegatedInContext -Text $txt -MatchIndex $m.Index -WindowWords $negWindow)) {
+                $isNeg = $true; $isCritical = $true
+            }
+        }
+        foreach ($n in $warningTerms) {
+            $escaped = [regex]::Escape($n.ToLower())
+            $m = [regex]::Match($txt, "\b$escaped\b")
+            if ($m.Success -and -not (Test-NegatedInContext -Text $txt -MatchIndex $m.Index -WindowWords $negWindow)) {
+                $isNeg = $true
+            }
+        }
+    } else {
+        # Flat list (backward compat with v1.0 schema)
+        foreach ($n in $negObj) {
+            $escaped = [regex]::Escape($n.ToLower())
+            $m = [regex]::Match($txt, "\b$escaped\b")
+            if ($m.Success -and -not (Test-NegatedInContext -Text $txt -MatchIndex $m.Index -WindowWords $negWindow)) {
+                $isNeg = $true
+            }
+        }
+    }
+
+    # Neutral check — in-progress / ambiguous state
+    $neutralTerms = if ($sentimentRules.PSObject.Properties.Name -contains 'Neutral') { $sentimentRules.Neutral } else { @() }
+    $isNeutral = $false
+    foreach ($n in $neutralTerms) {
+        if ($txt -match [regex]::Escape($n.ToLower())) { $isNeutral = $true; break }
+    }
+
     if ($isPos -and -not $isNeg) { return @{ Signal = "Positive"; Trajectory = "Improving" } }
-    if ($isNeg) { return @{ Signal = "Negative"; Trajectory = "Declining" } }
-    
+    if ($isNeg -and $isCritical)  { return @{ Signal = "Negative"; Trajectory = "Declining"; Severity = "Critical" } }
+    if ($isNeg)                   { return @{ Signal = "Negative"; Trajectory = "Declining"; Severity = "Warning" } }
+    if ($isNeutral)               { return @{ Signal = "Neutral";  Trajectory = "Stable";    Severity = "Info" } }
+
     return @{ Signal = "Neutral"; Trajectory = "Stable" }
 }
 
@@ -208,8 +336,16 @@ function Classify-Topic {
         }
 
         if ($hits -gt 0) {
-            # Basic density score (hits relative to keywords available)
-            # This helps differentiate between topics with many keywords vs few
+            # Suppress keyword check — if any suppress_keywords match, penalise this rule heavily
+            $suppressed = $false
+            if ($rule.PSObject.Properties.Name -contains 'suppress_keywords' -and $rule.suppress_keywords) {
+                foreach ($sk in $rule.suppress_keywords) {
+                    if ($cleanText -match [regex]::Escape($sk.ToLower())) { $suppressed = $true; break }
+                }
+            }
+            if ($suppressed) { continue }
+
+            # Density score (hits relative to keywords available)
             $density = $hits / $rule.Keywords.Count
             if ($density -gt $maxDensity) {
                 $maxDensity = $density
@@ -219,9 +355,7 @@ function Classify-Topic {
     }
 
     if (-not $bestMatch) {
-        # Task 2.2: Best-fit fallback logic
-        # Fallback to Strategy (T15) if no keywords match, 
-        # as it is the safest catch-all for executive discussion
+        # Fallback to Strategy (T15) — safest catch-all for executive discussion
         $bestMatch = "T15"
     }
 
@@ -407,7 +541,24 @@ function Enrich-Summary {
         if (-not $bullets.Trim()) { continue }
 
         $cls = & "Classify-Topic" ($label + "`n" + $bullets)
-        
+
+        # Brand conflict check on topic block
+        $brandConflicts = Get-BrandConflicts -Text ($label + " " + $bullets)
+        if ($brandConflicts.Count -gt 0) {
+            foreach ($bc in $brandConflicts) {
+                Write-Warning "  [BRAND INTEGRITY] $($bc.ConflictType) ($($bc.Severity)) in topic '$label': $($bc.Validation)"
+                $global:PipelineWarnings.Add([pscustomobject]@{
+                    Type       = "BrandIntegrity"
+                    Severity   = $bc.Severity
+                    ConflictType = $bc.ConflictType
+                    Detail     = "$($bc.ConflictType) — `"$label`""
+                    MeetingId  = $meetingId
+                    Subject    = $subject
+                    EventDate  = $start
+                })
+            }
+        }
+
         # Aggregate Signal
         $posCount = 0; $negCount = 0
         foreach ($line in ($bullets -split "`n")) {
@@ -690,6 +841,16 @@ function Resolve-People {
         }
         $existing | ConvertTo-Json -Depth 5 | Set-Content -Path $recPath -Encoding utf8
         Write-Warning "  [PEOPLE] Unresolved names: $($unresolved -join ', ') — flagged to people_recommendations.json"
+        foreach ($u in $unresolved) {
+            $global:PipelineWarnings.Add([pscustomobject]@{
+                Type      = "UnresolvedPerson"
+                Severity  = "warning"
+                Detail    = $u
+                MeetingId = $null
+                Subject   = $null
+                EventDate = $null
+            })
+        }
     }
 
     return $resolved.ToArray()
@@ -1159,6 +1320,9 @@ function Send-TeamsNotification {
         Write-Warning "  [TEAMS] Notification failed: $($_.Exception.Message). Ensure your webhook supports AdaptiveCards."
     }
 }
+
+# Pipeline warnings collector — populated during run, consumed by Teams notification
+$global:PipelineWarnings = [System.Collections.Generic.List[pscustomobject]]::new()
 
 $global:GraphTokenInfo = $null
 $global:authHeader = $null
@@ -2188,27 +2352,62 @@ Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $mas
 # --- BATCH TEAMS NOTIFICATION ---
 if ($log -and $log.Count -gt 0) {
     Write-Host "Sending batch Teams notification..."
-    $batchMsg = ""
-    foreach ($entry in $log) {
-        $hasTranscript = if ($entry.File) { "True" } else { "False" }
-        
-        $batchMsg += "MEETING ID: $($entry.MeetingId)`n"
-        $batchMsg += "SUBJECT: $($entry.Subject)`n"
-        $batchMsg += "ORGANISER: $($entry.Organiser)`n"
-        $batchMsg += "EVENT DATE: $($entry.EventDate)`n"
-        $batchMsg += "TYPE: $($entry.Type)`n"
-        $batchMsg += "PRIORITY: $($entry.Priority)`n"
-        $batchMsg += "MODE: $($entry.Classification)`n"
-        $batchMsg += "MODE_CONFIDENCE: $($entry.ClassificationConfidence)`n"
-        $batchMsg += "MODE_SOURCE: $($entry.ClassificationSource)`n"
-        $batchMsg += "STATUS: $($entry.Status)`n"
-        $batchMsg += "AGENT STATE: $($entry.AgentState)`n"
-        $batchMsg += "HAS TRANSCRIPT: $hasTranscript`n"
-        $batchMsg += "TRANSCRIPT FILE: $($entry.File)`n"
-        $batchMsg += "SUMMARY FILE: $($entry.SummaryFile)`n"
-        if ($entry.ConfluenceMirror) { $batchMsg += "CONFLUENCE MIRROR: $($entry.ConfluenceMirror)`n" }
-        $batchMsg += "LAST UPDATED: $($entry.LastProcessed)`n`n"
+
+    # Build run summary counts
+    $totalMeetings  = $log.Count
+    $newMeetings    = ($log | Where-Object { $_.Status -eq "processed" } | Measure-Object).Count
+    $skippedMeetings= ($log | Where-Object { $_.Status -eq "skipped" }   | Measure-Object).Count
+    $errorMeetings  = ($log | Where-Object { $_.Status -eq "error" }     | Measure-Object).Count
+    $dateRangeStr   = "$($FromDate.ToString('yyyy-MM-dd')) – $($ToDate.ToString('yyyy-MM-dd'))"
+
+    # Collect pipeline errors from log
+    foreach ($entry in ($log | Where-Object { $_.Status -eq "error" })) {
+        $global:PipelineWarnings.Add([pscustomobject]@{
+            Type      = "PipelineError"
+            Severity  = "critical"
+            Detail    = $entry.Subject
+            MeetingId = $entry.MeetingId
+            Subject   = $entry.Subject
+            EventDate = $entry.EventDate
+        })
     }
+
+    $summaryLine = "Run summary: $totalMeetings meetings processed ($newMeetings new, $skippedMeetings skipped, $errorMeetings errors) | $dateRangeStr"
+
+    if ($global:PipelineWarnings.Count -eq 0) {
+        $batchMsg = "✅ Pipeline ran without warnings`n$summaryLine"
+    } else {
+        $batchMsg = "⚠️ Pipeline completed with $($global:PipelineWarnings.Count) warning(s)`n$summaryLine`n"
+
+        # Brand integrity warnings
+        $brandWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "BrandIntegrity" }
+        if ($brandWarnings) {
+            $batchMsg += "`n⚠️ BRAND INTEGRITY ($($brandWarnings.Count))`n"
+            foreach ($w in $brandWarnings) {
+                $dateStr = if ($w.EventDate) { " [$($w.Subject), $([datetime]$w.EventDate -f 'yyyy-MM-dd')]" } else { "" }
+                $batchMsg += "  • $($w.Detail)$dateStr`n"
+            }
+        }
+
+        # Unresolved people warnings
+        $peopleWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "UnresolvedPerson" }
+        if ($peopleWarnings) {
+            $batchMsg += "`n⚠️ UNRESOLVED PEOPLE ($($peopleWarnings.Count))`n"
+            foreach ($w in $peopleWarnings) {
+                $batchMsg += "  • $($w.Detail)`n"
+            }
+        }
+
+        # Pipeline errors
+        $errorWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "PipelineError" }
+        if ($errorWarnings) {
+            $batchMsg += "`n❌ ERRORS ($($errorWarnings.Count))`n"
+            foreach ($w in $errorWarnings) {
+                $batchMsg += "  • $($w.Subject)`n"
+            }
+        }
+    }
+
     Send-TeamsNotification -MessageBlock $batchMsg.Trim()
 }
 
