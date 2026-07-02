@@ -1,7 +1,21 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "description": "People configuration for the Executive Intelligence Preprocessor (EIP). Provides canonical identity resolution, role metadata, authority domains, decision authority, functional metadata, speaker categorisation, and classification for all known meeting participants. Used by Step 4 (Enrichment) for deterministic name resolution and by Step 3 (Semantic Extraction) for people-aware contribution extraction. Version 1.5 promotes three partial-name entries to full people (Manasi Bhabal, Gaurav Ranjan Mhatre, Shweta Tripathi) and adds four new entries from people_recommendations.json (Jackie Kaur, Penny Taylor, Abhijeet, Johannes Blüml).",
   "changelog": [
+    {
+      "version": "1.7",
+      "date": "2026-07-01",
+      "changes": [
+        "brand_affinity and brand_exclusions added to all 29 people entries",
+        "brand_affinity and relationship added to all 10 organisation entries",
+        "org_epens_oem: supplier_contacts: [Shelly] added",
+        "org_scanning_pens: portfolio_role_note added to prevent sales/engineering confusion",
+        "candidate_shelly: metadata strengthened for e-pens OEM context",
+        "Charlotte Bassat: org_id -> org_squid, classification -> internal",
+        "Abhijeet -> Abhijeet Borah: full name resolved, ID -> person_abhijeet_borah, identity_quality -> complete",
+        "schema_enums: brand and brand_conflict_severity enums added"
+      ]
+    },
     {
       "version": "1.6",
       "date": "2026-06-30",
@@ -75,6 +89,7 @@
       "supplier",
       "customer",
       "consultant",
+      "affiliate",
       "unknown"
     ],
     "seniority_level": {
@@ -116,6 +131,16 @@
       "partial_name",
       "email_only",
       "candidate"
+    ],
+    "brand": [
+      "C-Pen",
+      "Wizcom",
+      "SuperPen",
+      "e-pens"
+    ],
+    "brand_conflict_severity": [
+      "warning",
+      "info"
     ]
   },
   "organisations": [
@@ -125,31 +150,58 @@
       "type": "parent_company",
       "domains": [
         "empoweringtech.com"
-      ]
+      ],
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ],
+      "relationship": "parent_company"
     },
     {
       "id": "org_wizcom",
       "name": "WizCom Technologies",
-      "type": "development_partner",
+      "type": "subsidiary_development",
       "domains": [
         "wizcomtech.com"
-      ]
+      ],
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "relationship": "in_house_development"
     },
     {
       "id": "org_webkorps",
       "name": "WebKorps",
-      "type": "development_partner",
+      "type": "external_development",
       "domains": [
         "webkorps.com"
-      ]
+      ],
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ],
+      "relationship": "external_development"
     },
     {
       "id": "org_scanning_pens",
       "name": "Scanning Pens / C-Pen",
-      "type": "subsidiary_brand",
+      "type": "subsidiary_sales",
       "domains": [
         "scanningpens.com"
-      ]
+      ],
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ],
+      "relationship": "distribution_gtm",
+      "portfolio_role_note": "Distribution and GTM across all brands — does not imply engineering ownership"
     },
     {
       "id": "org_uwe",
@@ -157,37 +209,68 @@
       "type": "academic_partner",
       "domains": [
         "uwe.ac.uk"
-      ]
+      ],
+      "brand_affinity": [
+        "C-Pen"
+      ],
+      "relationship": "academic_partner"
     },
     {
       "id": "org_hanwang",
       "name": "Hanwang",
-      "type": "supplier",
-      "domains": []
+      "type": "external_partner",
+      "domains": [],
+      "brand_affinity": [
+        "C-Pen"
+      ],
+      "relationship": "subcontract_manufacturer_odm"
     },
     {
       "id": "org_epens_oem",
-      "name": "E-pen OEM",
-      "type": "supplier",
-      "domains": []
+      "name": "e-pens OEM",
+      "type": "external_supplier",
+      "domains": [],
+      "brand_affinity": [
+        "e-pens"
+      ],
+      "relationship": "oem_supplier",
+      "supplier_contacts": [
+        "Shelly"
+      ]
     },
     {
       "id": "org_readspeaker",
       "name": "ReadSpeaker",
-      "type": "licensor",
-      "domains": []
+      "type": "external_licensor",
+      "domains": [],
+      "brand_affinity": [
+        "C-Pen"
+      ],
+      "relationship": "technology_licensor"
     },
     {
       "id": "org_squid",
       "name": "Squid",
-      "type": "affiliate",
-      "domains": []
+      "type": "subsidiary_marketing",
+      "domains": [],
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ],
+      "relationship": "subsidiary_marketing"
     },
     {
       "id": "org_virrata",
       "name": "Virrata AB",
-      "type": "partner",
-      "domains": []
+      "type": "internal_partner",
+      "domains": [],
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "relationship": "internal_partner"
     }
   ],
   "people": [
@@ -260,7 +343,13 @@
         "Mandar-Peter"
       ],
       "identity_quality": "complete",
-      "notes": "Chair of Local Management Committee. Drives NPI stage/gate governance, EIP pipeline, and product compliance (MDR, DTAC, RED-DA). Reviewed 2026-06-29."
+      "notes": "Chair of Local Management Committee. Drives NPI stage/gate governance, EIP pipeline, and product compliance (MDR, DTAC, RED-DA). Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_theo_davies",
@@ -318,7 +407,13 @@
         "WebKorps Daily"
       ],
       "identity_quality": "complete",
-      "notes": "Oversees full development lifecycle from concept through validation to production. KTP business partner supervisor. Reviewed 2026-06-29."
+      "notes": "Oversees full development lifecycle from concept through validation to production. KTP business partner supervisor. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_toby_sutton",
@@ -382,7 +477,13 @@
         "Quarterly Sales & Marketing"
       ],
       "identity_quality": "complete",
-      "notes": "Co-owner. Drives commercial strategy, sales oversight, and partner relationships. Alias 'Toby Salt' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Co-owner. Drives commercial strategy, sales oversight, and partner relationships. Alias 'Toby Salt' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_jack_churchill",
@@ -440,7 +541,13 @@
         "Sales Call"
       ],
       "identity_quality": "complete",
-      "notes": "Co-owner. Manages financial operations, legal matters, and corporate compliance. Alias 'Jack Middleton' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Co-owner. Manages financial operations, legal matters, and corporate compliance. Alias 'Jack Middleton' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_carolynn_helps",
@@ -495,7 +602,13 @@
         "Sales Call"
       ],
       "identity_quality": "complete",
-      "notes": "Facilitates ExCo daily meetings. Makes sure the engine is well oiled and operational. Alias 'Carolynn Sherwin' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Facilitates ExCo daily meetings. Makes sure the engine is well oiled and operational. Alias 'Carolynn Sherwin' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_sharmella_kirby",
@@ -551,7 +664,13 @@
         "NPI Stage 3"
       ],
       "identity_quality": "complete",
-      "notes": "CFO. Alias 'Sharmella Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "CFO. Alias 'Sharmella Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_alison_garbett",
@@ -605,7 +724,13 @@
         "ExCo daily"
       ],
       "identity_quality": "complete",
-      "notes": "Leads compliance documentation and regulatory evidence packs. KTP business partner supervisor 2. Reviewed 2026-06-29."
+      "notes": "Leads compliance documentation and regulatory evidence packs. KTP business partner supervisor 2. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_nick_barnes",
@@ -660,7 +785,13 @@
         "ExCo daily"
       ],
       "identity_quality": "complete",
-      "notes": "Manages supplier relationships, PO ordering, and packaging logistics. Alias 'Nick Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Manages supplier relationships, PO ordering, and packaging logistics. Alias 'Nick Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_ed_hill",
@@ -706,7 +837,10 @@
         "ExCo daily"
       ],
       "identity_quality": "complete",
-      "notes": "US-based sales leadership. Alias 'Ed Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "US-based sales leadership. Alias 'Ed Sherwood' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen"
+      ]
     },
     {
       "id": "person_chloe_garner",
@@ -756,7 +890,13 @@
         "Marketing Call"
       ],
       "identity_quality": "complete",
-      "notes": "Manages marketing campaigns, branding, and content strategy. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "Manages marketing campaigns, branding, and content strategy. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_julia_clouter",
@@ -806,7 +946,13 @@
         "NPI Stage 3"
       ],
       "identity_quality": "complete",
-      "notes": "Promoted from candidate_julia_clouter in v1.4. Head of Education — leads education strategy, pilot coordination, and teacher engagement. Reviewed 2026-06-29."
+      "notes": "Promoted from candidate_julia_clouter in v1.4. Head of Education — leads education strategy, pilot coordination, and teacher engagement. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_quin_chandler",
@@ -863,7 +1009,10 @@
         "Squid Call - BD Focus"
       ],
       "identity_quality": "complete",
-      "notes": "GM of Scanning Pens. In charge of all sales, execution and strategy. Alias 'Quin Sheridan' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "GM of Scanning Pens. In charge of all sales, execution and strategy. Alias 'Quin Sheridan' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "C-Pen"
+      ]
     },
     {
       "id": "person_mandar_padwal",
@@ -914,7 +1063,15 @@
         "WebKorps Daily"
       ],
       "identity_quality": "complete",
-      "notes": "Leads WizCom R&D team in Mumbai. Dual role: technical architecture and team management. Key dependency for SuperPen delivery. Reviewed 2026-06-29."
+      "notes": "Leads WizCom R&D team in Mumbai. Dual role: technical architecture and team management. Key dependency for SuperPen delivery. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_mangesh_ayachit",
@@ -965,7 +1122,15 @@
         "WebKorps Daily"
       ],
       "identity_quality": "complete",
-      "notes": "Manages project coordination between WizCom and WebKorps teams. Reviewed 2026-06-29."
+      "notes": "Manages project coordination between WizCom and WebKorps teams. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_bhavesh_bhadricha",
@@ -1021,7 +1186,15 @@
         "Compliance"
       ],
       "identity_quality": "complete",
-      "notes": "Hardware Team Lead managing related tech areas, planning, DFM, compliance (tech perspective), skills and resources. Alias 'Bhavesh Mistry' retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Hardware Team Lead managing related tech areas, planning, DFM, compliance (tech perspective), skills and resources. Alias 'Bhavesh Mistry' retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_ajita_chavan",
@@ -1069,7 +1242,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Leads firmware development including build recipes, OTA, and Vivoka TTS integration. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "Leads firmware development including build recipes, OTA, and Vivoka TTS integration. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_ashutosh_dhage",
@@ -1117,7 +1298,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Software dev engineer (Qt / pen software). Alias 'Ashutosh Bhagwat' was incorrect name — retained for backward transcript resolution. Reviewed 2026-06-29."
+      "notes": "Software dev engineer (Qt / pen software). Alias 'Ashutosh Bhagwat' was incorrect name — retained for backward transcript resolution. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_shrutee_phadke",
@@ -1164,7 +1353,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Test / V&V engineer. Reviewed 2026-06-29."
+      "notes": "Test / V&V engineer. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_prajakta_nawale",
@@ -1209,7 +1406,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Promoted from candidate_prajakta in v1.4. AI/ML engineer in R&D. Reviewed 2026-06-29."
+      "notes": "Promoted from candidate_prajakta in v1.4. AI/ML engineer in R&D. Reviewed 2026-06-29.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_komal_varadkar",
@@ -1252,7 +1457,15 @@
         "WebKorps Daily"
       ],
       "identity_quality": "complete",
-      "notes": "Software development contributor. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "Software development contributor. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_manasi_bhabal",
@@ -1295,7 +1508,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Software development contributor. Full name resolved from 'Manasi' in v1.5 via people_recommendations.json. Reviewed 2026-06-30."
+      "notes": "Software development contributor. Full name resolved from 'Manasi' in v1.5 via people_recommendations.json. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_shweta_tripathi",
@@ -1342,7 +1563,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "Acts as cross-functional hub across UI/UX, verification & validation, and API workstreams. Full name resolved from 'Shweta T' in v1.5 via people_recommendations.json. Reviewed 2026-06-30."
+      "notes": "Acts as cross-functional hub across UI/UX, verification & validation, and API workstreams. Full name resolved from 'Shweta T' in v1.5 via people_recommendations.json. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_gaurav_mhatre",
@@ -1390,7 +1619,15 @@
         "Weekly R&D update"
       ],
       "identity_quality": "complete",
-      "notes": "V&V technical lead. Runs regression testing on firmware builds. Full name resolved from 'Gaurav M' in v1.5 via people_recommendations.json. Reviewed 2026-06-30."
+      "notes": "V&V technical lead. Runs regression testing on firmware builds. Full name resolved from 'Gaurav M' in v1.5 via people_recommendations.json. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ],
+      "brand_exclusions": [
+        "C-Pen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_vipul",
@@ -1525,7 +1762,13 @@
         "Quarterly Sales & Marketing"
       ],
       "identity_quality": "complete",
-      "notes": "Involved in Squid agency general focus and marketing strategy. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "Involved in Squid agency general focus and marketing strategy. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_melissa_haywood",
@@ -1567,7 +1810,13 @@
         "Sales Call"
       ],
       "identity_quality": "complete",
-      "notes": "Sales team member. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "Sales team member. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_wenhao_zhang",
@@ -1611,7 +1860,10 @@
       },
       "meeting_series_primary": [],
       "identity_quality": "complete",
-      "notes": "KTP academic lead from UWE. Specialist in machine learning and curriculum-aligned education. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "KTP academic lead from UWE. Specialist in machine learning and curriculum-aligned education. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "C-Pen"
+      ]
     },
     {
       "id": "person_mark_hansen",
@@ -1651,7 +1903,10 @@
       },
       "meeting_series_primary": [],
       "identity_quality": "complete",
-      "notes": "KTP academic supervisor from UWE. Not reviewed in manual review session — carried forward from v1.1."
+      "notes": "KTP academic supervisor from UWE. Not reviewed in manual review session — carried forward from v1.1.",
+      "brand_affinity": [
+        "C-Pen"
+      ]
     },
     {
       "id": "person_jackie_kaur",
@@ -1664,7 +1919,7 @@
       ],
       "role": "Squid BD",
       "org_id": "org_squid",
-      "classification": "unknown",
+      "classification": "internal",
       "person_type": "unknown",
       "seniority_level": null,
       "functional_area": "Unknown",
@@ -1682,7 +1937,13 @@
       },
       "meeting_series_primary": [],
       "identity_quality": "complete",
-      "notes": "Promoted from people_recommendations.json in v1.5 (count: 3, first seen 2026-06-30). Role, org, and functional area unknown — please complete. Reviewed 2026-06-30."
+      "notes": "Promoted from people_recommendations.json in v1.5 (count: 3, first seen 2026-06-30). Role, org, and functional area unknown — please complete. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
       "id": "person_penny_taylor",
@@ -1713,14 +1974,21 @@
       },
       "meeting_series_primary": [],
       "identity_quality": "complete",
-      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Role, org, and functional area unknown — please complete. Reviewed 2026-06-30."
+      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Role, org, and functional area unknown — please complete. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "C-Pen",
+        "Wizcom",
+        "SuperPen",
+        "e-pens"
+      ]
     },
     {
-      "id": "person_abhijeet",
-      "canonical_name": "Abhijeet",
+      "id": "person_abhijeet_borah",
+      "canonical_name": "Abhijeet Borah",
       "first_name": "Abhijeet",
-      "last_name": null,
+      "last_name": "Borah",
       "aliases": [
+        "Abhijeet Borah",
         "Abhijeet"
       ],
       "role": "Unknown",
@@ -1742,8 +2010,8 @@
         "primary_operational_contact": null
       },
       "meeting_series_primary": [],
-      "identity_quality": "partial_name",
-      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Last name and all other details unknown — please complete. Reviewed 2026-06-30."
+      "identity_quality": "complete",
+      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Last name and all other details unknown — please complete. Reviewed 2026-06-30. Full name resolved to Abhijeet Borah in v1.7."
     },
     {
       "id": "person_johannes_bluml",
@@ -1757,7 +2025,7 @@
       ],
       "role": "Unknown",
       "org_id": "org_virrata",
-      "classification": "unknown",
+      "classification": "partner",
       "person_type": "unknown",
       "seniority_level": null,
       "functional_area": "Unknown",
@@ -1775,7 +2043,11 @@
       },
       "meeting_series_primary": [],
       "identity_quality": "complete",
-      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Role, org, and functional area unknown — please complete. ASCII alias 'Johannes Bluml' added for matching resilience. Reviewed 2026-06-30."
+      "notes": "Promoted from people_recommendations.json in v1.5 (count: 1, first seen 2026-06-30). Role, org, and functional area unknown — please complete. ASCII alias 'Johannes Bluml' added for matching resilience. Reviewed 2026-06-30.",
+      "brand_affinity": [
+        "Wizcom",
+        "SuperPen"
+      ]
     }
   ],
   "candidate_people": [
@@ -1799,9 +2071,12 @@
       ],
       "candidate_org_id": "org_epens_oem",
       "classification": "supplier",
-      "likely_functional_area": "Manufacturing / Supplier",
-      "candidate_reason": "Known e-pen OEM contact context; promote only if regularly present in transcripts or meeting artefacts.",
-      "status": "candidate_not_verified_from_this_file"
+      "likely_functional_area": "e-pens OEM Supplier",
+      "candidate_reason": "e-pens OEM supplier-side contact. Shelly appears in e-pens supply and factory context (offline language packs, pre-install, EP-XP-S2). Promote if regularly present in e-pens transcripts.",
+      "status": "candidate_not_verified_from_this_file",
+      "brand_affinity": [
+        "e-pens"
+      ]
     },
     {
       "id": "candidate_veenith",

@@ -1496,6 +1496,225 @@ try {
 }
 
 # =========================
+# VTT INBOX MODE
+# At every run, check the OneDrive personal Transcripts folder for *.vtt files.
+# Each file is processed through the full EIP and then deleted from the inbox folder.
+# Inbox: /Documents/Transcripts in peter@empoweringtech.com's OneDrive for Business.
+# =========================
+
+# VTT inbox uses the existing Petersplace SharePoint site drive — no extra permissions needed.
+# Folder: Shared Documents/Transcripts (root-relative path on the site drive)
+$vttInboxFolderPath = "Transcripts"  # relative to Shared Documents root on $driveId
+
+function Get-VttInboxFiles {
+    param([string]$DriveId, [string]$FolderPath)
+    try {
+        Ensure-GraphToken
+        $hdrs  = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+        $items = Invoke-RestMethod -Method GET `
+            -Uri "https://graph.microsoft.com/v1.0/drives/$DriveId/root:/${FolderPath}:/children?`$top=100" `
+            -Headers $hdrs -ErrorAction Stop
+        return @($items.value | Where-Object { $_.name -match '\.vtt$' -and -not $_.folder })
+    } catch {
+        Write-Warning "[VTT INBOX] Could not list inbox folder '${FolderPath}': $_"
+        return @()
+    }
+}
+
+function Remove-VttInboxFile {
+    param([string]$DriveId, [string]$ItemId)
+    try {
+        Ensure-GraphToken
+        $hdrs = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+        Invoke-RestMethod -Method DELETE `
+            -Uri "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$ItemId" `
+            -Headers $hdrs -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Warning "[VTT INBOX] Could not delete inbox file (id: $ItemId): $_"
+        return $false
+    }
+}
+
+function ConvertFrom-VttFilename {
+    param([string]$BaseName)
+    $eventDate = $null; $subject = $null
+    if ($BaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
+        $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
+        $subject   = ($matches[3] -replace "_", " ") -replace "-", " "
+    } elseif ($BaseName -match "^(\d{4}-\d{2}-\d{2})-(.+)$") {
+        $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
+        $subject   = ($matches[2] -replace "_", " ") -replace "-", " "
+    } else {
+        $eventDate = (Get-Date).Date
+        $subject   = $BaseName -replace "_", " " -replace "-", " "
+    }
+    $subject = (Get-Culture).TextInfo.ToTitleCase($subject.ToLower().Trim())
+    return @{ EventDate = $eventDate; Subject = $subject }
+}
+
+# --- Run VTT inbox check ---
+# Uses existing $driveId (Petersplace SharePoint site drive) — resolved earlier in startup.
+Write-Host "Checking VTT inbox folder..."
+$inboxVttFiles = Get-VttInboxFiles -DriveId $driveId -FolderPath $vttInboxFolderPath
+
+if ($inboxVttFiles -and $inboxVttFiles.Count -gt 0) {
+    Write-Host "VTT inbox: $($inboxVttFiles.Count) file(s) found ✅"
+} else {
+    Write-Host "VTT inbox: no files found."
+}
+
+foreach ($inboxFile in $inboxVttFiles) {
+    $baseName    = [System.IO.Path]::GetFileNameWithoutExtension($inboxFile.name)
+    $parsed      = ConvertFrom-VttFilename -BaseName $baseName
+    $eventDate   = $parsed.EventDate
+    $subject     = $parsed.Subject
+
+    # Meeting ID: sanitised filename + file creation date
+    $fileCreated = if ($inboxFile.fileSystemInfo -and $inboxFile.fileSystemInfo.createdDateTime) {
+        [datetime]$inboxFile.fileSystemInfo.createdDateTime
+    } else { Get-Date }
+    $createdDateStr = $fileCreated.ToString("yyyy-MM-dd")
+    $cleanBase   = $baseName -replace '[^a-zA-Z0-9_\-]', '_' -replace '__+', '_'
+    $mId         = "${cleanBase}_${createdDateStr}"
+
+    Write-Host "Processing VTT inbox: $($inboxFile.name) → [$mId]"
+
+    # Skip if already processed
+    $alreadyProcessed = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
+    if ($alreadyProcessed) {
+        Write-Host "  [VTT INBOX] Already in master log — skipping and removing from inbox"
+        Remove-VttInboxFile -DriveId $driveId -ItemId $inboxFile.id | Out-Null
+        continue
+    }
+
+    # Download VTT content from SharePoint drive
+    $inboxVttContent = $null
+    try {
+        Ensure-GraphToken
+        $dlHdrs = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+        $inboxVttContent = Invoke-RestMethod -Method GET `
+            -Uri "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($inboxFile.id)/content" `
+            -Headers $dlHdrs -ErrorAction Stop
+    } catch {
+        Write-Warning "  [VTT INBOX] Failed to download '$($inboxFile.name)': $_"
+        continue
+    }
+
+    $plainText = ConvertFrom-Vtt -VttContent $inboxVttContent
+    if ([string]::IsNullOrWhiteSpace($plainText)) {
+        Write-Warning "  [VTT INBOX] '$($inboxFile.name)' produced empty transcript — skipping"
+        continue
+    }
+
+    # LLM setup (same as calendar pipeline)
+    $inboxLlmKey  = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
+    $inboxAuth    = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+    $inboxHdrs    = if ($inboxAuth -eq "api-key") { @{ "api-key" = $inboxLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $inboxLlmKey"; "Content-Type" = "application/json" } }
+    $inboxDeploy  = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
+    $inboxBase    = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+    $inboxLlmUri  = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+        "$inboxBase/openai/deployments/$inboxDeploy/chat/completions?api-version=2024-02-15-preview"
+    } else { "$($rules.LLMConfig.Endpoint)/chat/completions" }
+    $inboxOrganiser = $calendarUserUpn
+
+    $classResult = Get-MeetingClassification -type "inbox_vtt" -organiser $inboxOrganiser -transcriptContent $plainText
+
+    $chunkSize   = if ($rules.LLMConfig.ChunkSize)   { [int]$rules.LLMConfig.ChunkSize }   else { 32000 }
+    $chunkOverlap= if ($rules.LLMConfig.ChunkOverlap){ [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
+    $chunks      = Split-TranscriptIntoChunks -Text $plainText -ChunkSize $chunkSize -Overlap $chunkOverlap
+    Write-Host "  [LLM DIAG] Chunks: $($chunks.Count) (VTT inbox)"
+
+    $llmResult   = Invoke-LLM -Chunks $chunks -Organiser $inboxOrganiser -Subject $subject -FullUri $inboxLlmUri -Headers $inboxHdrs -Model $inboxDeploy -MeetingType "inbox_vtt"
+
+    $summaryText = if ($llmResult -and $llmResult.summary) { $llmResult.summary } elseif ($llmResult) { $llmResult | ConvertTo-Json -Depth 10 } else { "No summary generated." }
+    $enriched    = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $masterLogData.Meetings
+
+    # Local file output
+    $timestamp    = $eventDate.ToString("yyyy-MM-dd") + "_" + $eventDate.ToString("HHmm")
+    $cleanSubject = ($subject -replace '[^a-zA-Z0-9\s]', '' -replace '\s+', '_').Trim('_')
+    $localTxt     = Join-Path $outDir "$timestamp-$cleanSubject.txt"
+    $localSum     = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
+    $plainText  | Out-File -FilePath $localTxt -Encoding utf8
+    $summaryText | Out-File -FilePath $localSum  -Encoding utf8
+
+    # Upload to SharePoint
+    $monthFolder     = $eventDate.ToString("yyyy-MM")
+    $evtFolderPath   = "$spTranscriptRootFolder/$monthFolder"
+    $evtFolderId     = Ensure-DriveFolder -DriveId $driveId -FolderPath $evtFolderPath
+    $uploadedTxt     = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localTxt
+    $uploadedSum     = $null
+    if (Test-Path $localSum) { $uploadedSum = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localSum }
+    Write-Host "  [VTT INBOX] Transcript uploaded: $($uploadedTxt.webUrl)"
+
+    # Confluence mirror
+    $inboxConfluenceUrl = $null
+    $inboxPipeConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { $null }
+    $isMirrorEnabled = ($inboxPipeConfig -and $inboxPipeConfig.enable_confluence_mirror) -or ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
+    if ($isMirrorEnabled) {
+        $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $inboxPipeConfig.confluence_space_key }
+        $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $inboxPipeConfig.confluence_parent_id }
+        $confHtml   = Convert-SummaryToConfluenceHtml -SummaryText $summaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $inboxOrganiser
+        $confResult = Publish-SummaryToConfluence -HtmlContent $confHtml -Title "$($eventDate.ToString('yyyy-MM-dd')) $subject" -SpaceKey $confSpace -ParentPageId $confParent
+        $inboxConfluenceUrl = if ($confResult -and $confResult.url) { $confResult.url } elseif ($confResult -and $confResult._links) { $confResult._links.webui } else { $null }
+        Write-Host "  [VTT INBOX] Confluence mirror: $inboxConfluenceUrl"
+    }
+
+    # People intelligence
+    $inboxPeopleUrl = $null
+    if ($peopleConfig) {
+        $inboxSpeakers = Get-TranscriptSpeakers -TranscriptText $plainText
+        $inboxPeople   = Resolve-People -Names $inboxSpeakers -PeopleConfig $peopleConfig
+        if ($inboxPeople -and $inboxPeople.Count -gt 0) {
+            $peopleRaw = Get-PeopleIntelligence `
+                -TranscriptText $plainText `
+                -SummaryText    $summaryText `
+                -ResolvedPeople $inboxPeople `
+                -Subject        $subject `
+                -MeetingId      $mId `
+                -FullUri        $inboxLlmUri `
+                -Headers        $inboxHdrs `
+                -Model          $inboxDeploy
+            if ($peopleRaw) {
+                $peopleContent  = Format-PeopleFile -LLMOutput $peopleRaw -MeetingId $mId -Subject $subject -EventDate $eventDate -PipelineVersion $PIPELINE_VERSION
+                $localPeople    = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
+                $peopleContent | Out-File -FilePath $localPeople -Encoding utf8
+                $uploadedPeople = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localPeople
+                $inboxPeopleUrl = $uploadedPeople.webUrl
+                Write-Host "  [VTT INBOX] People file uploaded: $inboxPeopleUrl"
+                $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $inboxPeopleUrl -ResolvedPeople $inboxPeople
+            }
+        }
+    }
+
+    # Add to run log
+    $log += @{
+        MeetingId                = $mId
+        Subject                  = $subject
+        Organiser                = $inboxOrganiser
+        EventDate                = $eventDate.ToString("yyyy-MM-ddTHH:mm:ss")
+        Type                     = "inbox_vtt"
+        Priority                 = "Normal"
+        Classification           = $classResult.Mode
+        ClassificationConfidence = $classResult.Confidence
+        ClassificationSource     = $classResult.Source
+        Status                   = "processed"
+        AgentState               = "processed_inbox_vtt"
+        File                     = $uploadedTxt.webUrl
+        SummaryFile              = if ($uploadedSum) { $uploadedSum.webUrl } else { $null }
+        ConfluenceMirror         = $inboxConfluenceUrl
+        PeopleFile               = $inboxPeopleUrl
+        LastProcessed            = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        LastRunId                = $runId
+    }
+
+    # Delete source VTT from inbox (consumed)
+    $deleted = Remove-VttInboxFile -DriveId $driveId -ItemId $inboxFile.id
+    if ($deleted) { Write-Host "  [VTT INBOX] Source file deleted from inbox ✅" }
+    else { Write-Warning "  [VTT INBOX] Could not delete '$($inboxFile.name)' — manual cleanup needed" }
+}
+
+# =========================
 # VTT DIRECT-FILE MODE
 # Bypasses calendar lookup and transcript fetch — processes a local .vtt file directly.
 # Usage: pwsh -File ./power-transcript-pipeline.ps1 -VttFile "path/to/file.vtt" -Participant "Theo Davis"

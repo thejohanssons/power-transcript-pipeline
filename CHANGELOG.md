@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.0] — 2026-07-01
+
+### Added
+- **VTT Inbox Mode**: At every pipeline run, the pipeline checks `/Documents/Transcripts` in Peter's OneDrive for Business for `*.vtt` files. Each file is processed through the full EIP (LLM classification, enrichment, people intelligence) and outputs transcript `.txt`, `-Summary.txt`, and `-People.txt` files uploaded to SharePoint and mirrored to Confluence. The source VTT file is deleted from the inbox on successful processing. Deduplication uses `master_log.json` — already-processed files are skipped and removed from the inbox.
+- **`Get-VttInboxFiles`**: Lists `*.vtt` files from the OneDrive inbox folder via Microsoft Graph API (`/users/{upn}/drive/root:/{path}:/children`).
+- **`Remove-VttInboxFile`**: Deletes a consumed VTT file from OneDrive via Graph API DELETE.
+- **`ConvertFrom-VttFilename`**: Derives meeting date and subject from VTT filename. Supports `YYYY-MM-DD_HHMM-Title.vtt`, `YYYY-MM-DD-Title.vtt`, and plain `Title.vtt` formats.
+- **Meeting ID scheme for inbox files**: `[sanitised_filename]_[file_creation_date_YYYY-MM-DD]` — stable across re-runs, used for deduplication.
+
+---
+
 ## [1.6.0] — 2026-07-01
 
 ### Added
