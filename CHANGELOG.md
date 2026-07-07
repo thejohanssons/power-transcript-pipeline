@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.1] — 2026-07-07
+
+### Fixed
+- **Meeting fetch resilience (403 fallback)**: The `onlineMeetings` endpoint now uses a tiered lookup strategy. If the organiser's ID (parsed from the Teams Join URL) returns a 403, the script falls back to the calendar user's (Peter's) ID. If both fail, the meeting is gracefully skipped with a `[POLICY]` warning instead of crashing the entire pipeline run.
+- **Auth header sync**: `$authHeader` is now explicitly synchronised with `$global:authHeader` inside the meeting processing loop, preventing stale token usage during long-running batch jobs.
+- **Variable bleed fix**: `$organiserId` is now resolved at the top of each loop iteration, preventing the previous meeting's ID from "bleeding" into the current one.
+
+---
+
 ## [1.7.0] — 2026-07-01
 
 ### Added
