@@ -85,7 +85,7 @@ $spRunLogsFolderName    = "_DO_NOT_PRIORITISE_Run logs"
 $rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
 $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 
-$PIPELINE_VERSION = "2.0"
+$PIPELINE_VERSION = "1.7.2"
 $TAXONOMY_VERSION = "1.0"
 $MAPPING_RULES_VERSION = "1.0"
 $ROLES_CONFIG_VERSION = "1.0"
@@ -1424,8 +1424,18 @@ function Upload-FileToSharePoint {
 function Get-MeetingLogId {
     param($EventDate, [string]$Subject)
     # Ensure date is treated as UTC to prevent local timezone offsets in the ID
-    $utcDate = if ($EventDate -is [string]) { [DateTime]::Parse($EventDate).ToUniversalTime() } else { $EventDate.ToUniversalTime() }
-    $datePart = $utcDate.ToString("yyyy-MM-dd_HHmm")
+    # We force UTC parsing to avoid dependency on the host machine's local timezone
+    $dt = if ($EventDate -is [string]) {
+        if ($EventDate -notmatch 'Z$|[+-]\d{2}:?\d{2}$') {
+            # No offset present? Treat as UTC (Standard for Graph API timestamps)
+            [DateTime]::Parse($EventDate + "Z")
+        } else {
+            [DateTime]::Parse($EventDate).ToUniversalTime()
+        }
+    } else {
+        $EventDate.ToUniversalTime()
+    }
+    $datePart = $dt.ToString("yyyy-MM-dd_HHmm")
     $slugSubject = ($Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
     return "$datePart`_$slugSubject"
 }

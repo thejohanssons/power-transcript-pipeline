@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.2] — 2026-07-08
+
+### Fixed
+- **Timezone-Invariant Meeting IDs**: Updated `Get-MeetingLogId` to force UTC parsing of Graph API timestamps. This prevents duplicate log entries caused by running the pipeline from different timezones (e.g., Local vs. Azure Function).
+- **Master Log Deduplication**: Rebuilt `master_log.json` using the new invariant ID format, resolving multiple duplicate entries and ensuring reliable meeting skipping.
+- **Internal Versioning**: Synchronised the `$PIPELINE_VERSION` variable with the release version.
+
 ## [1.7.1] — 2026-07-07
 
 ### Fixed
