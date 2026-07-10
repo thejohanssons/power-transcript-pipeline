@@ -1,0 +1,71 @@
+# 🤝 AGENT HANDOVER: EXECUTIVE INTELLIGENCE PREPROCESSOR (EIP) V2.1
+
+This document is the authoritative guide for an AI Intelligence Agent tasked with extracting executive insights from the meeting transcript ecosystem.
+
+---
+
+## 1. SYSTEM ARCHITECTURE & REPOSITORY
+The system is a PowerShell-driven pipeline that converts raw transcripts into structured executive intelligence.
+
+*   **Primary Data Store:** SharePoint Online (Site: Exec Intel Insights).
+*   **Time-Series Memory:** `master_log.json` (Stores all historical Topic Records).
+*   **Key Config Files:**
+    - `/config/taxonomy.json`: The source of truth for Domains and Topics.
+    - `/config/mapping_rules.json`: Defines which keywords trigger which Topic ID.
+    - `/config/sentiment_rules.json`: Defines Signal (Positive/Negative/Mixed) logic.
+
+---
+
+## 2. DATA ANCHORS: THE CANONICAL TAXONOMY
+All insights must be anchored to these 5 Domains and 18 Topic IDs. Do not invent new classifications.
+
+| DOMAIN | TOPIC IDs | SCOPE |
+| :--- | :--- | :--- |
+| **Product** | T01 - T04 | Performance, Quality, Value, Scope. |
+| **Execution** | T05 - T07 | Readiness, Risks/Constraints, Dev Execution. |
+| **Financial** | T08 - T11 | Cash Flow, Costs, Revenue, Risk/Exposure. |
+| **Organisation**| T12 - T14 | Capability, Resources, Effectiveness. |
+| **Strategy** | T15 - T18 | Alignment, Market Fit, Growth, Confidence. |
+
+---
+
+## 3. DATA STRUCTURE: SUMMARY FILES (.txt)
+Every summary file (e.g., `2026-06-22_1000-Meeting-Summary.txt`) follows this strict format:
+
+1.  **Metadata Header:** Separated by `---`. Contains `MODE` (CEO, CPO, etc.) and `MEETING ID`.
+2.  **Topic Blocks:** Each theme is marked with `## Topic: [Label]`.
+    - Every block contains immediate metadata: `DOMAIN`, `TOPIC_ID`, `CANONICAL_TOPIC`, `SIGNAL`, `TRAJECTORY`.
+3.  **Intelligence Alerts:**
+    - `## TOPIC TRENDS & PERSISTENCE`: Summarises shifts since the last meeting.
+    - `## STALLED WORK DETECTED`: Critical flags for zero-progress topics.
+4.  **Topic Records (Internal):** Machine-parsable footer at the bottom of the file used to populate the Master Log.
+
+---
+
+## 4. AGENT OPERATIONAL LOGIC (HOW TO ACT)
+
+When a user provides a prompt, the agent must follow these steps:
+
+1.  **Identify the Target:** Match the user's query to one or more Canonical Topics (T01–T18) using the `taxonomy.json` and `mapping_rules.json`.
+2.  **Query the Memory:** Search the `master_log.json` for all records matching those `TopicIds`.
+3.  **Sort & Analyse:** Sort results by `EventDate` (Descending). Compare the `SIGNAL` and `CONTENT` of the latest record against historical entries.
+4.  **Detect Deltas:**
+    - **Improving:** Signal shifted from Negative/Mixed to Positive.
+    - **Declining:** Signal shifted from Positive/Neutral to Negative.
+    - **Stalled:** Content remains identical across two or more meetings.
+5.  **Retrieve Depth:** If specific details are needed, use the `MeetingId` to locate the full `Summary.txt` file in SharePoint.
+
+---
+
+## 5. DATA TRUST & INTEGRITY RULES
+
+*   **The Join Key:** `MeetingId` is the Primary Key. `TopicId` is the Foreign Key within a meeting.
+*   **File Naming:** Files are strictly named `[YYYY-MM-DD]_[HHmm]-[Subject]-Summary.txt`.
+*   **Trust Hierarchy:**
+    - **MODE:** Deterministic (Assigned via roles_config.json). High Trust.
+    - **SIGNAL/TRAJECTORY:** Algorithmic assessment. Use for trend indicators.
+    - **CONTENT:** The ground truth extracted directly from the transcript.
+*   **Fallback Logic:** If a discussion doesn't match technical keywords, it is assigned to **T15 (Strategy)**. Treat T15 as the "General Executive Context" bucket.
+
+---
+**End of Handover Document. v2.1 Verified.**

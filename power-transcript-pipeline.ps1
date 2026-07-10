@@ -483,7 +483,7 @@ function Select-Category {
 }
 
 function Enrich-Summary {
-    param($summaryText, $meetingId, $historyRecords)
+    param($summaryText, $meetingId, $historyRecords, $InitialRecords = @())
 
     if (-not $summaryText) { return @{ Summary = $null; Records = @() } }
 
@@ -537,6 +537,9 @@ function Enrich-Summary {
         
         $lines = $block -split "`n"
         $label = $lines[0].Trim()
+        # Fallback for empty labels (common in short test fixtures)
+        if (-not $label) { $label = "General Discussion" }
+        
         $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match '^\s*-\s+' }) -join "`n"
         if (-not $bullets.Trim()) { continue }
 
@@ -998,6 +1001,92 @@ function Format-PeopleFile {
     return ($headerLines -join "`n") + $LLMOutput.Trim()
 }
 
+# --- STEP 1 & 3: TOPIC RECORD MODEL & ENTITY EXTRACTION ---
+function Get-TopicEntities {
+    param([string]$Text, $ResolvedPeople)
+    
+    $entities = @{
+        People = @(); Projects = @(); Products = @(); Systems = @(); Dependencies = @()
+    }
+
+    # 1. Resolve People mentioned in this specific topic text
+    if ($ResolvedPeople) {
+        foreach ($p in $ResolvedPeople) {
+            if ($Text -match [regex]::Escape($p.display_name)) {
+                $entities.People += $p.display_name
+            }
+        }
+    }
+
+    # 2. Extract Projects/Products/Systems/Dependencies via taxonomy keywords
+    $config = $GlobalConfig.Files.mapping_rules
+    if ($config -and $config.rules) {
+        foreach ($rule in $config.rules) {
+            foreach ($kw in $rule.keywords) {
+                if ($Text -match "\b$([regex]::Escape($kw))\b") {
+                    if ($rule.TopicId -match "T01|T02|T03|T04") { $entities.Products += $kw }
+                    if ($rule.TopicId -match "T05|T06|T07") { $entities.Projects += $kw }
+                }
+            }
+        }
+    }
+    
+    return $entities
+}
+
+function Format-TopicRecord {
+    param(
+        $TopicData, 
+        $MeetingMetadata, 
+        [string]$SummaryLink,
+        $ResolvedPeople
+    )
+    
+    $entities = Get-TopicEntities -Text $TopicData.Content -ResolvedPeople $ResolvedPeople
+    
+    $recordMd = @"
+# Topic Record: $($TopicData.Label)
+
+## Metadata
+- **TOPIC_ID:** $($TopicData.TopicId)
+- **DOMAIN:** $($TopicData.Domain)
+- **STATUS:** $($TopicData.Signal)
+- **TRAJECTORY:** $($TopicData.Trajectory)
+- **SOURCE_MEETING:** [$($MeetingMetadata.Subject)]($SummaryLink)
+- **DATE:** $($MeetingMetadata.EventDate)
+
+## Summary
+$($TopicData.Content)
+
+## Intelligence Details
+### Key Facts
+$($TopicData.KeyFacts)
+
+### Decisions
+$($TopicData.Decisions)
+
+### Actions
+$($TopicData.Actions)
+
+### Risks & Issues
+$($TopicData.Risks)
+
+### Next Steps
+$($TopicData.NextSteps)
+
+## Retrieval Anchors
+- **PEOPLE:** $($entities.People -join ", ")
+- **PROJECTS:** $($entities.Projects -join ", ")
+- **PRODUCTS:** $($entities.Products -join ", ")
+- **SYSTEMS:** $($entities.Systems -join ", ")
+- **DEPENDENCIES:** $($entities.Dependencies -join ", ")
+
+---
+*Source: $($MeetingMetadata.MeetingId)*
+"@
+    return $recordMd
+}
+
 # =========================
 # PEOPLE INTELLIGENCE: Update master_people_log data structure
 # =========================
@@ -1045,6 +1134,8 @@ function Get-MeetingClassification {
             } else {
                 @{ "Authorization" = "Bearer $llmKey"; "Content-Type" = "application/json" }
             }
+            # Azure OpenAI specific: ensure the api-key is also in the URI if headers are tricky in some environments
+            # but usually the header is sufficient. 
             $deploymentName = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
             $fullUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
                 $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
@@ -1104,6 +1195,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                             classification = $resultJson.classification
                             confidence     = $resultJson.confidence
                             summary        = $resultJson.summary
+                            records        = $resultJson.records
                             source         = "llm"
                         }
                     }
@@ -1782,9 +1874,12 @@ if ($VttFile) {
     if ($masterLogData -and $masterLogData.Meetings) {
         $historyTopicRecords = $masterLogData.Meetings | Where-Object { $_.TopicRecords } | ForEach-Object { $_.TopicRecords } | Where-Object { $_ }
     }
-    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
+    
+    # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
+    $initialRecords = if ($cls.records) { $cls.records } else { @() }
+    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
     $enrichedSummaryText = if ($enrichResult.Summary) { $enrichResult.Summary } else { $cls.summary }
-    $topicRecords3D      = if ($enrichResult.Records) { $enrichResult.Records } else { @() }
+    $topicRecords3D      = if ($enrichResult.Records) { $enrichResult.Records } else { $initialRecords }
     $modeResult          = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
 
     foreach ($rec in $topicRecords3D) {
@@ -1795,6 +1890,36 @@ if ($VttFile) {
 
     # --- Build header ---
     $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
+
+    # Resolve People for Entity Extraction
+    $resolvedPeople = Resolve-People -TranscriptText $plainText
+
+    # --- STEP 4: GENERATE TOPIC RECORDS ---
+    # Path aligned with Exec Intel Insights root
+    $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+    $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
+    
+    $summaryWithLinks = $enrichedSummaryText
+    foreach ($tr in $topicRecords3D) {
+        $cleanLabel = if ($tr.Label) { $tr.Label } else { $tr.TopicName }
+        $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
+        if (-not $sanitizedLabel) { $sanitizedLabel = "Details" }
+        $trFileName = "$($tr.TopicId)-$sanitizedLabel.md"
+        $trLocalPath = Join-Path $outDir $trFileName
+        
+        # Mutual Linking: Topic Record -> Summary
+        $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
+            Subject = $subject; MeetingId = $mId; EventDate = $eventDate
+        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople
+        
+        $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
+        Write-Host "  [VTT] Uploading Topic Record: $trFileName"
+        Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
+        
+        # Mutual Linking: Summary -> Topic Record
+        $summaryWithLinks = $summaryWithLinks -replace "(## Topic: $($tr.Label))", "`$1`n> [View Dedicated Topic Record]($trFileName)"
+    }
+
     $header = @"
 MEETING ID: $mId
 SUBJECT: $subject
@@ -1823,7 +1948,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     $localSummaryFile = $null
     if ($cls.summary) {
         $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-        ($header + $enrichedSummaryText) | Out-File -FilePath $localSummaryFile -Encoding utf8
+        ($header + $summaryWithLinks) | Out-File -FilePath $localSummaryFile -Encoding utf8
         Write-Host "  [VTT] Summary saved   : $localSummaryFile"
     }
 
@@ -1961,7 +2086,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 # FETCH CALENDAR
 # =========================
 
-Write-Host "Fetching calendar events..."
+Write-Host "Fetching calendar events from $FromDate to $ToDate..." -ForegroundColor Cyan
 $startStr = $FromDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
 $endStr = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
 $calUri = "https://graph.microsoft.com/v1.0/users/$calendarUserUpn/calendarView?startDateTime=$startStr&endDateTime=$endStr&`$top=999"
@@ -1979,7 +2104,7 @@ $events = $events | Where-Object {
 }
 
 $eventCount = ($events | Measure-Object).Count
-Write-Host ("Meetings found: " + $eventCount + " ✅")
+Write-Host "  [DIAG] Found $eventCount online meetings where you are the organiser." -ForegroundColor Gray
 
 # Fallback: include events where user is listed as an attendee
 $filterEnd = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -1993,11 +2118,14 @@ try {
 }
 
 if ($attendeeEvents -and $attendeeEvents.Count -gt 0) {
+    Write-Host "  [DIAG] Found $($attendeeEvents.Count) additional online meetings where you are an attendee." -ForegroundColor Gray
     $map = @{}
     foreach ($e in $events) { if ($e.id) { $map[$e.id] = $e } }
     foreach ($e in $attendeeEvents) { if ($e.id -and -not $map.ContainsKey($e.id)) { $map[$e.id] = $e } }
     $events = $map.Values
 }
+
+Write-Host "✅ Total unique online meetings to evaluate: $($events.Count)" -ForegroundColor Green
 
 # --- DEDUPLICATE BY ONLINE MEETING JOIN URL ---
 # Prevents processing the same meeting multiple times if it exists on multiple calendars
@@ -2025,17 +2153,24 @@ foreach ($calendarEvent in $events) {
     $organiser = $calendarEvent.organizer.emailAddress.address
     $start     = $calendarEvent.start.dateTime
 
+    Write-Host "--------------------------------------------------"
+    Write-Host "Evaluating: $subject" -ForegroundColor Cyan
+    Write-Host "  [DIAG] Date: $start"
+    Write-Host "  [DIAG] Organiser: $organiser"
+
     # --- SKIP SUCCESSFUL MEETINGS ---
     if (-not $ForceRerun) {
         $mIdCheck = Get-MeetingLogId -EventDate $start -Subject $subject
         $existing = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mIdCheck }
         if ($existing -and $existing.Status -eq "success" -and $existing.TranscriptFile -and $existing.SummaryFile) {
-            Write-Output "  [SKIP] Meeting '$subject' is already processed successfully. Skipping."
+            Write-Host "  [SKIP] Already processed successfully. Use -ForceRerun to re-evaluate." -ForegroundColor Gray
             continue
         }
     }
 
-    Write-Host ("Processing: " + $subject)
+    # Resolve participants from the calendar event object
+    $attendees = $calendarEvent.attendees | ForEach-Object { $_.emailAddress.name }
+    Write-Host "  [DIAG] Participants found in calendar: $($attendees -join ', ')" -ForegroundColor Gray
 
     # --- EXTERNAL TENANT CHECK ---
     if (Test-IsExternalTenant -JoinUrl $joinUrl -InternalTenantId $tenantId) {
@@ -2100,21 +2235,134 @@ foreach ($calendarEvent in $events) {
         continue
     }
 
-    try {
-        $encUrl = [System.Net.WebUtility]::UrlEncode($joinUrl)
-        $meetingUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings?`$filter=JoinWebUrl%20eq%20'$encUrl'"
-        $meeting = Invoke-RestMethod -Method Get -Uri $meetingUri -Headers $authHeader
+    $meetingId = $null
+    
+    # Extract OID from Join URL context if available (most reliable identity for onlineMeetings)
+    $urlOid = if ($joinUrl -match "Oid%22%3a%22([a-zA-Z0-9-]+)%22") { $matches[1] } else { $null }
+    $lookupIdentities = @($urlOid, $organiserId, $organiser, $calendarUserUpn) | Where-Object { $_ } | Select-Object -Unique
+    
+    $meeting = $null
+    $resolvedUsingId = $null
 
-        if (-not $meeting.value -or $meeting.value.Count -eq 0) { continue }
+    # Pre-calculate variations for matching
+    $baseJoinUrl = $joinUrl.Split('?')[0]
+    $cleanJoinUrl = $joinUrl -replace "'", "''"
+    $cleanBaseUrl = $baseJoinUrl -replace "'", "''"
+    $escapedUrlValue = [System.Uri]::EscapeDataString($cleanJoinUrl)
+    
+    $variations = @(
+        @{ Label = "Full URL (escaped)"; Value = $escapedUrlValue },
+        @{ Label = "Full URL (raw)";     Value = $cleanJoinUrl },
+        @{ Label = "Base URL (raw)";     Value = $cleanBaseUrl }
+    )
+
+    # Extract Meeting IDs from metadata and body (numeric resolution is most robust)
+    $meetingIdsToTry = @()
+    # 1. From onlineMeeting metadata (if provided by Graph in calendar fetch)
+    if ($calendarEvent.onlineMeeting.conferenceId) { $meetingIdsToTry += $calendarEvent.onlineMeeting.conferenceId }
+    # 2. From body text (regex)
+    if ($calendarEvent.bodyPreview -match "Meeting ID: ([\d\s]{10,})") { 
+        $meetingIdsToTry += ($matches[1] -replace "\s", "") 
+    } elseif ($calendarEvent.bodyPreview -match "teams\.microsoft\.com/meet/(\d+)") {
+        $meetingIdsToTry += $matches[1]
+    }
+    $meetingIdsToTry = $meetingIdsToTry | Select-Object -Unique
+
+    # 1. Try resolving via JoinWebUrl OR VideoTeleconferenceId across potential identities
+    foreach ($identity in $lookupIdentities) {
+        # Strategy A: Filter by numeric Meeting ID (VideoTeleconferenceId) - HIGHEST PRIORITY
+        foreach ($mid in $meetingIdsToTry) {
+            Write-Host "  [DIAG] Resolving via identity: $identity (Meeting ID: $mid)" -ForegroundColor Gray
+            try {
+                $vtcUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings?`$filter=VideoTeleconferenceId eq '$mid'"
+                $resp = Invoke-RestMethod -Method Get -Uri $vtcUri -Headers $authHeader
+                if ($resp.value -and $resp.value.Count -gt 0) {
+                    $meeting = $resp
+                    $resolvedUsingId = $identity
+                    Write-Host "  [DIAG] Resolved via Meeting ID ✅" -ForegroundColor Green
+                    break
+                }
+            } catch {
+                $err = $_.Exception.Message
+                if ($err -match "403") {
+                    Write-Host "  [DIAG] 403 Forbidden for $identity. Likely missing Application Access Policy." -ForegroundColor Yellow
+                }
+            }
+        }
+        if ($meeting) { break }
+
+        # Strategy B: Filter by JoinWebUrl (multiple variations)
+        foreach ($v in $variations) {
+            Write-Host "  [DIAG] Resolving via identity: $identity ($($v.Label))" -ForegroundColor Gray
+            try {
+                $meetingUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings?`$filter=JoinWebUrl eq '$($v.Value)'"
+                $resp = Invoke-RestMethod -Method Get -Uri $meetingUri -Headers $authHeader
+                if ($resp.value -and $resp.value.Count -gt 0) {
+                    $meeting = $resp
+                    $resolvedUsingId = $identity
+                    break
+                }
+            } catch { }
+        }
+        if ($meeting) { break }
+    }
+
+    # 2. Try resolving via ID/fragment matching in list (for complex Channel URLs)
+    if (-not $meeting) {
+        Write-Host "  [DIAG] No match on filters. Attempting client-side fragment matching..." -ForegroundColor Gray
+        
+        # Channel Meeting URLs often hide a unique fragment (like meeting_... or threadId/tacv2 fragment)
+        $fragment = $null
+        if ($joinUrl -match "meeting_([a-zA-Z0-9]+)") {
+            $fragment = $matches[1]
+        } elseif ($joinUrl -match "19%3a([a-zA-Z0-9-]+)%40thread") {
+            $fragment = $matches[1]
+        } elseif ($joinUrl -match "19:([a-zA-Z0-9-]+)@thread") {
+            $fragment = $matches[1]
+        } else {
+            $fragment = $baseJoinUrl
+        }
+        
+        foreach ($identity in $lookupIdentities) {
+            try {
+                # Some environments allow listing if we filter by something common like startsWith(subject, ...)
+                # But here we try to list and filter client-side if we can get a page.
+                $listUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings"
+                $all = Invoke-RestMethod -Method Get -Uri $listUri -Headers $authHeader
+                
+                $found = $all.value | Where-Object { $_.joinWebUrl -match [regex]::Escape($fragment) }
+                if ($found) {
+                    $meeting = @{ value = @($found) }
+                    $resolvedUsingId = $identity
+                    Write-Host "  [DIAG] Resolved via list match on identity: $identity ✅" -ForegroundColor Green
+                    break
+                }
+            } catch { }
+        }
+    }
+
+    try {
+        if (-not $meeting -or -not $meeting.value -or $meeting.value.Count -eq 0) { 
+            Write-Warning "  [DIAG] Could not resolve online meeting via Graph. It may be an external meeting or the organizer has not granted permission."
+            continue 
+        }
 
         $meetingId = $meeting.value[0].id
+        $organiserId = $resolvedUsingId # Update for subsequent transcript calls
+        Write-Host "  [DIAG] Meeting ID resolved ($resolvedUsingId): $meetingId" -ForegroundColor Gray
+        
         $transcriptsUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts"
         $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
 
-        $eventDate = (Get-Date $start).Date
+        $eventStartTime = [datetime]$start
+        $windowStart = $eventStartTime.AddHours(-2)
+        $windowEnd   = $eventStartTime.AddHours(24)
+        
         $transcriptsForThisEvent = @($transcripts.value | Where-Object { 
-            $_.createdDateTime -and ([datetime]$_.createdDateTime).Date -eq $eventDate 
-        })
+            $_.createdDateTime -and ([datetime]$_.createdDateTime) -ge $windowStart -and ([datetime]$_.createdDateTime) -le $windowEnd
+        } | Sort-Object { [Math]::Abs(([datetime]$_.createdDateTime - $eventStartTime).Ticks) }) # Closest first
+        
+        Write-Host "  [DIAG] Found $($transcriptsForThisEvent.Count) matching transcript(s) for this date." -ForegroundColor Gray
 
         if (-not $transcriptsForThisEvent -or $transcriptsForThisEvent.Count -eq 0) {
             $isChannelCandidate = $joinUrl -match "threadId"
@@ -2149,7 +2397,31 @@ foreach ($calendarEvent in $events) {
 
             $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
             
-            $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
+            # --- Robust Content Fetching (with retries for 404s) ---
+            $content = $null
+            $retryLimit = 3
+            $retryCount = 0
+            while ($null -eq $content -and $retryCount -lt $retryLimit) {
+                try {
+                    $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
+                } catch {
+                    $err = $_.Exception.Message
+                    if ($err -match "404") {
+                        $retryCount++
+                        Write-Host "  [DIAG] Content not ready (404). Retrying ($retryCount/$retryLimit)..." -ForegroundColor Yellow
+                        Start-Sleep -Seconds (2 * $retryCount)
+                    } elseif ($err -match "403") {
+                        Write-Host "  [DIAG] Content access forbidden (403). Policy may still be propagating for $organiserId." -ForegroundColor Yellow
+                        break # Don't retry 403s
+                    } else {
+                        throw $_ # Re-throw other errors to be caught by the main meeting loop
+                    }
+                }
+            }
+
+            if ($null -eq $content) {
+                throw "Failed to fetch transcript content after $retryLimit attempts or due to terminal error."
+            }
 
             # --- METADATA ENHANCEMENT ---
             $mId = Get-MeetingLogId -EventDate $start -Subject $subject
@@ -2190,12 +2462,14 @@ foreach ($calendarEvent in $events) {
             }
 
             # Phase 1-4: Stable Topic Classification & Consolidation
-            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords
+            # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
+            $initialRecords = if ($cls.records) { $cls.records } else { @() }
+            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
             $enrichedSummaryText = $enrichResult.Summary
-            $topicRecords = $enrichResult.Records
+            $topicRecords3D = if ($enrichResult.Records) { $enrichResult.Records } else { $initialRecords }
 
             # Task 5.1: Smart Mode Switch for "Work" meetings based on topic content
-            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords
+            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
 
             # --- PHASE 7: VALIDATION & LOGGING ---
             if ($pipelineConfig.enable_stable_topic_classification) {
@@ -2243,8 +2517,34 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             # 2. Save and Upload SUMMARY (if available)
             $uploadedSummary = $null
             if ($cls.summary) {
+                # --- STEP 4: GENERATE TOPIC RECORDS ---
+                $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+                $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
+                
+                $summaryWithLinks = $enrichedSummaryText
+                foreach ($tr in $topicRecords3D) {
+                    $cleanLabel = if ($tr.Label) { $tr.Label } else { $tr.TopicName }
+                    $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
+                    if (-not $sanitizedLabel) { $sanitizedLabel = "Details" }
+                    $trFileName = "$mId-$($tr.TopicId)-$sanitizedLabel.md"
+                    $trLocalPath = Join-Path $outDir $trFileName
+                    
+                    # Mutual Linking: Topic Record -> Summary
+                    $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
+                        Subject = $subject; MeetingId = $mId; EventDate = $start
+                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople
+                    
+                    $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
+                    Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"
+                    Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
+                    
+                    # Mutual Linking: Summary -> Topic Record
+                    # Append link to the topic block in the summary text
+                    $summaryWithLinks = $summaryWithLinks -replace "(## Topic: $($tr.Label))", "`$1`n> [View Dedicated Topic Record]($trFileName)"
+                }
+
                 $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-                $summaryWithHeader = $header + $enrichedSummaryText
+                $summaryWithHeader = $header + $summaryWithLinks
                 $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
                 $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
 

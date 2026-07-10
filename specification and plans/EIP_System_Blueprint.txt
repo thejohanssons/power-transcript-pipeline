@@ -1,0 +1,62 @@
+🏗️ SYSTEM BLUEPRINT: EIP V2.1 DATA ARCHITECTURE
+====================================================
+Canonical Data Specification for Intelligence Agents
+
+1. STORAGE & DIRECTORY STRUCTURE
+--------------------------------
+The system operates as a PowerShell-based pipeline that mirrors local processing states to SharePoint Online.
+
+* Root Configuration:
+    - power-transcript-pipeline.ps1: The primary processing engine.
+    - classification_rules.json: Contains LLM system prompt and model parameters.
+    - pipeline_config.json: Feature flags (e.g., enable_stable_topic_classification).
+* Configuration (/config/):
+    - taxonomy.json: Authoritative list of 5 Domains and 18 Topics (T01–T18).
+    - mapping_rules.json: Keyword-to-TopicId mapping logic.
+    - roles_config.json: Deterministic Mode rules (CEO, CPO, etc.).
+    - sentiment_rules.json: Keyword-based Signal detection (Positive, Negative, Mixed).
+* Output (SharePoint):
+    - Meeting transcripts/: Contains [Date]-[Subject]-Transcript.txt and [Date]-[Subject]-Summary.txt.
+    - master_log.json: The "Time-Series Memory" of every meeting and topic record.
+
+2. TAXONOMY & CLASSIFICATION MODEL
+----------------------------------
+Intelligence is anchored to a Canonical Taxonomy. Agents must use these IDs as primary anchors.
+
+| Domain       | Topics   | Description                                      |
+| :----------- | :------- | :----------------------------------------------- |
+| Product      | T01–T04  | Performance, Quality, Value, Scope.              |
+| Execution    | T05–T07  | Readiness, Risks/Constraints, Sprint Execution.  |
+| Financial    | T08–T11  | Cash Flow, Costs, Revenue, Risk/Exposure.        |
+| Organisation | T12–T14  | Capability, Resource Allocation, Effectiveness.  |
+| Strategy     | T15–T18  | Alignment, Market Fit, Growth, Confidence.       |
+
+3. SUMMARY FILE STRUCTURE (TRANSCRIPT OUTPUT)
+---------------------------------------------
+* Part A: Metadata Header
+  Separated by '---' blocks. Contains: MODE, MEETING ID, PIPELINE_VERSION.
+* Part B: Human-Readable Content
+  Grouped by ## Topic: [Label]. 
+  Each block includes metadata: DOMAIN, TOPIC_ID, CANONICAL_TOPIC, SIGNAL, TRAJECTORY.
+* Part C: Intelligence Alerts
+  ## TOPIC TRENDS & PERSISTENCE: Identifies state shifts across meetings.
+  ## STALLED WORK DETECTED: High-priority flags for zero context shift.
+* Part D: Topic Records (Internal)
+  Structured footer: [Record: MeetingId_Txx].
+
+4. AGENT OPERATIONAL LOGIC (HOW TO ACT)
+---------------------------------------
+1. Identify the Topic: Match user query to a Canonical Topic (T01–T18) using taxonomy.json.
+2. Fetch History: Query master_log.json for all instances of that TopicId.
+3. Analyse Delta: Compare SIGNAL and CONTENT of the latest record against historical records.
+4. Retrieve Context: To provide depth, fetch the full [MeetingId]-[Subject]-Summary.txt using standard naming.
+
+5. DATA INTEGRITY & TRUST RULES
+-------------------------------
+* Join Key: 'MeetingId' is the Primary Key. 'TopicId' is the Foreign Key.
+* File Naming: [YYYY-MM-DD]_[HHmm]-[Subject]-Summary.txt.
+* Status Sticky: A 'success' status in the Master Log is the source of truth.
+* Fallback: T15 (Strategy) is the default catch-all for technical-keyword misses.
+
+====================================================
+End of Specification. v2.1 Verified.
