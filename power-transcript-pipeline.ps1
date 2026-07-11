@@ -360,6 +360,7 @@ function Classify-Topic {
     }
 
     $topicInfo = $taxonomy.Topics.$bestMatch
+    $familyInfo = $taxonomy.TopicFamilies.($topicInfo.Family)
 
     $contextHints = @()
     $ruleMatch = $mappingRules.Rules | Where-Object { $_.TopicId -eq $bestMatch } | Select-Object -First 1
@@ -370,7 +371,8 @@ function Classify-Topic {
     return @{
         TopicId        = $bestMatch
         TopicName      = $topicInfo.Name
-        Domain         = if ($topicInfo.PSObject.Properties.Name -contains 'Domain') { $topicInfo.Domain } else { $null }
+        Family         = $topicInfo.Family
+        Domain         = $familyInfo.Domain
         CategoryHints  = $contextHints
         Score          = $maxDensity
     }
@@ -487,17 +489,21 @@ function Enrich-Summary {
 
     if (-not $summaryText) { return @{ Summary = $null; Records = @() } }
 
-    $sections = [regex]::Split($summaryText, '(?m)^\d+\.\s+')
+    # Use -split operator which is more robust in PSCore
+    $sections = $summaryText -split '(?m)^\d+\.\s+'
     if ($sections.Count -le 1) { return @{ Summary = $summaryText; Records = @() } } 
 
     $sectionNames = @("Topics / Context", "Signals", "Decisions", "Actions", "Next Direction", "Risks / Issues", "Implications", "Alignment", "Trend / Trajectory")
     
     # --- PHASE 1: PARSING SECTIONS 2-9 ---
     $statementObjects = @()
-    for ($sectionIndex = 2; $sectionIndex -lt $sections.Count; $sectionIndex++) {
+    for ($sectionIndex = 1; $sectionIndex -lt $sections.Count; $sectionIndex++) {
         $sectionBody = $sections[$sectionIndex]
         if (-not $sectionBody.Trim()) { continue }
+        
+        # Section index is 1-based in split result after first empty/preamble
         $sectionName = if ($sectionIndex -le $sectionNames.Count) { $sectionNames[$sectionIndex - 1] } else { "Section $sectionIndex" }
+        if ($sectionName -eq "Topics / Context") { continue } # Handled in Phase 2
 
         $defaultType = switch ($sectionName) {
             'Signals' { 'Status Update' }
@@ -530,7 +536,7 @@ function Enrich-Summary {
     # --- PHASE 2: PARSING TOPIC REGISTRY (SECTION 1) ---
     $topicRecordsMap = @{}
     $topicSection = $sections[1]
-    $blocks = [regex]::Split($topicSection, '(?m)^### Topic:\s+')
+    $blocks = $topicSection -split '(?m)^### Topic:\s+'
     
     foreach ($block in $blocks) {
         if (-not $block.Trim() -or $block -match '^\d+\.\s+') { continue }
@@ -1034,52 +1040,130 @@ function Get-TopicEntities {
     return $entities
 }
 
+function Validate-TopicRecord {
+    param($TopicData, $Anchors)
+    $checks = @{
+        DOMAIN          = if ($TopicData.Domain) { "PASS" } else { "FAIL" }
+        TOPIC_FAMILY    = if ($TopicData.TopicFamily) { "PASS" } else { "FAIL" }
+        TOPIC           = if ($TopicData.Topic -match "^(Product Performance|Product Quality|Product Value|Product Scope|Delivery Progress|Delivery Risk|Development Execution|Cash Flow|Cost Structure|Revenue Performance|Financial Risk|Organisation|Resource Allocation|Operational Effectiveness|Strategic Direction|Product-Market Fit|Growth|Delivery Confidence|AI|Data)$") { "PASS" } else { "FAIL" }
+        TITLE           = if ($TopicData.Title -and $TopicData.Title.Length -gt 10) { "PASS" } else { "FAIL" }
+        CATEGORY        = if ($TopicData.Category -match "^(Risk|Issue|Action|Decision|Progress|Opportunity|Dependency|Strategy|Insight)$") { "PASS" } else { "FAIL" }
+        CONTEXT_TYPE    = if ($TopicData.ContextType -match "^(Discussion|Update|Decision|Agreement|Proposal|Concern|Commitment|Observation|Assumption)$") { "PASS" } else { "FAIL" }
+        TAGS            = if ($TopicData.Tags -and $TopicData.Tags.Count -gt 0) { "PASS" } else { "FAIL" }
+        STATUS          = if ($TopicData.Signal -and $TopicData.Signal -match "^(Positive|Negative|Neutral|Unknown)$") { "PASS" } else { "FAIL" }
+        TRAJECTORY      = if ($TopicData.Trajectory -and $TopicData.Trajectory -match "^(Improving|Stable|Declining|Unclear|Unknown)$") { "PASS" } else { "FAIL" }
+        ANCHORS         = if ($Anchors.People.Count -gt 0) { "PASS" } else { "FAIL" }
+    }
+    
+    $failCount = ($checks.Values | Where-Object { $_ -eq "FAIL" }).Count
+    return @{
+        Checks = $checks
+        Status = if ($failCount -eq 0) { "PASS" } else { "FAIL" }
+    }
+}
+
 function Format-TopicRecord {
     param(
         $TopicData, 
         $MeetingMetadata, 
         [string]$SummaryLink,
-        $ResolvedPeople
+        $ResolvedPeople,
+        $Taxonomy
     )
     
-    $entities = Get-TopicEntities -Text $TopicData.Content -ResolvedPeople $ResolvedPeople
+    $tagsString = if ($TopicData.Tags) { $TopicData.Tags -join ", " } else { "None" }
+    $displayTitle = if ($TopicData.Title) { $TopicData.Title } elseif ($TopicData.TopicName) { $TopicData.TopicName } else { $TopicData.Label }
+    $topicValue = if ($TopicData.Topic) { $TopicData.Topic } else { $TopicData.TopicName }
     
+    # Versioned Topic Lookup
+    $topicVersion = if ($Taxonomy.Topics.$topicValue.Version) { $Taxonomy.Topics.$topicValue.Version } else { "1.0" }
+    $versionedTopic = "$topicValue v$topicVersion"
+
+    # Helper for list formatting
+    function Get-ListString {
+        param($items)
+        if (-not $items -or ($items -is [array] -and $items.Count -eq 0)) { return "None" }
+        if ($items -is [string]) { return $items }
+        if ($items -is [array]) {
+            return ($items | ForEach-Object { 
+                if ($_ -is [hashtable] -or $_ -is [pscustomobject]) { 
+                    # Handle Decision/Action objects from LLM
+                    $text = if ($_.Decision) { "$($_.Decision) (Rationale: $($_.Rationale))" } 
+                            elseif ($_.Action) { "$($_.Action) (Owner: $($_.Owner), Deadline: $($_.Deadline))" }
+                            else { $_ | ConvertTo-Json -Compress }
+                    "- $text"
+                } else {
+                    "- $_" 
+                }
+            }) -join "`n"
+        }
+        return "None"
+    }
+
+    $keyFactsStr = Get-ListString -items $TopicData.KeyFacts
+    $decisionsStr = Get-ListString -items $TopicData.Decisions
+    $actionsStr = Get-ListString -items $TopicData.Actions
+    $risksStr = Get-ListString -items $TopicData.Risks
+    $nextStepsStr = Get-ListString -items $TopicData.NextSteps
+    
+    # Retrieval Anchors from LLM or fallback to local extraction
+    $anchors = $TopicData.RetrievalAnchors
+    if (-not $anchors -or $anchors.PSObject.Properties.Count -eq 0) {
+        $anchors = Get-TopicEntities -Text $TopicData.Content -ResolvedPeople $ResolvedPeople
+    }
+    
+    $peopleStr = if ($anchors.People) { $anchors.People -join ", " } else { "None" }
+    $projectsStr = if ($anchors.Projects) { $anchors.Projects -join ", " } else { "None" }
+    $productsStr = if ($anchors.Products) { $anchors.Products -join ", " } else { "None" }
+    $systemsStr = if ($anchors.Systems) { $anchors.Systems -join ", " } else { "None" }
+    $dependenciesStr = if ($anchors.Dependencies) { $anchors.Dependencies -join ", " } else { "None" }
+
+    # Run EIP 1.1 Validation
+    $validation = Validate-TopicRecord -TopicData $TopicData -Anchors $anchors
+
     $recordMd = @"
-# Topic Record: $($TopicData.Label)
+# Topic Record: $displayTitle
 
 ## Metadata
-- **TOPIC_ID:** $($TopicData.TopicId)
 - **DOMAIN:** $($TopicData.Domain)
+- **TOPIC_FAMILY:** $($TopicData.TopicFamily)
+- **TOPIC:** $versionedTopic
+- **TITLE:** $displayTitle
+- **CATEGORY:** $($TopicData.Category)
+- **CONTEXT_TYPE:** $($TopicData.ContextType)
+- **TAGS:** $tagsString
 - **STATUS:** $($TopicData.Signal)
 - **TRAJECTORY:** $($TopicData.Trajectory)
+- **TOPIC_ID:** $($TopicData.TopicId)
 - **SOURCE_MEETING:** [$($MeetingMetadata.Subject)]($SummaryLink)
 - **DATE:** $($MeetingMetadata.EventDate)
+- **EIP_VALIDATION:** $($validation.Status)
+
+## Key Facts
+$keyFactsStr
 
 ## Summary
-$($TopicData.Content)
+$($TopicData.Summary)
 
-## Intelligence Details
-### Key Facts
-$($TopicData.KeyFacts)
-
+## Structured Intelligence
 ### Decisions
-$($TopicData.Decisions)
+$decisionsStr
 
 ### Actions
-$($TopicData.Actions)
+$actionsStr
 
 ### Risks & Issues
-$($TopicData.Risks)
+$risksStr
 
 ### Next Steps
-$($TopicData.NextSteps)
+$nextStepsStr
 
 ## Retrieval Anchors
-- **PEOPLE:** $($entities.People -join ", ")
-- **PROJECTS:** $($entities.Projects -join ", ")
-- **PRODUCTS:** $($entities.Products -join ", ")
-- **SYSTEMS:** $($entities.Systems -join ", ")
-- **DEPENDENCIES:** $($entities.Dependencies -join ", ")
+- **PEOPLE:** $peopleStr
+- **PROJECTS:** $projectsStr
+- **PRODUCTS:** $productsStr
+- **SYSTEMS:** $systemsStr
+- **DEPENDENCIES:** $dependenciesStr
 
 ---
 *Source: $($MeetingMetadata.MeetingId)*
@@ -2466,7 +2550,33 @@ foreach ($calendarEvent in $events) {
             $initialRecords = if ($cls.records) { $cls.records } else { @() }
             $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
             $enrichedSummaryText = $enrichResult.Summary
-            $topicRecords3D = if ($enrichResult.Records) { $enrichResult.Records } else { $initialRecords }
+            
+            # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
+            $topicRecords3D = @()
+            if ($enrichResult.Records) {
+                foreach ($er in $enrichResult.Records) {
+                    $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
+                    if ($ir) {
+                        # Prepare values to avoid inline-if syntax errors
+                        $finalSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
+                        $finalTags = if ($ir.Tags) { $ir.Tags } else { $er.Tags }
+
+                        # Add new properties to the enriched record object
+                        $er | Add-Member -MemberType NoteProperty -Name "Summary" -Value $finalSummary -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "KeyFacts" -Value $ir.KeyFacts -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "Decisions" -Value $ir.Decisions -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "Actions" -Value $ir.Actions -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "NextSteps" -Value $ir.NextSteps -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "Risks" -Value $ir.Risks -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "TopicName" -Value $ir.TopicName -Force
+                        $er | Add-Member -MemberType NoteProperty -Name "Tags" -Value $finalTags -Force
+                    }
+                    $topicRecords3D += $er
+                }
+            } else {
+                $topicRecords3D = $initialRecords
+            }
 
             # Task 5.1: Smart Mode Switch for "Work" meetings based on topic content
             $modeInfo = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
@@ -2523,16 +2633,18 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 
                 $summaryWithLinks = $enrichedSummaryText
                 foreach ($tr in $topicRecords3D) {
-                    $cleanLabel = if ($tr.Label) { $tr.Label } else { $tr.TopicName }
-                    $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
-                    if (-not $sanitizedLabel) { $sanitizedLabel = "Details" }
-                    $trFileName = "$mId-$($tr.TopicId)-$sanitizedLabel.md"
+                    # Use canonical topic name for filename grouping
+                    $safeTopicName = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.Label }
+                    $sanitizedTopic = $safeTopicName -replace '[^\w\s-]', '' -replace '\s+', '-'
+                    if (-not $sanitizedTopic) { $sanitizedTopic = "Details" }
+                    
+                    $trFileName = "$mId-$($tr.TopicId)-$sanitizedTopic.md"
                     $trLocalPath = Join-Path $outDir $trFileName
                     
                     # Mutual Linking: Topic Record -> Summary
                     $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
                         Subject = $subject; MeetingId = $mId; EventDate = $start
-                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople
+                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy
                     
                     $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
                     Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"

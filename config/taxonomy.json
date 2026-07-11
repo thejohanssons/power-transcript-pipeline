@@ -1,82 +1,115 @@
 {
-  "Version": "3.1",
-  "Description": "Topic taxonomy and context type registry for the EIP pipeline. Version 3.1 adds Decision, Action, Commitment, and Escalation context types, topic group metadata, and short descriptions for all topics.",
+  "Version": "4.2",
+  "Description": "Frozen EIP 1.1 Taxonomy. Implements versioned topics and canonical 9-axis metadata schema.",
   "Changelog": [
     {
-      "version": "3.1",
-      "date": "2026-07-01",
+      "version": "4.2",
+      "date": "2026-07-11",
       "changes": [
-        "ContextTypes: added Decision, Action, Commitment, Escalation",
-        "ContextTypeDescriptions added for all 11 context types",
-        "TopicGroups added: Product, Delivery, Financial, Operational, Strategic",
-        "Topic descriptions added for all 18 topics"
+        "Implemented Versioned Topic Registry (Topic concepts decoupled from Families)",
+        "Frozen Canonical Metadata Axis Order (9-axis schema)",
+        "Hardened vocabulary for Category and ContextType axes"
       ]
-    },
-    {
-      "version": "3.0",
-      "date": "2026-01-01",
-      "changes": ["Initial taxonomy with 18 topics and 7 context types"]
     }
   ],
 
-  "Topics": {
-    "T01": { "Name": "Product Performance",              "Group": "Product",    "Description": "Functional performance, UX quality, scan accuracy, speed, battery, thermal behaviour" },
-    "T02": { "Name": "Product Quality & Compliance",     "Group": "Product",    "Description": "Regulatory compliance, certification, defects, quality standards, safety" },
-    "T03": { "Name": "Product Value & Perception",       "Group": "Product",    "Description": "Customer feedback, usability, value perception, market appeal" },
-    "T04": { "Name": "Product Scope & Prioritisation",   "Group": "Product",    "Description": "Feature scope, backlog, MVP definition, requirements, prioritisation decisions" },
-
-    "T05": { "Name": "Delivery Progress & Readiness",    "Group": "Delivery",   "Description": "Launch readiness, milestones, deployment, rollout scheduling and timing" },
-    "T06": { "Name": "Delivery Risk & Constraints",      "Group": "Delivery",   "Description": "Blockers, delays, constraints, stalled progress, bottlenecks" },
-    "T07": { "Name": "Development Execution",            "Group": "Delivery",   "Description": "Engineering execution, sprint progress, build, code, development activity" },
-
-    "T08": { "Name": "Cash Flow & Liquidity",            "Group": "Financial",  "Description": "Cash position, liquidity, funding runway, capital requirements" },
-    "T09": { "Name": "Cost Structure & Margins",         "Group": "Financial",  "Description": "Cost base, margins, cost overruns, unit economics, BOM cost" },
-    "T10": { "Name": "Revenue & Commercial Performance", "Group": "Financial",  "Description": "Revenue performance, sales results, commercial outcomes, pricing" },
-    "T11": { "Name": "Financial Risk & Exposure",        "Group": "Financial",  "Description": "Financial exposure, foreign exchange, credit risk, financial contingency" },
-
-    "T12": { "Name": "Organisation & Capability",        "Group": "Operational","Description": "Org structure, headcount, team capability, hiring, skills gaps" },
-    "T13": { "Name": "Resource Allocation",              "Group": "Operational","Description": "Resource assignment, capacity, bandwidth, competing priorities" },
-    "T14": { "Name": "Operational Effectiveness",        "Group": "Operational","Description": "Process efficiency, operational performance, supply chain, logistics" },
-
-    "T15": { "Name": "Strategic Direction & Alignment",  "Group": "Strategic",  "Description": "Strategic priorities, vision, direction-setting, alignment across leadership" },
-    "T16": { "Name": "Product-Market Fit",               "Group": "Strategic",  "Description": "Market positioning, competitive landscape, TAM, segments, product-market alignment" },
-    "T17": { "Name": "Growth & Opportunities",           "Group": "Strategic",  "Description": "Growth initiatives, new markets, partnerships, commercial opportunities" },
-    "T18": { "Name": "Delivery Confidence",              "Group": "Strategic",  "Description": "Overall confidence in delivery, cross-topic risk sentiment, leadership posture" }
-  },
-
-  "TopicGroups": {
-    "Product":     { "Description": "Topics concerning product quality, scope, performance and customer perception",   "Topics": ["T01","T02","T03","T04"] },
-    "Delivery":    { "Description": "Topics concerning engineering execution, delivery risk and launch readiness",      "Topics": ["T05","T06","T07"] },
-    "Financial":   { "Description": "Topics concerning cash, cost, revenue and financial risk",                        "Topics": ["T08","T09","T10","T11"] },
-    "Operational": { "Description": "Topics concerning organisation, resources, capability and operational effectiveness", "Topics": ["T12","T13","T14"] },
-    "Strategic":   { "Description": "Topics concerning direction, market fit, growth and cross-portfolio confidence",  "Topics": ["T15","T16","T17","T18"] }
-  },
-
-  "ContextTypes": [
-    "Strategy",
-    "Execution",
-    "Problem",
-    "Risk",
-    "Opportunity",
-    "Governance",
-    "Learning",
-    "Decision",
-    "Action",
-    "Commitment",
-    "Escalation"
+  "MetadataAxes": [
+    "DOMAIN",
+    "TOPIC_FAMILY",
+    "TOPIC",
+    "TITLE",
+    "CATEGORY",
+    "CONTEXT_TYPE",
+    "TAGS",
+    "STATUS",
+    "TRAJECTORY"
   ],
 
-  "ContextTypeDescriptions": {
-    "Strategy":    "High-level direction, priorities, goals and alignment discussions",
-    "Execution":   "Progress updates, delivery activity, sprint work and implementation",
-    "Problem":     "Issues, defects, failures, and things that are not working as expected",
-    "Risk":        "Potential future problems, uncertainty, exposure and mitigation",
-    "Opportunity": "Growth, improvement or commercial possibilities identified in discussion",
-    "Governance":  "Approvals, compliance, oversight, policy and process decisions",
-    "Learning":    "Retrospective insights, experiments, lessons learned and knowledge sharing",
-    "Decision":    "A clear decision reached or ratified in the meeting — with owner and rationale",
-    "Action":      "A specific task assigned to a named owner with expected completion",
-    "Commitment":  "A formal commitment made by an individual or team to a deliverable or outcome",
-    "Escalation":  "An issue, risk or decision explicitly escalated to a higher authority for resolution"
-  }
+  "Domains": [
+    "Product",
+    "Sales",
+    "Marketing",
+    "Technology",
+    "IT",
+    "Operations",
+    "SupplyChain",
+    "Finance",
+    "People",
+    "Governance"
+  ],
+
+  "TopicFamilies": [
+    "Product",
+    "Delivery",
+    "Commercial",
+    "Customer",
+    "People",
+    "Process",
+    "Technology",
+    "Operations",
+    "Strategy"
+  ],
+
+  "Topics": {
+    "Product Performance":              { "Version": "1.0", "Description": "Functional performance, UX, speed" },
+    "Product Quality":                  { "Version": "1.0", "Description": "Bugs, defects, safety, compliance" },
+    "Product Value":                    { "Version": "1.0", "Description": "Customer feedback, perception" },
+    "Product Scope":                    { "Version": "1.0", "Description": "Feature set, MVP, backlog" },
+    "Delivery Progress":                { "Version": "1.0", "Description": "Milestones, launch readiness" },
+    "Delivery Risk":                    { "Version": "1.0", "Description": "Blockers, bottlenecks, delays" },
+    "Development Execution":            { "Version": "1.0", "Description": "Engineering activity, sprint progress" },
+    "Cash Flow":                        { "Version": "1.0", "Description": "Liquidity, capital requirements" },
+    "Cost Structure":                   { "Version": "1.0", "Description": "Margins, BOM cost" },
+    "Revenue Performance":              { "Version": "1.0", "Description": "Sales, pricing, performance" },
+    "Financial Risk":                   { "Version": "1.0", "Description": "Exposure, credit, forex" },
+    "Organisation":                     { "Version": "1.0", "Description": "Headcount, capability, structure" },
+    "Resource Allocation":              { "Version": "1.0", "Description": "Bandwidth, competing priorities" },
+    "Operational Effectiveness":        { "Version": "1.0", "Description": "Process efficiency, logistics" },
+    "Strategic Direction":              { "Version": "1.0", "Description": "Vision, priorities, direction-setting" },
+    "Product-Market Fit":               { "Version": "1.0", "Description": "Segments, TAM, positioning" },
+    "Growth":                           { "Version": "1.0", "Description": "Initiatives, partnerships" },
+    "Delivery Confidence":              { "Version": "1.0", "Description": "Overall risk sentiment" },
+    "AI":                               { "Version": "1.0", "Description": "Artificial intelligence and ML concepts" },
+    "Data":                             { "Version": "1.0", "Description": "Data architecture and strategy" }
+  },
+
+  "Categories": [
+    "Risk",
+    "Issue",
+    "Action",
+    "Decision",
+    "Progress",
+    "Opportunity",
+    "Dependency",
+    "Strategy",
+    "Insight"
+  ],
+
+  "ContextTypes": [
+    "Discussion",
+    "Update",
+    "Decision",
+    "Agreement",
+    "Proposal",
+    "Concern",
+    "Commitment",
+    "Observation",
+    "Assumption"
+  ],
+
+  "Tags": [
+    "CriticalPath",
+    "BOM_Risk",
+    "Revenue_Impacting",
+    "Customer_Facing",
+    "Regulatory_Hold",
+    "AI",
+    "Automation",
+    "Strategy",
+    "Compliance",
+    "NPI",
+    "Product",
+    "Quality",
+    "ProcessImprovement"
+  ]
 }
