@@ -1,0 +1,11 @@
+{
+  "overallStatus": "pending",
+  "status": "Initializing",
+  "sourceFile": "testing transcript.vtt",
+  "timestamp": "2026-07-09T12:29:53.1508140+02:00",
+  "artefactPaths": {
+    "expected": "expected_output.json",
+    "snapshot": "source_snapshot.vtt"
+  },
+  "runId": "RUN_20260709_122953_08bd529c"
+}

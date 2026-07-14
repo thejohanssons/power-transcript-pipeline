@@ -1,0 +1,7 @@
+{
+  "retrievalValidation": "pass",
+  "hardValidation": "pass",
+  "overallStatus": "fail",
+  "llmGroundingValidation": "fail",
+  "schemaValidation": "fail"
+}

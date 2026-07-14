@@ -1,0 +1,49 @@
+{
+  "process_governors": {
+    "ExCo": {
+      "governance_owner": "CEO",
+      "description": "Executive Committee governance."
+    },
+    "Product Board": {
+      "governance_owner": "ExCo",
+      "represented_by": "CPO",
+      "description": "Product Board is an ExCo-governed process represented by CPO."
+    },
+    "NPI": {
+      "governance_owner": "CPO",
+      "description": "New Product Introduction governance."
+    },
+    "Business Operations": {
+      "governance_owner": "COO",
+      "description": "Business operations governance."
+    },
+    "Commercial Planning": {
+      "governance_owner": "COO",
+      "description": "Commercial planning governance."
+    },
+    "Education Governance": {
+      "governance_owner": "COO",
+      "description": "Governance of education-related planning and execution."
+    },
+    "Finance Management": {
+      "governance_owner": "CFO",
+      "description": "Finance governance."
+    },
+    "IT Governance": {
+      "governance_owner": "CTO",
+      "description": "IT and technology governance."
+    },
+    "Corporate Transformation": {
+      "governance_owner": "CEO",
+      "description": "Enterprise-level transformation governance."
+    },
+    "Strategic Initiative": {
+      "governance_owner": "CEO",
+      "description": "Strategic initiative governance where no more specific process applies."
+    },
+    "Ad Hoc": {
+      "governance_owner": "Unknown",
+      "description": "Ad hoc work with no clear governance framework."
+    }
+  }
+}

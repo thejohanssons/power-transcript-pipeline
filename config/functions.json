@@ -1,0 +1,22 @@
+{
+  "functions": [
+    "Executive",
+    "Product",
+    "R&D",
+    "Engineering",
+    "Quality",
+    "Operations",
+    "Supply Chain",
+    "Manufacturing",
+    "Marketing",
+    "Sales",
+    "Education",
+    "Support",
+    "Finance",
+    "IT",
+    "HR",
+    "Compliance",
+    "External Supplier",
+    "Unknown"
+  ]
+}

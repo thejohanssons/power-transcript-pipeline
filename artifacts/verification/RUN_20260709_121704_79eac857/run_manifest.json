@@ -1,0 +1,10 @@
+{
+  "sourceFile": "testing transcript.vtt",
+  "status": "Initializing",
+  "runId": "RUN_20260709_121704_79eac857",
+  "timestamp": "2026-07-09T12:17:04.1074170+02:00",
+  "artefactPaths": {
+    "expected": "expected_output.json",
+    "snapshot": "source_snapshot.vtt"
+  }
+}

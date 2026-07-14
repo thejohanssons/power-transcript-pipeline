@@ -1,0 +1,17 @@
+{
+  "hardValidation": "pass",
+  "schemaValidation": "pass",
+  "llmGroundingValidation": "fail",
+  "overallStatus": "fail",
+  "details": {
+    "forbiddenDetected": [],
+    "missingRequiredFacts": [
+      "Canada sales uptake",
+      "100 new schools",
+      "schools want pens",
+      "10 pens per school",
+      "possible increase to 20 pens per school"
+    ]
+  },
+  "retrievalValidation": "pass"
+}

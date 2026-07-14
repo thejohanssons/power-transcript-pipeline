@@ -1,0 +1,16 @@
+{
+  "execution_contexts": [
+    "NPI-managed",
+    "Product Development",
+    "R&D Project",
+    "Operational BAU",
+    "Commercial BAU",
+    "Finance BAU",
+    "IT BAU",
+    "Executive Governance",
+    "Programme",
+    "Project",
+    "Ad Hoc",
+    "Unknown"
+  ]
+}

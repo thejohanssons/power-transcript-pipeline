@@ -1,0 +1,11 @@
+{
+  "status": "Completed",
+  "timestamp": "2026-07-09T12:17:17.059371+02:00",
+  "runId": "RUN_20260709_121717_c7a04fe2",
+  "artefactPaths": {
+    "snapshot": "source_snapshot.vtt",
+    "expected": "expected_output.json"
+  },
+  "overallStatus": "fail",
+  "sourceFile": "testing transcript.vtt"
+}

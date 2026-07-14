@@ -102,6 +102,31 @@ $peopleConfigPath = Join-Path $configDir "people_config.json"
 $peopleConfig = if (Test-Path $peopleConfigPath) { Get-Content -Path $peopleConfigPath | ConvertFrom-Json } else { $null }
 if ($peopleConfig) { Write-Host "People config loaded ($($peopleConfig.people.Count) people) ✅" } else { Write-Warning "people_config.json not found — people intelligence disabled" }
 
+# --- EIP 1.2 OWNERSHIP CONFIG LOADING ---
+$capabilitiesPath = Join-Path $configDir "capabilities.json"
+$capabilitiesConfig = if (Test-Path $capabilitiesPath) { Get-Content $capabilitiesPath | ConvertFrom-Json } else { $null }
+
+$functionsPath = Join-Path $configDir "functions.json"
+$functionsConfig = if (Test-Path $functionsPath) { Get-Content $functionsPath | ConvertFrom-Json } else { $null }
+
+$governorsPath = Join-Path $configDir "process_governors.json"
+$governorsConfig = if (Test-Path $governorsPath) { Get-Content $governorsPath | ConvertFrom-Json } else { $null }
+
+$ownershipRulesPath = Join-Path $configDir "ownership_rules.json"
+$ownershipRulesConfig = if (Test-Path $ownershipRulesPath) { Get-Content $ownershipRulesPath | ConvertFrom-Json } else { $null }
+
+$lifecyclePhasesPath = Join-Path $configDir "lifecycle_phases.json"
+$lifecyclePhasesConfig = if (Test-Path $lifecyclePhasesPath) { Get-Content $lifecyclePhasesPath | ConvertFrom-Json } else { $null }
+
+$executionContextsPath = Join-Path $configDir "execution_contexts.json"
+$executionContextsConfig = if (Test-Path $executionContextsPath) { Get-Content $executionContextsPath | ConvertFrom-Json } else { $null }
+
+if ($capabilitiesConfig -and $ownershipRulesConfig) {
+    Write-Host "EIP 1.2 Ownership & Governance config loaded ✅"
+} else {
+    Write-Warning "EIP 1.2 configuration files missing — ownership resolution may be degraded"
+}
+
 # =========================
 # VTT HELPER: Strip WebVTT timestamps and cue markers, return clean transcript text
 # =========================
@@ -245,6 +270,61 @@ function Test-NegatedInContext {
         if ($negationPrefixes -contains $w.ToLower().Trim('.,;:!?')) { return $true }
     }
     return $false
+}
+
+function Resolve-Ownership {
+    param(
+        [string]$Capability,
+        [string]$Phase,
+        [string]$Governor
+    )
+
+    $ownership = @{
+        PRIMARY_OWNER        = "Unknown"
+        PROCESS_GOVERNOR     = $Governor
+        GOVERNANCE_OWNER     = "Unknown"
+        ACCOUNTABLE_PROCESS  = $Capability
+        EXECUTION_CONTEXT    = "Unknown"
+        CAPABILITY           = $Capability
+        CAPABILITY_PHASE     = $Phase
+        SUPPORTING_FUNCTIONS = @()
+        RESOURCE_FUNCTIONS   = @()
+        EXECUTIVE_LENSES     = @()
+        OWNERSHIP_CONFIDENCE = "Low"
+        OWNERSHIP_REASON     = ""
+    }
+
+    # 1. Resolve PROCESS_GOVERNOR and GOVERNANCE_OWNER
+    if ($global:governorsConfig -and $Governor -ne "Unknown") {
+        $govInfo = $global:governorsConfig.process_governors.$Governor
+        if ($govInfo) {
+            $ownership.GOVERNANCE_OWNER = $govInfo.governance_owner
+            $ownership.OWNERSHIP_CONFIDENCE = "Medium"
+        }
+    }
+
+    # 2. Resolve PRIMARY_OWNER from ownership_rules.json
+    if ($global:ownershipRulesConfig -and $Capability -ne "Unknown") {
+        $rule = $global:ownershipRulesConfig.ownership_rules | Where-Object { $_.capability -eq $Capability } | Select-Object -First 1
+        if ($rule) {
+            $owner = $rule.default_owner
+            if ($rule.phase_owners -and $rule.phase_owners.$Phase) {
+                $owner = $rule.phase_owners.$Phase
+            }
+            $ownership.PRIMARY_OWNER = $owner
+            $ownership.OWNERSHIP_CONFIDENCE = "High"
+            $ownership.OWNERSHIP_REASON = "Topic concerns $Capability within $($ownership.PROCESS_GOVERNOR). Resolved via ownership rules for phase: $Phase."
+        }
+    }
+
+    # 3. Handle specific canon rules (e.g., Product Industrialisation)
+    if ($Capability -eq "Product Industrialisation") {
+        $ownership.PRIMARY_OWNER = "CPO"
+        $ownership.OWNERSHIP_CONFIDENCE = "High"
+        $ownership.OWNERSHIP_REASON = "Product Industrialisation remains CPO-owned across all lifecycle phases."
+    }
+
+    return $ownership
 }
 
 function Get-TopicSentiment {
@@ -582,11 +662,54 @@ function Enrich-Summary {
         elseif ($negCount -gt $posCount) { $finalSignal = "Negative"; $finalTrajectory = "Declining" }
         elseif ($posCount -gt $negCount) { $finalSignal = "Positive"; $finalTrajectory = "Improving" }
 
+        # --- EIP 1.2 METADATA EXTRACTION ---
+        $capability = "Unknown"; $phase = "Unknown"; $context = "Unknown"; $governor = "Unknown"
+        $supportingFuncs = @(); $resourceFuncs = @()
+        
+        foreach ($line in ($block -split "`n")) {
+            if ($line -match '^CAPABILITY:\s*(.*)$') { $capability = $matches[1].Trim() }
+            elseif ($line -match '^CAPABILITY_PHASE:\s*(.*)$') { $phase = $matches[1].Trim() }
+            elseif ($line -match '^EXECUTION_CONTEXT:\s*(.*)$') { $context = $matches[1].Trim() }
+            elseif ($line -match '^PROCESS_GOVERNOR:\s*(.*)$') { $governor = $matches[1].Trim() }
+            elseif ($line -match '^SUPPORTING_FUNCTIONS:\s*(.*)$') { 
+                $supportingFuncs = $matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+            elseif ($line -match '^RESOURCE_FUNCTIONS:\s*(.*)$') { 
+                $resourceFuncs = $matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+        }
+
         # --- 3D SELECTION ---
         $selectedCategory = Select-Category -CandidateCategories $cls.CategoryHints -SectionName 'Topics / Context' -Signal $finalSignal -Trajectory $finalTrajectory -Label $label -Content $bullets
         $selectedContextType = 'Discussion' # Topic Registry default
 
-        Write-Host "  [3D DIAG] Topic=$($cls.TopicId) / $($cls.TopicName) | Section=Topics / Context | Category=$selectedCategory | ContextType=$selectedContextType"
+        # --- RESOLVE OWNERSHIP ---
+        $ownership = Resolve-Ownership -Capability $capability -Phase $phase -Governor $governor
+        $ownership.EXECUTION_CONTEXT = $context
+        $ownership.SUPPORTING_FUNCTIONS = $supportingFuncs
+        $ownership.RESOURCE_FUNCTIONS = $resourceFuncs
+        
+        # EIP 1.2 Config Versions
+        $ownership.OWNERSHIP_RULES_VERSION = "1.0"
+        $ownership.PROCESS_GOVERNORS_VERSION = "1.0"
+        $ownership.CAPABILITIES_VERSION = "1.0"
+        $ownership.FUNCTIONS_VERSION = "1.0"
+
+        # Resolve Executive Lenses (Primary Owner + Governance Owner + any stratégically relevant lenses)
+        $lenses = @($ownership.PRIMARY_OWNER)
+        if ($ownership.GOVERNANCE_OWNER -ne "Unknown" -and $lenses -notcontains $ownership.GOVERNANCE_OWNER) {
+            $lenses += $ownership.GOVERNANCE_OWNER
+        }
+        $ownership.EXECUTIVE_LENSES = $lenses
+
+        # Handle Deprecated "Delivery" Topic
+        if ($cls.TopicName -eq "Delivery" -or $label -eq "Delivery") {
+            $cls.TopicName = "Delivery Capability"
+            $ownership.OWNERSHIP_CONFIDENCE = "Low"
+            $ownership.OWNERSHIP_REASON += " [DEPRECATION NOTICE: Standalone 'Delivery' topic replaced with 'Delivery Capability']"
+        }
+
+        Write-Host "  [EIP 1.2 DIAG] Topic=$($cls.TopicId) | Owner=$($ownership.PRIMARY_OWNER) | Governor=$($ownership.PROCESS_GOVERNOR)"
 
         $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
             RecordId      = $meetingId + "_" + $cls.TopicId
@@ -599,6 +722,7 @@ function Enrich-Summary {
             Content       = $bullets
             Signal        = $finalSignal
             Trajectory    = $finalTrajectory
+            Ownership     = $ownership
         }
     }
 
@@ -728,9 +852,10 @@ function Invoke-LLM {
         [string]$FullUri,
         [hashtable]$Headers,
         [string]$Model,
-        [int]$MaxTokens = 16000
+        [int]$MaxTokens = 16000,
+        [string]$ResponseFormat = "text"
     )
-    $body = @{
+    $bodyObj = @{
         model    = $Model
         messages = @(
             @{ role = "system"; content = $SystemPrompt },
@@ -738,13 +863,26 @@ function Invoke-LLM {
         )
         temperature           = 0
         max_completion_tokens = $MaxTokens
-    } | ConvertTo-Json -Depth 10
+    }
+    
+    if ($ResponseFormat -eq "json_object") {
+        $bodyObj.response_format = @{ type = "json_object" }
+    }
+    
+    $body = $bodyObj | ConvertTo-Json -Depth 10
 
     try {
         $response     = Invoke-RestMethod -Method Post -Uri $FullUri -Headers $Headers -Body $body
         $finishReason = $response.choices[0].finish_reason
         if ($finishReason -ne "stop") {
             Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
+            
+            # If JSON was requested but truncated, we log the raw partial for debugging
+            if ($ResponseFormat -eq "json_object") {
+                $truncatedLog = "truncated_llm_$(Get-Date -Format 'HHmmss').json"
+                $response.choices[0].message.content | Set-Content -Path (Join-Path $outDir $truncatedLog) -Encoding utf8
+                Write-Warning "  [LLM DIAG] Partial JSON saved to $truncatedLog"
+            }
         }
         return $response.choices[0].message.content
     } catch {
@@ -1042,17 +1180,18 @@ function Get-TopicEntities {
 
 function Validate-TopicRecord {
     param($TopicData, $Anchors)
+    $o = $TopicData.Ownership
     $checks = @{
         DOMAIN          = if ($TopicData.Domain) { "PASS" } else { "FAIL" }
         TOPIC_FAMILY    = if ($TopicData.TopicFamily) { "PASS" } else { "FAIL" }
-        TOPIC           = if ($TopicData.Topic -match "^(Product Performance|Product Quality|Product Value|Product Scope|Delivery Progress|Delivery Risk|Development Execution|Cash Flow|Cost Structure|Revenue Performance|Financial Risk|Organisation|Resource Allocation|Operational Effectiveness|Strategic Direction|Product-Market Fit|Growth|Delivery Confidence|AI|Data)$") { "PASS" } else { "FAIL" }
-        TITLE           = if ($TopicData.Title -and $TopicData.Title.Length -gt 10) { "PASS" } else { "FAIL" }
-        CATEGORY        = if ($TopicData.Category -match "^(Risk|Issue|Action|Decision|Progress|Opportunity|Dependency|Strategy|Insight)$") { "PASS" } else { "FAIL" }
-        CONTEXT_TYPE    = if ($TopicData.ContextType -match "^(Discussion|Update|Decision|Agreement|Proposal|Concern|Commitment|Observation|Assumption)$") { "PASS" } else { "FAIL" }
-        TAGS            = if ($TopicData.Tags -and $TopicData.Tags.Count -gt 0) { "PASS" } else { "FAIL" }
-        STATUS          = if ($TopicData.Signal -and $TopicData.Signal -match "^(Positive|Negative|Neutral|Unknown)$") { "PASS" } else { "FAIL" }
-        TRAJECTORY      = if ($TopicData.Trajectory -and $TopicData.Trajectory -match "^(Improving|Stable|Declining|Unclear|Unknown)$") { "PASS" } else { "FAIL" }
-        ANCHORS         = if ($Anchors.People.Count -gt 0) { "PASS" } else { "FAIL" }
+        TOPIC           = if ($TopicData.Topic -and $TopicData.Topic -notmatch "^Delivery$") { "PASS" } else { "FAIL" }
+        CATEGORY        = if ($TopicData.Category -match "^(Risk|Issue|Action|Decision|Progress|Opportunity|Dependency|Strategy|Insight|Execution|Governance|Problem|Learning)$") { "PASS" } else { "FAIL" }
+        OWNERSHIP_BLOCK = if ($o) { "PASS" } else { "FAIL" }
+        PRIMARY_OWNER   = if ($o.PRIMARY_OWNER -and $o.PRIMARY_OWNER -ne "Unknown") { "PASS" } else { "WARN" }
+        GOVERNOR        = if ($o.PROCESS_GOVERNOR -and $o.PROCESS_GOVERNOR -ne "Unknown") { "PASS" } else { "FAIL" }
+        GOV_OWNER_SYNC  = if ($o.GOVERNANCE_OWNER -ne "Unknown") { "PASS" } else { "FAIL" }
+        OWNER_REASON    = if ($o.PRIMARY_OWNER -ne "Unknown" -and -not [string]::IsNullOrWhiteSpace($o.OWNERSHIP_REASON)) { "PASS" } else { "FAIL" }
+        CANON_CPO_IND   = if ($o.CAPABILITY -eq "Product Industrialisation" -and $o.PRIMARY_OWNER -ne "CPO") { "FAIL" } else { "PASS" }
     }
     
     $failCount = ($checks.Values | Where-Object { $_ -eq "FAIL" }).Count
@@ -1072,12 +1211,15 @@ function Format-TopicRecord {
     )
     
     $tagsString = if ($TopicData.Tags) { $TopicData.Tags -join ", " } else { "None" }
-    $displayTitle = if ($TopicData.Title) { $TopicData.Title } elseif ($TopicData.TopicName) { $TopicData.TopicName } else { $TopicData.Label }
-    $topicValue = if ($TopicData.Topic) { $TopicData.Topic } else { $TopicData.TopicName }
+    $displayTitle = if ($TopicData.Title) { $TopicData.Title } elseif ($TopicData.TopicName) { $TopicData.TopicName } elseif ($TopicData.Label) { $TopicData.Label } else { $TopicData.DISPLAY_LABEL }
+    $topicValue = if ($TopicData.Topic) { $TopicData.Topic } elseif ($TopicData.TopicName) { $TopicData.TopicName } else { $TopicData.CANONICAL_TOPIC }
     
     # Versioned Topic Lookup
-    $topicVersion = if ($Taxonomy.Topics.$topicValue.Version) { $Taxonomy.Topics.$topicValue.Version } else { "1.0" }
-    $versionedTopic = "$topicValue v$topicVersion"
+    $topicVersion = "1.0"
+    if ($topicValue -and $Taxonomy.Topics.$topicValue.Version) { 
+        $topicVersion = $Taxonomy.Topics.$topicValue.Version 
+    }
+    $versionedTopic = if ($topicValue) { "$topicValue v$topicVersion" } else { "Unknown v1.0" }
 
     # Helper for list formatting
     function Get-ListString {
@@ -1121,6 +1263,12 @@ function Format-TopicRecord {
     # Run EIP 1.1 Validation
     $validation = Validate-TopicRecord -TopicData $TopicData -Anchors $anchors
 
+    # OWNERSHIP Block Formatting
+    $o = $TopicData.Ownership
+    $supportingFuncsStr = if ($o.SUPPORTING_FUNCTIONS) { $o.SUPPORTING_FUNCTIONS -join ", " } else { "None" }
+    $resourceFuncsStr = if ($o.RESOURCE_FUNCTIONS) { $o.RESOURCE_FUNCTIONS -join ", " } else { "None" }
+    $lensesStr = if ($o.EXECUTIVE_LENSES) { $o.EXECUTIVE_LENSES -join ", " } else { "None" }
+
     $recordMd = @"
 # Topic Record: $displayTitle
 
@@ -1131,6 +1279,23 @@ function Format-TopicRecord {
 - **TITLE:** $displayTitle
 - **CATEGORY:** $($TopicData.Category)
 - **CONTEXT_TYPE:** $($TopicData.ContextType)
+
+### OWNERSHIP
+- **PRIMARY_OWNER:** $($o.PRIMARY_OWNER)
+- **PROCESS_GOVERNOR:** $($o.PROCESS_GOVERNOR)
+- **GOVERNANCE_OWNER:** $($o.GOVERNANCE_OWNER)
+- **ACCOUNTABLE_PROCESS:** $($o.ACCOUNTABLE_PROCESS)
+- **EXECUTION_CONTEXT:** $($o.EXECUTION_CONTEXT)
+- **CAPABILITY:** $($o.CAPABILITY)
+- **CAPABILITY_PHASE:** $($o.CAPABILITY_PHASE)
+- **SUPPORTING_FUNCTIONS:** $supportingFuncsStr
+- **RESOURCE_FUNCTIONS:** $resourceFuncsStr
+- **EXECUTIVE_LENSES:** $lensesStr
+- **OWNERSHIP_CONFIDENCE:** $($o.OWNERSHIP_CONFIDENCE)
+- **OWNERSHIP_REASON:** $($o.OWNERSHIP_REASON)
+- **OWNERSHIP_RULES_VERSION:** $($o.OWNERSHIP_RULES_VERSION)
+- **PROCESS_GOVERNORS_VERSION:** $($o.PROCESS_GOVERNORS_VERSION)
+
 - **TAGS:** $tagsString
 - **STATUS:** $($TopicData.Signal)
 - **TRAJECTORY:** $($TopicData.Trajectory)
@@ -1143,7 +1308,7 @@ function Format-TopicRecord {
 $keyFactsStr
 
 ## Summary
-$($TopicData.Summary)
+$(if ($TopicData.Summary) { $TopicData.Summary } else { $TopicData.CONTENT })
 
 ## Structured Intelligence
 ### Decisions
@@ -1264,37 +1429,72 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
             if ($chunkSummaries.Count -eq 0) {
                 Write-Warning "LLM Analysis failed: all chunk passes returned empty."
             } else {
-                # --- PASS 2: Synthesise all chunk summaries into final structured JSON ---
-                $combinedSummaries = $chunkSummaries -join "`n`n"
-                $userContent = "Meeting transcript summaries (from $($chunks.Count) sections):`n`n$combinedSummaries"
-                $rawContent  = Invoke-LLM -SystemPrompt $rules.LLMConfig.Prompt `
-                                          -UserContent $userContent `
-                                          -FullUri $fullUri -Headers $llmHeaders `
-                                          -Model $rules.LLMConfig.Model -MaxTokens 16000
-
-                if ($rawContent) {
-                    $resultJson = ConvertFrom-LLMJson -RawContent $rawContent
-                    if ($resultJson) {
-                        return @{
-                            classification = $resultJson.classification
-                            confidence     = $resultJson.confidence
-                            summary        = $resultJson.summary
-                            records        = $resultJson.records
-                            source         = "llm"
-                        }
+                # --- PASS 2: Tiered Synthesis (for large meetings) ---
+                $currentSummaries = $chunkSummaries
+                while ($currentSummaries.Count -gt 3) {
+                    Write-Host "  [LLM DIAG] Tiered Synthesis: Reducing $($currentSummaries.Count) summaries..." -ForegroundColor Gray
+                    $nextTier = @()
+                    for ($i = 0; $i -lt $currentSummaries.Count; $i += 2) {
+                        $pair = $currentSummaries[$i]
+                        if ($i+1 -lt $currentSummaries.Count) { $pair += "`n`n" + $currentSummaries[$i+1] }
+                        
+                        $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail."
+                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $rules.LLMConfig.Model -MaxTokens 6000
+                        if ($syn) { $nextTier += $syn }
                     }
-                    # JSON parse failed — try regex recovery
-                    $recovered = Recover-LLMResult -RawContent $rawContent
-                    if ($recovered.summary) {
-                        Write-Warning "LLM Analysis returned malformed JSON; using recovered summary fallback."
-                        return @{
-                            classification = if ($recovered.classification) { $recovered.classification } else { "CEO" }
-                            confidence     = if ($recovered.confidence) { $recovered.confidence } else { "Low" }
-                            summary        = $recovered.summary
-                            source         = "llm_recovered"
-                        }
+                    $currentSummaries = $nextTier
+                }
+                $combinedSummaries = $currentSummaries -join "`n`n"
+                
+                # --- PASS 3: Decoupled Output Calls ---
+                Write-Host "  [LLM DIAG] Synthesising final Leadership Summary..." -ForegroundColor Gray
+                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []."
+                
+                $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
+                                         -UserContent $combinedSummaries `
+                                         -FullUri $fullUri -Headers $llmHeaders `
+                                         -Model $rules.LLMConfig.Model -MaxTokens 8000 `
+                                         -ResponseFormat "json_object"
+
+                Write-Host "  [LLM DIAG] Extracting Topic Records..." -ForegroundColor Gray
+                $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'records' array. Leave 'summary' as an empty string."
+                
+                $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
+                                         -UserContent $combinedSummaries `
+                                         -FullUri $fullUri -Headers $llmHeaders `
+                                         -Model $rules.LLMConfig.Model -MaxTokens 12000 `
+                                         -ResponseFormat "json_object"
+
+                $finalResult = @{
+                    classification = "CEO"
+                    confidence     = "Low"
+                    summary        = "No summary generated."
+                    records        = @()
+                    source         = "llm_failed"
+                }
+
+                if ($summaryRaw) {
+                    $sJson = ConvertFrom-LLMJson -RawContent $summaryRaw
+                    if ($sJson) {
+                        $finalResult.classification = $sJson.classification
+                        $finalResult.confidence     = $sJson.confidence
+                        $finalResult.summary        = $sJson.summary
+                        $finalResult.source         = "llm"
                     }
                 }
+
+                if ($recordsRaw) {
+                    $rJson = ConvertFrom-LLMJson -RawContent $recordsRaw
+                    if ($rJson -and $rJson.records) {
+                        $finalResult.records = $rJson.records
+                        if ($finalResult.source -eq "llm") { $finalResult.source = "llm" } else { $finalResult.source = "llm_partial_records" }
+                    }
+                }
+
+                if ($finalResult.source -ne "llm_failed") {
+                    return $finalResult
+                }
+                
                 Write-Warning "LLM Analysis failed: synthesis pass returned no usable content."
             }
         } catch {

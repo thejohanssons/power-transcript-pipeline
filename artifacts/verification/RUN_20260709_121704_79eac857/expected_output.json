@@ -1,0 +1,32 @@
+{
+  "forbiddenStrings": [
+    "Peter Johansson",
+    "Mandar Padwal",
+    "Mangesh Ayachit",
+    "Recruitment",
+    "Appraisals",
+    "CAD",
+    "Firmware",
+    "SuperPen MVP"
+  ],
+  "requiredFacts": [
+    "Canada sales uptake",
+    "100 new schools",
+    "schools want pens",
+    "10 pens per school",
+    "possible increase to 20 pens per school"
+  ],
+  "people": {
+    "speakers": [
+      "Max Davis"
+    ],
+    "mentioned": [
+      "Jack"
+    ]
+  },
+  "topics": [
+    "Canada school sales opportunity",
+    "Canada sales growth",
+    "education market demand"
+  ]
+}

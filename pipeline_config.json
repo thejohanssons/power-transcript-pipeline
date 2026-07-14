@@ -1,11 +1,10 @@
 {
-  "enable_stable_topic_classification": true,
-  "enable_confluence_mirror": true,
+  "confluence_user": "peter@empoweringtech.com",
+  "confluence_token": "REPLACEME_OR_USE_ENV_VAR",
+  "confluence_base_url": "https://etpd.atlassian.net/wiki",
   "confluence_space_key": "PWMN",
   "confluence_parent_id": "2102919177",
-  "confluence_base_url": "https://etpd.atlassian.net/wiki",
-  "confluence_user": "",
-  "confluence_token": "",
-  "enable_teams_notifications": true,
-  "teams_webhook_url": "https://webhookbot.c-toss.com/api/bot/webhooks/1dc81f0a-d74d-4b18-9dd1-0340af30efd9"
+  "enable_confluence_mirror": true,
+  "enable_stable_topic_classification": true,
+  "teams_webhook_url": "https://webhookbot.c-toss.com/api/bot/webhooks/528ec50e-056b-4bce-80d9-dcdf4891d903"
 }

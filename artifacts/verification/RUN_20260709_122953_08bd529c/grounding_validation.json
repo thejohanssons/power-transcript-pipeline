@@ -1,0 +1,12 @@
+{
+  "forbiddenDetected": [],
+  "missingRequiredFacts": [
+    "Canada sales uptake",
+    "100 new schools",
+    "schools want pens",
+    "10 pens per school",
+    "possible increase to 20 pens per school"
+  ],
+  "traceability": "Metadata grounding confirmed via sourceTurnIds",
+  "status": "fail"
+}

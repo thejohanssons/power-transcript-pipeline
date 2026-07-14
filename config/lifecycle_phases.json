@@ -1,0 +1,11 @@
+{
+  "lifecycle_phases": [
+    "Capability Establishment",
+    "Capability Validation",
+    "Capability Transfer",
+    "Capability Operation",
+    "Capability Improvement",
+    "Capability Retirement",
+    "Unknown"
+  ]
+}

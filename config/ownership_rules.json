@@ -1,0 +1,145 @@
+{
+  "ownership_rules": [
+    {
+      "capability": "Corporate Strategy",
+      "default_owner": "CEO",
+      "phase_owners": {
+        "Capability Establishment": "CEO",
+        "Capability Validation": "CEO",
+        "Capability Transfer": "CEO",
+        "Capability Operation": "CEO",
+        "Capability Improvement": "CEO",
+        "Capability Retirement": "CEO"
+      }
+    },
+    {
+      "capability": "Executive Governance",
+      "default_owner": "CEO",
+      "phase_owners": {
+        "Capability Establishment": "CEO",
+        "Capability Validation": "CEO",
+        "Capability Transfer": "CEO",
+        "Capability Operation": "CEO",
+        "Capability Improvement": "CEO",
+        "Capability Retirement": "CEO"
+      }
+    },
+
+    {
+      "capability": "Product Strategy",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "Product Management",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "Product Development",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "R&D",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "Product Quality",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "Product Lifecycle Management",
+      "default_owner": "CPO"
+    },
+    {
+      "capability": "Product Industrialisation",
+      "default_owner": "CPO",
+      "phase_owners": {
+        "Capability Establishment": "CPO",
+        "Capability Validation": "CPO",
+        "Capability Transfer": "CPO",
+        "Capability Operation": "CPO",
+        "Capability Improvement": "CPO",
+        "Capability Retirement": "CPO"
+      },
+      "notes": "Product Industrialisation remains CPO-owned across all lifecycle phases."
+    },
+
+    {
+      "capability": "Marketing",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Sales",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Commercial Execution",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Customer Acquisition",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Customer Onboarding",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Customer Support",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Supply Operations",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Manufacturing Operations",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Logistics",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "Order Fulfilment",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "People Operations",
+      "default_owner": "COO"
+    },
+    {
+      "capability": "HR Operations",
+      "default_owner": "COO"
+    },
+
+    {
+      "capability": "Financial Management",
+      "default_owner": "CFO"
+    },
+    {
+      "capability": "Treasury Management",
+      "default_owner": "CFO"
+    },
+    {
+      "capability": "Cash Flow Management",
+      "default_owner": "CFO"
+    },
+    {
+      "capability": "Financial Planning",
+      "default_owner": "CFO"
+    },
+
+    {
+      "capability": "IT Operations",
+      "default_owner": "CTO"
+    },
+    {
+      "capability": "Cyber Security",
+      "default_owner": "CTO"
+    },
+    {
+      "capability": "Technology Governance",
+      "default_owner": "CTO"
+    }
+  ]
+}

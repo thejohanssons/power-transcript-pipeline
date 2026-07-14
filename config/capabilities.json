@@ -1,0 +1,38 @@
+{
+  "capabilities": [
+    "Corporate Strategy",
+    "Executive Governance",
+
+    "Product Strategy",
+    "Product Management",
+    "Product Development",
+    "R&D",
+    "Product Quality",
+    "Product Industrialisation",
+    "Product Lifecycle Management",
+
+    "Marketing",
+    "Sales",
+    "Commercial Execution",
+    "Customer Acquisition",
+    "Customer Onboarding",
+    "Customer Support",
+
+    "Supply Operations",
+    "Manufacturing Operations",
+    "Logistics",
+    "Order Fulfilment",
+
+    "Financial Management",
+    "Treasury Management",
+    "Cash Flow Management",
+    "Financial Planning",
+
+    "IT Operations",
+    "Cyber Security",
+    "Technology Governance",
+
+    "People Operations",
+    "HR Operations"
+  ]
+}

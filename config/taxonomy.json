@@ -20,6 +20,7 @@
     "TITLE",
     "CATEGORY",
     "CONTEXT_TYPE",
+    "OWNERSHIP",
     "TAGS",
     "STATUS",
     "TRAJECTORY"
