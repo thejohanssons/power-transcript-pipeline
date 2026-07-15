@@ -331,7 +331,8 @@
       "trigger_keywords": ["C-Pen", "SuperPen", "e-pens", "Wizcom", "scanning pen", "EP-XP-S2"],
       "validation": "When multiple brand names appear in the same segment, verify the context applies equally to all brands or flag as BRAND_CAST_CONFLICT",
       "conflict_type": "BrandCastConflict",
-      "severity": "warning"
+      "severity": "warning",
+      "suppress_keywords": ["banking", "funding", "overdraft", "account", "payment", "revenue", "cash flow"]
     },
     {
       "id": "SupplierBrandConflict",
@@ -339,7 +340,8 @@
       "trigger_keywords": ["Hanwang", "e-pens OEM", "EP-XP-S2", "OEM", "factory", "offline language pack", "pre-install"],
       "validation": "Contributions in this context should be attributed to Supply Chain / Operations, not to Wizcom engineering or C-Pen product team",
       "conflict_type": "SupplierBrandConflict",
-      "severity": "warning"
+      "severity": "warning",
+      "suppress_keywords": ["NPI", "Roadmap", "Sprint", "Backlog", "User Story"]
     },
     {
       "id": "PersonBrandConflict",
@@ -356,7 +358,8 @@
       "trigger_patterns": ["all pens", "all products", "across the range", "all brands", "product portfolio", "our products"],
       "validation": "Verify that the original discussion genuinely applied to all brands before casting a cross-brand conclusion",
       "conflict_type": "BrandCastConflict",
-      "severity": "info"
+      "severity": "info",
+      "suppress_keywords": ["banking", "funding", "overdraft", "account", "payment", "revenue", "cash flow"]
     }
   ]
 }

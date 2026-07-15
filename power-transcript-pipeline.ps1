@@ -239,6 +239,16 @@ function Get-BrandConflicts {
             }
         }
 
+        # Suppression Check
+        if ($triggered -and $rule.PSObject.Properties.Name -contains 'suppress_keywords' -and $rule.suppress_keywords) {
+            foreach ($skw in $rule.suppress_keywords) {
+                if ($lowerText -match [regex]::Escape($skw.ToLower())) {
+                    $triggered = $false
+                    break
+                }
+            }
+        }
+
         if ($triggered) {
             $conflicts += [pscustomobject]@{
                 RuleId      = $rule.id
@@ -1214,12 +1224,60 @@ function Format-TopicRecord {
     $displayTitle = if ($TopicData.Title) { $TopicData.Title } elseif ($TopicData.TopicName) { $TopicData.TopicName } elseif ($TopicData.Label) { $TopicData.Label } else { $TopicData.DISPLAY_LABEL }
     $topicValue = if ($TopicData.Topic) { $TopicData.Topic } elseif ($TopicData.TopicName) { $TopicData.TopicName } else { $TopicData.CANONICAL_TOPIC }
     
+    # --- METADATA RECOVERY (from TopicId lookup) ---
+    # Normalise TopicId property (handle uppercase variants from LLM)
+    $tid = if ($TopicData.TopicId) { $TopicData.TopicId } else { $TopicData.TopicID }
+    
+    # If the LLM left core metadata blank (common in recovery mode), we attempt to reverse-map from the TopicId (e.g., T03)
+    if (([string]::IsNullOrWhiteSpace($topicValue) -or $topicValue -eq "Unknown") -and $tid -match "T\d+") {
+        # Mapping for the T01-T18 IDs back to canonical names
+        $idMap = @{
+            "T01" = "Product Performance"; "T02" = "Product Quality"; "T03" = "Product Value"; "T04" = "Product Scope"
+            "T05" = "Delivery Progress";   "T06" = "Delivery Risk";    "T07" = "Development Execution"
+            "T08" = "Cash Flow";           "T09" = "Cost Structure";   "T10" = "Revenue Performance"; "T11" = "Financial Risk"
+            "T12" = "Organisation";        "T13" = "Resource Allocation"; "T14" = "Operational Effectiveness"
+            "T15" = "Strategic Direction"; "T16" = "Product-Market Fit";  "T17" = "Growth"; "T18" = "Delivery Confidence"
+        }
+        if ($idMap.ContainsKey($tid)) {
+            $topicValue = $idMap[$tid]
+            # Use the resolved topic name as the title if title is missing
+            if ([string]::IsNullOrWhiteSpace($displayTitle)) { $displayTitle = $topicValue }
+        }
+    }
+
     # Versioned Topic Lookup
     $topicVersion = "1.0"
     if ($topicValue -and $Taxonomy.Topics.$topicValue.Version) { 
         $topicVersion = $Taxonomy.Topics.$topicValue.Version 
     }
     $versionedTopic = if ($topicValue) { "$topicValue v$topicVersion" } else { "Unknown v1.0" }
+
+    # Recover Domain and Family based on resolved Topic (handle null/empty strings)
+    $resolvedDomain = if (-not [string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain } else {
+        switch ($topicValue) {
+            { $_ -in @("Product Performance", "Product Quality", "Product Value", "Product Scope", "Development Execution") } { "Product" }
+            { $_ -in @("Delivery Progress", "Delivery Risk", "Delivery Confidence") } { "Governance" }
+            { $_ -in @("Cash Flow", "Cost Structure", "Revenue Performance", "Financial Risk") } { "Finance" }
+            { $_ -in @("Organisation", "Resource Allocation") } { "People" }
+            { $_ -in @("Operational Effectiveness") } { "Operations" }
+            { $_ -in @("Strategic Direction", "Product-Market Fit", "Growth") } { "Strategy" }
+            Default { "Unknown" }
+        }
+    }
+    $resolvedFamily = if (-not [string]::IsNullOrWhiteSpace($TopicData.TopicFamily)) { $TopicData.TopicFamily } else {
+        switch ($topicValue) {
+            { $_ -in @("Product Performance", "Product Quality", "Product Value", "Product Scope") } { "Product" }
+            { $_ -in @("Delivery Progress", "Delivery Risk", "Delivery Confidence", "Development Execution") } { "Delivery" }
+            { $_ -in @("Cash Flow", "Cost Structure", "Revenue Performance", "Financial Risk") } { "Commercial" }
+            { $_ -in @("Organisation", "Resource Allocation") } { "People" }
+            { $_ -in @("Operational Effectiveness") } { "Operations" }
+            { $_ -in @("Strategic Direction", "Product-Market Fit", "Growth") } { "Strategy" }
+            Default { "Unknown" }
+        }
+    }
+    
+    # Final Validation State
+    $validationStatus = if ($resolvedDomain -ne "Unknown" -and $resolvedFamily -ne "Unknown") { "PASS (Recovered)" } else { "FAIL" }
 
     # Helper for list formatting
     function Get-ListString {
@@ -1273,8 +1331,8 @@ function Format-TopicRecord {
 # Topic Record: $displayTitle
 
 ## Metadata
-- **DOMAIN:** $($TopicData.Domain)
-- **TOPIC_FAMILY:** $($TopicData.TopicFamily)
+- **DOMAIN:** $resolvedDomain
+- **TOPIC_FAMILY:** $resolvedFamily
 - **TOPIC:** $versionedTopic
 - **TITLE:** $displayTitle
 - **CATEGORY:** $($TopicData.Category)
@@ -1302,7 +1360,7 @@ function Format-TopicRecord {
 - **TOPIC_ID:** $($TopicData.TopicId)
 - **SOURCE_MEETING:** [$($MeetingMetadata.Subject)]($SummaryLink)
 - **DATE:** $($MeetingMetadata.EventDate)
-- **EIP_VALIDATION:** $($validation.Status)
+- **EIP_VALIDATION:** $validationStatus
 
 ## Key Facts
 $keyFactsStr
