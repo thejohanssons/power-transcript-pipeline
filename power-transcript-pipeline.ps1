@@ -1254,6 +1254,9 @@ function Validate-TopicRecord {
         GOV_OWNER_SYNC  = if ($o.GOVERNANCE_OWNER -ne "Unknown") { "PASS" } else { "FAIL" }
         OWNER_REASON    = if ($o.PRIMARY_OWNER -ne "Unknown" -and -not [string]::IsNullOrWhiteSpace($o.OWNERSHIP_REASON)) { "PASS" } else { "FAIL" }
         CANON_CPO_IND   = if ($o.CAPABILITY -eq "Product Industrialisation" -and $o.PRIMARY_OWNER -ne "CPO") { "FAIL" } else { "PASS" }
+        STRAT_IMPACT    = if ($TopicData.STRATEGIC_IMPACT -ge 1 -and $TopicData.STRATEGIC_IMPACT -le 5) { "PASS" } else { "FAIL" }
+        EXEC_PRIO       = if ($TopicData.EXECUTIVE_PRIORITY -match "Low|Medium|High|Critical") { "PASS" } else { "FAIL" }
+        ALIGNMENT       = if ($TopicData.ALIGNMENT_LEVEL -match "Consensus|Majority|Divided|Conflicted|Unknown") { "PASS" } else { "FAIL" }
     }
     
     $failCount = ($checks.Values | Where-Object { $_ -eq "FAIL" }).Count
@@ -1303,6 +1306,11 @@ function Format-TopicRecord {
         $topicVersion = $Taxonomy.Topics.$topicValue.Version 
     }
     $versionedTopic = if ($topicValue) { "$topicValue v$topicVersion" } else { "Unknown v1.0" }
+
+    # --- STRATEGIC RECOVERY ---
+    $stratImpact = if ($TopicData.STRATEGIC_IMPACT) { $TopicData.STRATEGIC_IMPACT } else { "Unknown" }
+    $execPrio    = if ($TopicData.EXECUTIVE_PRIORITY) { $TopicData.EXECUTIVE_PRIORITY } else { "Unknown" }
+    $alignment   = if ($TopicData.ALIGNMENT_LEVEL) { $TopicData.ALIGNMENT_LEVEL } else { "Unknown" }
 
     # Recover Domain and Family based on resolved Topic (handle null/empty strings)
     $resolvedDomain = if (-not [string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain } else {
@@ -1389,6 +1397,9 @@ function Format-TopicRecord {
 - **TITLE:** $displayTitle
 - **CATEGORY:** $($TopicData.Category)
 - **CONTEXT_TYPE:** $($TopicData.ContextType)
+- **STRATEGIC_IMPACT:** $stratImpact
+- **EXECUTIVE_PRIORITY:** $execPrio
+- **ALIGNMENT_LEVEL:** $alignment
 
 ### OWNERSHIP
 - **PRIMARY_OWNER:** $($o.PRIMARY_OWNER)

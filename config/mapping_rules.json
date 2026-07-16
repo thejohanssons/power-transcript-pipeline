@@ -361,5 +361,28 @@
       "severity": "info",
       "suppress_keywords": ["banking", "funding", "overdraft", "account", "payment", "revenue", "cash flow"]
     }
+  ],
+
+  "StrategicSignals": [
+    {
+      "id": "Urgency",
+      "keywords": ["critical path", "bottleneck", "blocker", "board-level", "exposure", "urgency", "immediate action", "ASAP", "time-sensitive", "delay risk", "slippage"],
+      "impact_hint": 4
+    },
+    {
+      "id": "HighStrategicWeight",
+      "keywords": ["pivot", "business viability", "roadmap shift", "quarterly goal", "major release", "market exit", "acquisition", "strategic priority", "CEO agenda"],
+      "impact_hint": 5
+    },
+    {
+      "id": "AlignmentConsensus",
+      "keywords": ["consensus", "agreed", "unanimous", "on the same page", "aligned", "full agreement", "settled"],
+      "alignment_hint": "Consensus"
+    },
+    {
+      "id": "AlignmentConflict",
+      "keywords": ["diverging views", "split opinion", "disagreement", "misaligned", "conflicted", "heated discussion", "no consensus", "deadlock", "pushback"],
+      "alignment_hint": "Conflicted"
+    }
   ]
 }

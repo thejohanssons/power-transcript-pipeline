@@ -21,9 +21,35 @@
     "CATEGORY",
     "CONTEXT_TYPE",
     "OWNERSHIP",
+    "STRATEGIC_IMPACT",
+    "EXECUTIVE_PRIORITY",
+    "ALIGNMENT_LEVEL",
     "TAGS",
     "STATUS",
     "TRAJECTORY"
+  ],
+
+  "StrategicImpactScales": {
+    "1": "Operational: Business as usual, minor local impact.",
+    "2": "Functional: Affects a specific department or process.",
+    "3": "Cross-Functional: Impact across multiple teams or products.",
+    "4": "Strategic: Significant impact on quarterly goals or major releases.",
+    "5": "Critical: Affects core business viability or major pivot."
+  },
+
+  "ExecutivePriorityLevels": [
+    "Low",
+    "Medium",
+    "High",
+    "Critical"
+  ],
+
+  "AlignmentLevels": [
+    "Consensus",
+    "Majority",
+    "Divided",
+    "Conflicted",
+    "Unknown"
   ],
 
   "Domains": [
