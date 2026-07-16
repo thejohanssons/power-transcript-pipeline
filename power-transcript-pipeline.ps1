@@ -79,6 +79,10 @@ $spSiteServerRelPath    = "/sites/Petersplace"
 $spTranscriptRootFolder = "/Exec Intel Insights/Meeting transcripts"
 $spRunLogsFolderName    = "_DO_NOT_PRIORITISE_Run logs"
 
+# MeetingIntelligence Source (Non-destructive)
+$spMeetingIntelSitePath = "/sites/MeetingIntelligence"
+$spMeetingIntelLibrary  = "Transcripts"
+
 # =========================
 # REST AUTH HELPER
 # =========================
@@ -101,6 +105,11 @@ $pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")
 $peopleConfigPath = Join-Path $configDir "people_config.json"
 $peopleConfig = if (Test-Path $peopleConfigPath) { Get-Content -Path $peopleConfigPath | ConvertFrom-Json } else { $null }
 if ($peopleConfig) { Write-Host "People config loaded ($($peopleConfig.people.Count) people) ✅" } else { Write-Warning "people_config.json not found — people intelligence disabled" }
+
+# --- CONFLUENCE MAPPINGS LOADING ---
+$confMappingsPath = Join-Path $configDir "confluence_mappings.json"
+$confMappings = if (Test-Path $confMappingsPath) { Get-Content $confMappingsPath | ConvertFrom-Json } else { $null }
+if ($confMappings) { Write-Host "Confluence domain mappings loaded ✅" }
 
 # --- EIP 1.2 OWNERSHIP CONFIG LOADING ---
 $capabilitiesPath = Join-Path $configDir "capabilities.json"
@@ -167,6 +176,31 @@ function ConvertFrom-Vtt {
     }
 
     return ($output -join "`n")
+}
+
+function ConvertFrom-MeetingIntelTxt {
+    param([string]$Content)
+    $result = @{ Subject = $null; StartDate = $null; Transcript = $Content }
+    
+    $lines = $Content -split "\r?\n"
+    if ($lines.Count -gt 0 -and $lines[0] -match "^Meeting:\s*(.+?)\s*\|\s*Start:\s*(.+)$") {
+        $result.Subject = $matches[1].Trim()
+        try {
+            # Normalize common date formats if needed, or just let Parse try
+            $dateStr = $matches[2].Trim()
+            $result.StartDate = [datetime]::Parse($dateStr)
+        } catch {
+            Write-Warning "  [VTT/TXT] Failed to parse date from MeetingIntelligence header: $($matches[2])"
+        }
+        
+        # Skip the header line and any subsequent blank lines
+        $startIndex = 1
+        while ($startIndex -lt $lines.Count -and [string]::IsNullOrWhiteSpace($lines[$startIndex])) {
+            $startIndex++
+        }
+        $result.Transcript = ($lines | Select-Object -Skip $startIndex) -join "`n"
+    }
+    return $result
 }
 
 function Assign-Mode {
@@ -631,13 +665,31 @@ function Enrich-Summary {
     foreach ($block in $blocks) {
         if (-not $block.Trim() -or $block -match '^\d+\.\s+') { continue }
         
-        $lines = $block -split "`n"
-        $label = $lines[0].Trim()
-        # Fallback for empty labels (common in short test fixtures)
+        $lines = $block -split "`n" | ForEach-Object { $_.Trim() }
+        
+        # Find the first line that isn't empty and isn't a "View Dedicated Topic Record" link
+        $label = ""
+        $contentStartIndex = 0
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if (-not [string]::IsNullOrWhiteSpace($lines[$i]) -and $lines[$i] -notmatch '^> \[View Dedicated Topic Record\]') {
+                $label = $lines[$i]
+                $contentStartIndex = $i + 1
+                break
+            }
+        }
+        
+        # Fallback for empty labels
         if (-not $label) { $label = "General Discussion" }
         
-        $bullets = ($lines | Select-Object -Skip 1 | Where-Object { $_.Trim() -match '^\s*-\s+' }) -join "`n"
-        if (-not $bullets.Trim()) { continue }
+        # Collect bullets and also look for embedded metadata the LLM might have repeated
+        $bullets = ($lines | Select-Object -Skip $contentStartIndex | Where-Object { $_ -match '^\s*-\s+' }) -join "`n"
+        
+        # If no bullets, but there is block text, use the remaining block as content
+        if (-not $bullets.Trim()) {
+            $bullets = ($lines | Select-Object -Skip $contentStartIndex | Where-Object { $_ -and $_ -notmatch '^[A-Z_]+:\s*' }) -join "`n"
+        }
+        
+        if (-not $bullets.Trim() -and $label -eq "General Discussion") { continue }
 
         $cls = & "Classify-Topic" ($label + "`n" + $bullets)
 
@@ -1725,6 +1777,24 @@ function Publish-SummaryToConfluence {
     return $null
 }
 
+function Publish-TopicRecordToConfluence {
+    param($TopicRecordText, $TopicId, $TopicLabel, $Domain, $MeetingId, $EventDate, $Subject, $Organiser)
+
+    if (-not $confMappings -or -not $script:pipelineConfig.enable_confluence_mirror) { return $null }
+
+    $mapping = $confMappings.domain_mappings.$Domain
+    $space = if ($mapping -and $mapping.space_key) { $mapping.space_key } else { $confMappings.default_space }
+    $parent = if ($mapping -and $mapping.parent_id) { $mapping.parent_id } else { $confMappings.default_parent_id }
+
+    # If we have a space but no parent, we'll still attempt to publish (it may go to space root)
+    if (-not $space) { return $null }
+
+    $title = "[$TopicId] $TopicLabel ($($EventDate.ToString('yyyy-MM-dd')))"
+    $html = Convert-SummaryToConfluenceHtml -SummaryText $TopicRecordText -Subject $Subject -MeetingId $MeetingId -EventDate $EventDate -Organiser $Organiser
+    
+    return Publish-SummaryToConfluence -HtmlContent $html -Title $title -SpaceKey $space -ParentPageId $parent
+}
+
 function Send-TeamsNotification {
     param($MessageBlock)
 
@@ -1887,14 +1957,30 @@ function Get-StickyMasterLogValue {
 # RESOLVE SHAREPOINT
 # =========================
 
+# 1. Primary Site (Petersplace)
 $siteUri = "https://graph.microsoft.com/v1.0/sites/$($spHostname):$spSiteServerRelPath"
 $site = Invoke-RestMethod -Method Get -Uri $siteUri -Headers $authHeader
-Write-Host "Resolved SharePoint site ✅"
+Write-Host "Resolved Primary SharePoint site ✅"
 
 $driveUri = "https://graph.microsoft.com/v1.0/sites/$($site.id)/drive"
 $drive = Invoke-RestMethod -Method Get -Uri $driveUri -Headers $authHeader
 $driveId = $drive.id
-Write-Host "Resolved SharePoint drive ✅"
+Write-Host "Resolved Primary SharePoint drive ✅"
+
+# 2. MeetingIntelligence Site (Source)
+$miSiteUri = "https://graph.microsoft.com/v1.0/sites/$($spHostname):$spMeetingIntelSitePath"
+$miSite = Invoke-RestMethod -Method Get -Uri $miSiteUri -Headers $authHeader
+Write-Host "Resolved MeetingIntelligence site ✅"
+
+$miDrivesUri = "https://graph.microsoft.com/v1.0/sites/$($miSite.id)/drives"
+$miDrives = Invoke-RestMethod -Method Get -Uri $miDrivesUri -Headers $authHeader
+$miDrive = $miDrives.value | Where-Object { $_.name -eq $spMeetingIntelLibrary }
+if ($null -eq $miDrive) {
+    Write-Warning "MeetingIntelligence 'Transcripts' library not found. Falling back to default drive."
+    $miDrive = Invoke-RestMethod -Method Get -Uri "https://graph.microsoft.com/v1.0/sites/$($miSite.id)/drive" -Headers $authHeader
+}
+$miDriveId = $miDrive.id
+Write-Host "Resolved MeetingIntelligence drive ✅"
 
 $runLogsFolderPath = "$spTranscriptRootFolder/$spRunLogsFolderName"
 $runLogsFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $runLogsFolderPath
@@ -1950,6 +2036,334 @@ try {
 # Folder: Shared Documents/Transcripts (root-relative path on the site drive)
 $vttInboxFolderPath = "Transcripts"  # relative to Shared Documents root on $driveId
 
+function Process-VttFile {
+    param(
+        [Parameter(Mandatory=$true)]
+        $FileItem,
+        [Parameter(Mandatory=$true)]
+        [string]$SourceDriveId,
+        [Parameter(Mandatory=$false)]
+        [switch]$SkipDeletion
+    )
+
+    $baseName    = [System.IO.Path]::GetFileNameWithoutExtension($FileItem.name)
+    $parsed      = ConvertFrom-VttFilename -BaseName $baseName
+    $eventDate   = $parsed.EventDate
+    $subject     = $parsed.Subject
+
+    # Meeting ID: sanitised filename + file creation date (ensures uniqueness)
+    $fileCreated = if ($FileItem.fileSystemInfo -and $FileItem.fileSystemInfo.createdDateTime) {
+        [datetime]$FileItem.fileSystemInfo.createdDateTime
+    } else { Get-Date }
+    $createdDateStr = $fileCreated.ToString("yyyy-MM-dd")
+    $cleanBase   = $baseName -replace '[^a-zA-Z0-9_\-]', '_' -replace '__+', '_'
+    $mId         = "${cleanBase}_${createdDateStr}"
+
+    Write-Host "Processing VTT: $($FileItem.name) → [$mId]"
+
+    # 1. Skip if already processed in Master Log
+    $alreadyProcessed = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId -and $_.Status -eq "success" }
+    if ($alreadyProcessed) {
+        Write-Host "  [VTT] Already in master log — skipping"
+        if (-not $SkipDeletion) {
+            Remove-VttInboxFile -DriveId $SourceDriveId -ItemId $FileItem.id | Out-Null
+            Write-Host "  [VTT] Source file deleted from inbox ✅"
+        }
+        return
+    }
+
+    # 2. Download VTT content
+    $vttContent = $null
+    try {
+        Ensure-GraphToken
+        $dlHdrs = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+        $vttContent = Invoke-RestMethod -Method GET `
+            -Uri "https://graph.microsoft.com/v1.0/drives/$SourceDriveId/items/$($FileItem.id)/content" `
+            -Headers $dlHdrs -ErrorAction Stop
+    } catch {
+        Write-Warning "  [VTT] Failed to download '$($FileItem.name)': $_"
+        return
+    }
+
+    # 3. Convert and Process
+    $isVtt = $FileItem.name -match "\.vtt$"
+    $parsedContent = if ($isVtt) { 
+        @{ Transcript = ConvertFrom-Vtt -VttContent $vttContent } 
+    } else { 
+        ConvertFrom-MeetingIntelTxt -Content $vttContent 
+    }
+    
+    $plainText = $parsedContent.Transcript
+    
+    if ([string]::IsNullOrWhiteSpace($plainText)) {
+        Write-Warning "  [VTT/TXT] '$($FileItem.name)' produced empty transcript — skipping"
+        return
+    }
+
+    # Override metadata if found in content (more reliable than filename)
+    if ($parsedContent.Subject) { 
+        $subject = $parsedContent.Subject 
+        Write-Host "  [VTT/TXT] Subject overridden from content: $subject"
+    }
+    if ($parsedContent.StartDate) { 
+        $eventDate = $parsedContent.StartDate 
+        Write-Host "  [VTT/TXT] Date overridden from content: $($eventDate.ToString('yyyy-MM-dd HH:mm'))"
+    }
+
+    # LLM & Classification setup
+    $llmKey  = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $script:rules.LLMConfig.ApiKey }
+    $auth    = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+    $hdrs    = if ($auth -eq "api-key") { @{ "api-key" = $llmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $llmKey"; "Content-Type" = "application/json" } }
+    $deploy  = if ($script:rules.LLMConfig.DeploymentName) { $script:rules.LLMConfig.DeploymentName } else { $script:rules.LLMConfig.Model }
+    $base    = $script:rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+    $llmUri  = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+        "$base/openai/deployments/$deploy/chat/completions?api-version=2024-02-15-preview"
+    } else { "$($script:rules.LLMConfig.Endpoint)/chat/completions" }
+    
+    $organiser = $script:calendarUserUpn
+    $classResult = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
+
+    # --- CLASSIFICATION & SUMMARY LOGIC ---
+    $cls = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
+    if (-not $cls.summary) {
+        Write-Warning "  [VTT] Summary generation failed. Retrying once..."
+        $cls = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
+    }
+
+    $summaryText = if ($cls.summary) { $cls.summary } else { "No summary generated." }
+    
+    # --- EIP ENHANCEMENT LAYER ---
+    # Pre-extract history for Enrichment function
+    $historyTopicRecords = @()
+    if ($script:masterLogData.Meetings) {
+        foreach ($mE in $script:masterLogData.Meetings) {
+            if ($mE.TopicRecords) {
+                foreach ($tr in $mE.TopicRecords) {
+                    $historyTopicRecords += [pscustomobject]@{
+                        TopicId   = $tr.TopicId
+                        TopicName = $tr.TopicName
+                        Content   = $tr.Content
+                        Signal    = $tr.Signal
+                        EventDate = $mE.EventDate
+                    }
+                }
+            }
+        }
+    }
+
+    # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
+    $initialRecords = if ($cls.records) { $cls.records } else { @() }
+    $enrichResult = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
+    $enrichedSummaryText = $enrichResult.Summary
+    
+    # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
+    $topicRecords3D = @()
+    if ($enrichResult.Records) {
+        foreach ($er in $enrichResult.Records) {
+            $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
+            if ($ir) {
+                # Prepare values
+                $finalSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
+                $finalTags = if ($ir.Tags) { $ir.Tags } else { $er.Tags }
+
+                # Add new properties to the enriched record object
+                $er | Add-Member -MemberType NoteProperty -Name "Summary" -Value $finalSummary -Force
+                $er | Add-Member -MemberType NoteProperty -Name "KeyFacts" -Value $ir.KeyFacts -Force
+                $er | Add-Member -MemberType NoteProperty -Name "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
+                $er | Add-Member -MemberType NoteProperty -Name "Decisions" -Value $ir.Decisions -Force
+                $er | Add-Member -MemberType NoteProperty -Name "Actions" -Value $ir.Actions -Force
+                $er | Add-Member -MemberType NoteProperty -Name "NextSteps" -Value $ir.NextSteps -Force
+                $er | Add-Member -MemberType NoteProperty -Name "Risks" -Value $ir.Risks -Force
+                $er | Add-Member -MemberType NoteProperty -Name "TopicName" -Value $ir.TopicName -Force
+                $er | Add-Member -MemberType NoteProperty -Name "Tags" -Value $finalTags -Force
+            }
+            $topicRecords3D += $er
+        }
+    } else {
+        $topicRecords3D = $initialRecords
+    }
+
+    # Smart Mode Switch
+    $modeInfo = Assign-Mode -type "vtt_sync" -organiser $organiser -topicRecords $topicRecords3D
+
+    # --- TOPIC RECORD GENERATION ---
+    $summaryWithLinks = $enrichedSummaryText
+    if ($cls.summary) {
+        $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+        $topicFolderId = Ensure-DriveFolder -DriveId $script:driveId -FolderPath $topicRecordsDir
+        
+        foreach ($tr in $topicRecords3D) {
+            $safeTopicName = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.Label }
+            $sanitizedTopic = $safeTopicName -replace '[^\w\s-]', '' -replace '\s+', '-'
+            if (-not $sanitizedTopic) { $sanitizedTopic = "Details" }
+            
+            $trFileName = "$mId-$($tr.TopicId)-$sanitizedTopic.md"
+            $trLocalPath = Join-Path $script:outDir $trFileName
+            
+            $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
+                Subject = $subject; MeetingId = $mId; EventDate = $eventDate
+            } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $script:taxonomy
+            
+            $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
+            Write-Host "  [VTT] Uploading Topic Record: $trFileName"
+            Upload-FileToSharePoint -DriveId $script:driveId -FolderId $topicFolderId -FilePath $trLocalPath | Out-Null
+            
+            # Confluence Topic Record Mirror
+            try {
+                Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
+            } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
+
+            # Mutual Linking: Summary -> Topic Record
+            $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
+            $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+            $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+        }
+    }
+
+    # Local Files
+    $timestamp    = $eventDate.ToString("yyyy-MM-dd_HHmm")
+    $cleanSubject = ($subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_').Trim('_')
+    $localTxt     = Join-Path $script:outDir "$timestamp-$cleanSubject.txt"
+    $localSum     = Join-Path $script:outDir "$timestamp-$cleanSubject-Summary.txt"
+    
+    $header = @"
+---
+MEETING ID: $mId
+SUBJECT: $subject
+ORGANISER: $organiser
+EVENT DATE: $($eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+TYPE: vtt_sync
+PRIORITY: Normal
+MODE: $($modeInfo.mode)
+MODE_SOURCE: $($modeInfo.source)
+MODE_CONFIDENCE: $($modeInfo.confidence)
+PIPELINE_VERSION: $script:PIPELINE_VERSION
+PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
+STATUS: success
+---
+
+"@
+
+    ($header + $plainText) | Out-File -FilePath $localTxt -Encoding utf8
+    ($header + $summaryWithLinks) | Out-File -FilePath $localSum -Encoding utf8
+
+    # 4. Upload to Primary SharePoint (Petersplace)
+    $monthFolder   = $eventDate.ToString("yyyy-MM")
+    $evtFolderPath = "$script:spTranscriptRootFolder/$monthFolder"
+    $evtFolderId   = Ensure-DriveFolder -DriveId $script:driveId -FolderPath $evtFolderPath
+    $uploadedTxt   = Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localTxt
+    $uploadedSum   = if (Test-Path $localSum) { Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localSum } else { $null }
+
+    # 5. Confluence mirror
+    $confluenceUrl = $null
+    if ($script:pipelineConfig.enable_confluence_mirror) {
+        try {
+            $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $script:pipelineConfig.confluence_space_key }
+            $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $script:pipelineConfig.confluence_parent_id }
+            $confHtml   = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $organiser
+            $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
+        } catch { Write-Warning "  [VTT] Confluence mirror failed: $_" }
+    }
+
+    # 6. People Intelligence
+    $peopleUrl = $null
+    if ($script:peopleConfig -and $cls.summary -and $plainText) {
+        try {
+            $speakerNames = Get-TranscriptSpeakers -TranscriptText $plainText
+            $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $script:peopleConfig
+
+            if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
+                # Build LLM connection for people pass (same config as classification)
+                $pLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $script:rules.LLMConfig.ApiKey }
+                $pAuthMode   = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+                $pHeaders    = if ($pAuthMode -eq "api-key") { @{ "api-key" = $pLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $pLlmKey"; "Content-Type" = "application/json" } }
+                $pDeployment = if ($script:rules.LLMConfig.DeploymentName) { $script:rules.LLMConfig.DeploymentName } else { $script:rules.LLMConfig.Model }
+                $pUri        = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
+                    $pBase = $script:rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+                    "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
+                } else { "$($script:rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
+
+                $peopleRaw = Get-PeopleIntelligence `
+                    -TranscriptText $plainText `
+                    -ChunkSummaries $enrichedSummaryText `
+                    -ResolvedPeople $resolvedPeople `
+                    -TopicRecords   $topicRecords3D `
+                    -MeetingId      $mId `
+                    -Subject        $subject `
+                    -FullUri        $pUri `
+                    -Headers        $pHeaders `
+                    -Model          $script:rules.LLMConfig.Model
+
+                if ($peopleRaw) {
+                    $peopleFileContent = Format-PeopleFile `
+                        -LLMOutput $peopleRaw `
+                        -MeetingId $mId `
+                        -Subject $subject `
+                        -EventDate $eventDate `
+                        -PipelineVersion $script:PIPELINE_VERSION
+                    $localPeopleFile = Join-Path $script:outDir "$timestamp-$cleanSubject-People.txt"
+                    $peopleFileContent | Out-File -FilePath $localPeopleFile -Encoding utf8
+
+                    $upPeople = Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localPeopleFile
+                    $peopleUrl = $upPeople.webUrl
+                    $script:masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $script:masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $peopleUrl -ResolvedPeople $resolvedPeople
+                }
+            }
+        } catch {
+            Write-Warning "  [VTT] People intelligence failed: $_"
+        }
+    }
+
+    # 7. Update Master Log Entry
+    $logEntry = @{
+        MeetingId      = $mId
+        Subject        = $subject
+        Organiser      = $organiser
+        EventDate      = $eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        Type           = "vtt_sync"
+        Status         = "success"
+        AgentState     = "processed_vtt"
+        TopicRecords   = $topicRecords3D
+        TranscriptFile = $uploadedTxt.webUrl
+        SummaryFile    = if ($uploadedSum) { $uploadedSum.webUrl } else { $null }
+        ConfluenceMirror = $confluenceUrl
+        PeopleFile     = $peopleUrl
+        LastProcessed  = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        PipelineVersion = $script:PIPELINE_VERSION
+    }
+
+    $existing = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
+    if ($existing) {
+        $idx = [array]::IndexOf($script:masterLogData.Meetings, $existing)
+        $script:masterLogData.Meetings[$idx] = $logEntry
+    } else {
+        $script:masterLogData.Meetings += $logEntry
+    }
+
+    # 8. Persistence (Update Master Logs in SharePoint)
+    try {
+        $masterLogLocalPath = Join-Path $script:outDir $script:masterLogFileName
+        $script:masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
+        Upload-FileToSharePoint -DriveId $script:driveId -FolderId $script:rootFolderId -FilePath $masterLogLocalPath | Out-Null
+        
+        $masterPeopleLogLocalPath = Join-Path $script:outDir $script:masterPeopleLogFileName
+        $script:masterPeopleLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterPeopleLogLocalPath -Encoding utf8
+        Upload-FileToSharePoint -DriveId $script:driveId -FolderId $script:rootFolderId -FilePath $masterPeopleLogLocalPath | Out-Null
+        
+        Write-Host "  [VTT] Master logs updated in SharePoint ✅"
+    } catch {
+        Write-Warning "  [VTT] Failed to update master logs: $_"
+    }
+
+    # 9. Cleanup Source (if applicable)
+    if (-not $SkipDeletion) {
+        Remove-VttInboxFile -DriveId $SourceDriveId -ItemId $FileItem.id | Out-Null
+        Write-Host "  [VTT] Source file deleted from inbox ✅"
+    }
+
+    Write-Host "  [VTT] Done: $mId"
+}
+
 function Get-VttInboxFiles {
     param([string]$DriveId, [string]$FolderPath)
     try {
@@ -1983,8 +2397,17 @@ function Remove-VttInboxFile {
 function ConvertFrom-VttFilename {
     param([string]$BaseName)
     $eventDate = $null; $subject = $null
-    if ($BaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
-        $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
+    
+    if ($BaseName -match "^HoD_(\d{8})_(\d{6})$") {
+        # Format: HoD_YYYYMMDD_HHMMSS
+        $eventDate = [datetime]::ParseExact($matches[1] + $matches[2], "yyyyMMddHHmmss", $null)
+        $subject   = "Head of Department Meeting"
+    } elseif ($BaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
+        try {
+            $eventDate = [datetime]::ParseExact($matches[1] + " " + $matches[2], "yyyy-MM-dd HHmm", $null)
+        } catch {
+            $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
+        }
         $subject   = ($matches[3] -replace "_", " ") -replace "-", " "
     } elseif ($BaseName -match "^(\d{4}-\d{2}-\d{2})-(.+)$") {
         $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
@@ -1997,165 +2420,35 @@ function ConvertFrom-VttFilename {
     return @{ EventDate = $eventDate; Subject = $subject }
 }
 
-# --- Run VTT inbox check ---
-# Uses existing $driveId (Petersplace SharePoint site drive) — resolved earlier in startup.
-Write-Host "Checking VTT inbox folder..."
+# --- Run VTT inbox check (Legacy Source: Petersplace) ---
+Write-Host "Checking VTT inbox folder (Legacy)..."
 $inboxVttFiles = Get-VttInboxFiles -DriveId $driveId -FolderPath $vttInboxFolderPath
-
 if ($inboxVttFiles -and $inboxVttFiles.Count -gt 0) {
     Write-Host "VTT inbox: $($inboxVttFiles.Count) file(s) found ✅"
+    foreach ($f in $inboxVttFiles) { Process-VttFile -FileItem $f -SourceDriveId $driveId }
 } else {
-    Write-Host "VTT inbox: no files found."
+    Write-Host "VTT inbox (Legacy): no files found."
 }
 
-foreach ($inboxFile in $inboxVttFiles) {
-    $baseName    = [System.IO.Path]::GetFileNameWithoutExtension($inboxFile.name)
-    $parsed      = ConvertFrom-VttFilename -BaseName $baseName
-    $eventDate   = $parsed.EventDate
-    $subject     = $parsed.Subject
-
-    # Meeting ID: sanitised filename + file creation date
-    $fileCreated = if ($inboxFile.fileSystemInfo -and $inboxFile.fileSystemInfo.createdDateTime) {
-        [datetime]$inboxFile.fileSystemInfo.createdDateTime
-    } else { Get-Date }
-    $createdDateStr = $fileCreated.ToString("yyyy-MM-dd")
-    $cleanBase   = $baseName -replace '[^a-zA-Z0-9_\-]', '_' -replace '__+', '_'
-    $mId         = "${cleanBase}_${createdDateStr}"
-
-    Write-Host "Processing VTT inbox: $($inboxFile.name) → [$mId]"
-
-    # Skip if already processed
-    $alreadyProcessed = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
-    if ($alreadyProcessed) {
-        Write-Host "  [VTT INBOX] Already in master log — skipping and removing from inbox"
-        Remove-VttInboxFile -DriveId $driveId -ItemId $inboxFile.id | Out-Null
-        continue
+# --- Run MeetingIntelligence Source (Non-destructive) ---
+Write-Host "Checking MeetingIntelligence Transcripts..."
+try {
+    # The new library is at the root of the drive (no subfolder needed in the URI usually, or we use 'root')
+    Ensure-GraphToken
+    $miHdrs = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
+    $miResp = Invoke-RestMethod -Method GET `
+        -Uri "https://graph.microsoft.com/v1.0/drives/$miDriveId/root/children?`$top=100" `
+        -Headers $miHdrs -ErrorAction Stop
+    $miFiles = @($miResp.value | Where-Object { $_.name -match '\.(vtt|txt)$' -and -not $_.folder })
+    
+    if ($miFiles -and $miFiles.Count -gt 0) {
+        Write-Host "MeetingIntelligence: $($miFiles.Count) file(s) found ✅"
+        foreach ($f in $miFiles) { Process-VttFile -FileItem $f -SourceDriveId $miDriveId -SkipDeletion }
+    } else {
+        Write-Host "MeetingIntelligence: no files found."
     }
-
-    # Download VTT content from SharePoint drive
-    $inboxVttContent = $null
-    try {
-        Ensure-GraphToken
-        $dlHdrs = @{ Authorization = "Bearer $($global:GraphTokenInfo.Token)" }
-        $inboxVttContent = Invoke-RestMethod -Method GET `
-            -Uri "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($inboxFile.id)/content" `
-            -Headers $dlHdrs -ErrorAction Stop
-    } catch {
-        Write-Warning "  [VTT INBOX] Failed to download '$($inboxFile.name)': $_"
-        continue
-    }
-
-    $plainText = ConvertFrom-Vtt -VttContent $inboxVttContent
-    if ([string]::IsNullOrWhiteSpace($plainText)) {
-        Write-Warning "  [VTT INBOX] '$($inboxFile.name)' produced empty transcript — skipping"
-        continue
-    }
-
-    # LLM setup (same as calendar pipeline)
-    $inboxLlmKey  = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-    $inboxAuth    = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-    $inboxHdrs    = if ($inboxAuth -eq "api-key") { @{ "api-key" = $inboxLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $inboxLlmKey"; "Content-Type" = "application/json" } }
-    $inboxDeploy  = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-    $inboxBase    = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-    $inboxLlmUri  = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-        "$inboxBase/openai/deployments/$inboxDeploy/chat/completions?api-version=2024-02-15-preview"
-    } else { "$($rules.LLMConfig.Endpoint)/chat/completions" }
-    $inboxOrganiser = $calendarUserUpn
-
-    $classResult = Get-MeetingClassification -type "inbox_vtt" -organiser $inboxOrganiser -transcriptContent $plainText
-
-    $chunkSize   = if ($rules.LLMConfig.ChunkSize)   { [int]$rules.LLMConfig.ChunkSize }   else { 32000 }
-    $chunkOverlap= if ($rules.LLMConfig.ChunkOverlap){ [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
-    $chunks      = Split-TranscriptIntoChunks -Text $plainText -ChunkSize $chunkSize -Overlap $chunkOverlap
-    Write-Host "  [LLM DIAG] Chunks: $($chunks.Count) (VTT inbox)"
-
-    $llmResult   = Invoke-LLM -Chunks $chunks -Organiser $inboxOrganiser -Subject $subject -FullUri $inboxLlmUri -Headers $inboxHdrs -Model $inboxDeploy -MeetingType "inbox_vtt"
-
-    $summaryText = if ($llmResult -and $llmResult.summary) { $llmResult.summary } elseif ($llmResult) { $llmResult | ConvertTo-Json -Depth 10 } else { "No summary generated." }
-    $enriched    = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $masterLogData.Meetings
-
-    # Local file output
-    $timestamp    = $eventDate.ToString("yyyy-MM-dd") + "_" + $eventDate.ToString("HHmm")
-    $cleanSubject = ($subject -replace '[^a-zA-Z0-9\s]', '' -replace '\s+', '_').Trim('_')
-    $localTxt     = Join-Path $outDir "$timestamp-$cleanSubject.txt"
-    $localSum     = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-    $plainText  | Out-File -FilePath $localTxt -Encoding utf8
-    $summaryText | Out-File -FilePath $localSum  -Encoding utf8
-
-    # Upload to SharePoint
-    $monthFolder     = $eventDate.ToString("yyyy-MM")
-    $evtFolderPath   = "$spTranscriptRootFolder/$monthFolder"
-    $evtFolderId     = Ensure-DriveFolder -DriveId $driveId -FolderPath $evtFolderPath
-    $uploadedTxt     = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localTxt
-    $uploadedSum     = $null
-    if (Test-Path $localSum) { $uploadedSum = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localSum }
-    Write-Host "  [VTT INBOX] Transcript uploaded: $($uploadedTxt.webUrl)"
-
-    # Confluence mirror
-    $inboxConfluenceUrl = $null
-    $inboxPipeConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { $null }
-    $isMirrorEnabled = ($inboxPipeConfig -and $inboxPipeConfig.enable_confluence_mirror) -or ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
-    if ($isMirrorEnabled) {
-        $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $inboxPipeConfig.confluence_space_key }
-        $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $inboxPipeConfig.confluence_parent_id }
-        $confHtml   = Convert-SummaryToConfluenceHtml -SummaryText $summaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $inboxOrganiser
-        $confResult = Publish-SummaryToConfluence -HtmlContent $confHtml -Title "$($eventDate.ToString('yyyy-MM-dd')) $subject" -SpaceKey $confSpace -ParentPageId $confParent
-        $inboxConfluenceUrl = if ($confResult -and $confResult.url) { $confResult.url } elseif ($confResult -and $confResult._links) { $confResult._links.webui } else { $null }
-        Write-Host "  [VTT INBOX] Confluence mirror: $inboxConfluenceUrl"
-    }
-
-    # People intelligence
-    $inboxPeopleUrl = $null
-    if ($peopleConfig) {
-        $inboxSpeakers = Get-TranscriptSpeakers -TranscriptText $plainText
-        $inboxPeople   = Resolve-People -Names $inboxSpeakers -PeopleConfig $peopleConfig
-        if ($inboxPeople -and $inboxPeople.Count -gt 0) {
-            $peopleRaw = Get-PeopleIntelligence `
-                -TranscriptText $plainText `
-                -SummaryText    $summaryText `
-                -ResolvedPeople $inboxPeople `
-                -Subject        $subject `
-                -MeetingId      $mId `
-                -FullUri        $inboxLlmUri `
-                -Headers        $inboxHdrs `
-                -Model          $inboxDeploy
-            if ($peopleRaw) {
-                $peopleContent  = Format-PeopleFile -LLMOutput $peopleRaw -MeetingId $mId -Subject $subject -EventDate $eventDate -PipelineVersion $PIPELINE_VERSION
-                $localPeople    = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
-                $peopleContent | Out-File -FilePath $localPeople -Encoding utf8
-                $uploadedPeople = Upload-FileToSharePoint -DriveId $driveId -FolderId $evtFolderId -FilePath $localPeople
-                $inboxPeopleUrl = $uploadedPeople.webUrl
-                Write-Host "  [VTT INBOX] People file uploaded: $inboxPeopleUrl"
-                $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $inboxPeopleUrl -ResolvedPeople $inboxPeople
-            }
-        }
-    }
-
-    # Add to run log
-    $log += @{
-        MeetingId                = $mId
-        Subject                  = $subject
-        Organiser                = $inboxOrganiser
-        EventDate                = $eventDate.ToString("yyyy-MM-ddTHH:mm:ss")
-        Type                     = "inbox_vtt"
-        Priority                 = "Normal"
-        Classification           = $classResult.Mode
-        ClassificationConfidence = $classResult.Confidence
-        ClassificationSource     = $classResult.Source
-        Status                   = "processed"
-        AgentState               = "processed_inbox_vtt"
-        File                     = $uploadedTxt.webUrl
-        SummaryFile              = if ($uploadedSum) { $uploadedSum.webUrl } else { $null }
-        ConfluenceMirror         = $inboxConfluenceUrl
-        PeopleFile               = $inboxPeopleUrl
-        LastProcessed            = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
-        LastRunId                = $runId
-    }
-
-    # Delete source VTT from inbox (consumed)
-    $deleted = Remove-VttInboxFile -DriveId $driveId -ItemId $inboxFile.id
-    if ($deleted) { Write-Host "  [VTT INBOX] Source file deleted from inbox ✅" }
-    else { Write-Warning "  [VTT INBOX] Could not delete '$($inboxFile.name)' — manual cleanup needed" }
+} catch {
+    Write-Warning "Failed to sync MeetingIntelligence transcripts: $_"
 }
 
 # =========================
@@ -2258,8 +2551,15 @@ if ($VttFile) {
         Write-Host "  [VTT] Uploading Topic Record: $trFileName"
         Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
         
+        # Confluence Topic Record Mirror
+        try {
+            Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
+        } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
+
         # Mutual Linking: Summary -> Topic Record
-        $summaryWithLinks = $summaryWithLinks -replace "(## Topic: $($tr.Label))", "`$1`n> [View Dedicated Topic Record]($trFileName)"
+        $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
+        $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+        $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
     }
 
     $header = @"
@@ -2908,9 +3208,15 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"
                     Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
                     
+                    # Confluence Topic Record Mirror
+                    try {
+                        Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
+                    } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
+
                     # Mutual Linking: Summary -> Topic Record
-                    # Append link to the topic block in the summary text
-                    $summaryWithLinks = $summaryWithLinks -replace "(## Topic: $($tr.Label))", "`$1`n> [View Dedicated Topic Record]($trFileName)"
+                    $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
+                    $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+                    $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
                 }
 
                 $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
