@@ -7,10 +7,37 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.4] — 2026-07-19
+
+### Added
+- **Ownership Deep Recovery**: `Format-TopicRecord` now automatically resolves blank ownership fields via `taxonomy.json` defaults when the LLM omits Capability/Phase/Governor. Eliminates blank `### OWNERSHIP` blocks in Topic Records.
+- **Capability/Phase/Governor defaults in `taxonomy.json`**: All 20 canonical topics now carry default `Capability`, `Phase`, and `Governor` values, enabling deterministic ownership recovery without LLM input.
+- **EIP 1.2 axes in LLM prompt**: `classification_rules.json` now explicitly mandates `CAPABILITY`, `CAPABILITY_PHASE`, and `PROCESS_GOVERNOR` in the Topic Record output schema.
+- **Environment variable support for `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_USER_UPN`**: Pipeline credentials can now be fully overridden via environment variables, improving portability and security.
+
+### Fixed
+- **Topic name sync**: All 20 topic names in `taxonomy.json` now exactly match `mapping_rules.json` (e.g., "Product Quality & Compliance", "Revenue & Commercial Performance", "Strategic Direction & Alignment"). This was causing ownership recovery to fail silently.
+- **Missing `-Taxonomy` parameter**: `Format-TopicRecord` in VTT direct mode (`-VttFile`) was called without the `$Taxonomy` argument, preventing ownership recovery. Fixed.
+- **Dynamic Topic ID map**: Replaced hardcoded 18-entry `$idMap` in `Format-TopicRecord` with a live lookup against `mapping_rules.json`. New topics added to config are automatically recognized.
+- **Mutual linking regex hardened**: Topic Summary → Topic Record linking now handles `##` and `###` header variants and is null-safe.
+- **EIP diagnostic log clarified**: `[EIP 1.2 DIAG]` log line now states `[recovery may apply]` to avoid confusion between pre-recovery LLM output and final rendered ownership.
+
+## [1.7.3] — 2026-07-18
+
+### Added
+- **7-Day Retry Window**: Automated runs now look back 7 days by default (previously 1 day). This allows for multiple retries of transcripts that fail or are delayed by Microsoft Graph, while built-in deduplication ensures no duplicate processing.
+
+### Fixed
+- **EIP 1.1 Topic Record Summary Hardening**: 
+  - Updated LLM prompts in `classification_rules.json` to explicitly mandate a 2-3 sentence summary for every extracted topic record.
+  - Added a code-level fallback in `Format-TopicRecord` to use the record's title or content if the LLM fails to provide a summary, preventing empty Markdown blocks.
+  - Hardened `Validate-TopicRecord` to ensure missing summaries trigger a validation failure for easier auditing.
+- **Artifact Isolation**: Discovery logic updated to ignore `artifacts/` and `tmp_` folders, preventing local verification data from "bleeding" into production logs.
+
 ## [1.7.2] — 2026-07-08
 
 ### Fixed
-- **Timezone-Invariant Meeting IDs**: Updated `Get-MeetingLogId` to force UTC parsing of Graph API timestamps. This prevents duplicate log entries caused by running the pipeline from different timezones (e.g., Local vs. Azure Function).
+- **Timezone-Invariant Meeting IDs**: Updated `Get-MeetingLogId` to force UTC parsing of Graph API timestamps. This prevents duplicate log entries caused by caused by running the pipeline from different timezones (e.g., Local vs. Azure Function).
 - **Master Log Deduplication**: Rebuilt `master_log.json` using the new invariant ID format, resolving multiple duplicate entries and ensuring reliable meeting skipping.
 - **Internal Versioning**: Synchronised the `$PIPELINE_VERSION` variable with the release version.
 

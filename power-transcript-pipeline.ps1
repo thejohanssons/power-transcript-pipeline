@@ -54,15 +54,15 @@ $runId = Get-Date -Format "yyyyMMdd_HHmmss"
 # CONFIG
 # =========================
 
-$tenantId     = "f9e144a5-228f-4e5a-86c4-2cc253376402"
-$clientId     = "9cfcadb2-27c0-41e5-8c6e-c1305c4827e2"
+$tenantId     = if ($env:GRAPH_TENANT_ID) { $env:GRAPH_TENANT_ID } else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
+$clientId     = if ($env:GRAPH_CLIENT_ID) { $env:GRAPH_CLIENT_ID } else { "9cfcadb2-27c0-41e5-8c6e-c1305c4827e2" }
 $clientSecret = $env:GRAPH_CLIENT_SECRET
 
 if (-not $clientSecret) {
     throw "GRAPH_CLIENT_SECRET environment variable is not set"
 }
 
-$calendarUserUpn = "peter@empoweringtech.com"
+$calendarUserUpn = if ($env:GRAPH_USER_UPN) { $env:GRAPH_USER_UPN } else { "peter@empoweringtech.com" }
 # Use temporary directory for cloud compatibility (Function App file system is often read-only)
 # On Linux Azure Functions, /tmp is the guaranteed writable location.
 $tempRoot = if ($null -ne $env:TEMP) { $env:TEMP } elseif ($IsLinux) { "/tmp" } else { $PSScriptRoot }
@@ -89,11 +89,11 @@ $spMeetingIntelLibrary  = "Transcripts"
 $rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
 $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 
-$PIPELINE_VERSION = "1.7.2"
-$TAXONOMY_VERSION = "1.0"
-$MAPPING_RULES_VERSION = "1.0"
-$ROLES_CONFIG_VERSION = "1.0"
-$SENTIMENT_RULES_VERSION = "1.0"
+$PIPELINE_VERSION = "1.7.3"
+$TAXONOMY_VERSION = "1.1"
+$MAPPING_RULES_VERSION = "2.1"
+$ROLES_CONFIG_VERSION = "1.1"
+$SENTIMENT_RULES_VERSION = "1.1"
 
 # --- EIP CONFIG LOADING ---
 $configDir = Join-Path $PSScriptRoot "config"
@@ -338,18 +338,20 @@ function Resolve-Ownership {
         OWNERSHIP_REASON     = ""
     }
 
-    # 1. Resolve PROCESS_GOVERNOR and GOVERNANCE_OWNER
-    if ($global:governorsConfig -and $Governor -ne "Unknown") {
-        $govInfo = $global:governorsConfig.process_governors.$Governor
+    # 1. Resolve PROCESS_GOVERNOR and GOVERNANCE_OWNER (Access via script scope)
+    $dynamicGov = Get-Variable -Name "governorsConfig" -Scope Script -ErrorAction SilentlyContinue
+    if ($dynamicGov -and $Governor -ne "Unknown") {
+        $govInfo = $dynamicGov.Value.process_governors.$Governor
         if ($govInfo) {
             $ownership.GOVERNANCE_OWNER = $govInfo.governance_owner
             $ownership.OWNERSHIP_CONFIDENCE = "Medium"
         }
     }
 
-    # 2. Resolve PRIMARY_OWNER from ownership_rules.json
-    if ($global:ownershipRulesConfig -and $Capability -ne "Unknown") {
-        $rule = $global:ownershipRulesConfig.ownership_rules | Where-Object { $_.capability -eq $Capability } | Select-Object -First 1
+    # 2. Resolve PRIMARY_OWNER from ownership_rules.json (Access via script scope)
+    $dynamicOwn = Get-Variable -Name "ownershipRulesConfig" -Scope Script -ErrorAction SilentlyContinue
+    if ($dynamicOwn -and $Capability -ne "Unknown") {
+        $rule = $dynamicOwn.Value.ownership_rules | Where-Object { $_.capability -eq $Capability } | Select-Object -First 1
         if ($rule) {
             $owner = $rule.default_owner
             if ($rule.phase_owners -and $rule.phase_owners.$Phase) {
@@ -771,7 +773,7 @@ function Enrich-Summary {
             $ownership.OWNERSHIP_REASON += " [DEPRECATION NOTICE: Standalone 'Delivery' topic replaced with 'Delivery Capability']"
         }
 
-        Write-Host "  [EIP 1.2 DIAG] Topic=$($cls.TopicId) | Owner=$($ownership.PRIMARY_OWNER) | Governor=$($ownership.PROCESS_GOVERNOR)"
+        Write-Host "  [EIP 1.2 DIAG] Topic=$($cls.TopicId) | LLM Owner=$($ownership.PRIMARY_OWNER) | Governor=$($ownership.PROCESS_GOVERNOR) [recovery may apply]"
 
         $topicRecordsMap[$cls.TopicId] = [pscustomobject]@{
             RecordId      = $meetingId + "_" + $cls.TopicId
@@ -1218,7 +1220,7 @@ function Get-TopicEntities {
     # 1. Resolve People mentioned in this specific topic text
     if ($ResolvedPeople) {
         foreach ($p in $ResolvedPeople) {
-            if ($Text -match [regex]::Escape($p.display_name)) {
+            if ($p.display_name -and $Text -match [regex]::Escape($p.display_name)) {
                 $entities.People += $p.display_name
             }
         }
@@ -1286,18 +1288,25 @@ function Format-TopicRecord {
     
     # If the LLM left core metadata blank (common in recovery mode), we attempt to reverse-map from the TopicId (e.g., T03)
     if (([string]::IsNullOrWhiteSpace($topicValue) -or $topicValue -eq "Unknown") -and $tid -match "T\d+") {
-        # Mapping for the T01-T18 IDs back to canonical names
-        $idMap = @{
-            "T01" = "Product Performance"; "T02" = "Product Quality"; "T03" = "Product Value"; "T04" = "Product Scope"
-            "T05" = "Delivery Progress";   "T06" = "Delivery Risk";    "T07" = "Development Execution"
-            "T08" = "Cash Flow";           "T09" = "Cost Structure";   "T10" = "Revenue Performance"; "T11" = "Financial Risk"
-            "T12" = "Organisation";        "T13" = "Resource Allocation"; "T14" = "Operational Effectiveness"
-            "T15" = "Strategic Direction"; "T16" = "Product-Market Fit";  "T17" = "Growth"; "T18" = "Delivery Confidence"
+        # Build dynamic map from script-scope mappingRules if available
+        $dynamicRules = Get-Variable -Name "mappingRules" -Scope Script -ErrorAction SilentlyContinue
+        if ($dynamicRules -and $dynamicRules.Value.Rules) {
+            $matchedRule = $dynamicRules.Value.Rules | Where-Object { $_.TopicId -eq $tid }
+            if ($matchedRule) {
+                $topicValue = $matchedRule.Name
+                if ([string]::IsNullOrWhiteSpace($displayTitle)) { $displayTitle = $topicValue }
+            }
         }
-        if ($idMap.ContainsKey($tid)) {
-            $topicValue = $idMap[$tid]
-            # Use the resolved topic name as the title if title is missing
-            if ([string]::IsNullOrWhiteSpace($displayTitle)) { $displayTitle = $topicValue }
+    }
+
+    # Final attempt to normalise topicValue against Taxonomy keys (case-insensitive)
+    if ($topicValue -and -not $Taxonomy.Topics.$topicValue) {
+        $exactMatch = $Taxonomy.Topics.PSObject.Properties.Name | Where-Object { $_ -eq $topicValue }
+        if ($exactMatch) { $topicValue = $exactMatch }
+        else {
+            # Try fuzzy match against Name in mapping rules
+            $altMatch = $Taxonomy.Topics.PSObject.Properties.Name | Where-Object { $_ -like "*$topicValue*" -or $topicValue -like "*$_*" }
+            if ($altMatch) { $topicValue = $altMatch | Select-Object -First 1 }
         }
     }
 
@@ -1308,37 +1317,52 @@ function Format-TopicRecord {
     }
     $versionedTopic = if ($topicValue) { "$topicValue v$topicVersion" } else { "Unknown v1.0" }
 
+    # Recover Domain and Family based on resolved Topic (handle null/empty strings)
+    $resolvedDomain = if (-not [string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain } else {
+        if ($topicValue -and $Taxonomy.Topics.$topicValue.Domain) { $Taxonomy.Topics.$topicValue.Domain } else { "Unknown" }
+    }
+    $resolvedFamily = if (-not [string]::IsNullOrWhiteSpace($TopicData.TopicFamily)) { $TopicData.TopicFamily } else {
+        if ($topicValue -and $Taxonomy.Topics.$topicValue.TopicFamily) { $Taxonomy.Topics.$topicValue.TopicFamily } else { "Unknown" }
+    }
+
+    # Update TopicData for validation (safely handle PSCustomObject properties)
+    if ($TopicData -is [pscustomobject]) {
+        if (-not $TopicData.PSObject.Properties['Domain']) { $TopicData | Add-Member -NotePropertyName "Domain" -NotePropertyValue $resolvedDomain } elseif ([string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain = $resolvedDomain }
+        if (-not $TopicData.PSObject.Properties['TopicFamily']) { $TopicData | Add-Member -NotePropertyName "TopicFamily" -NotePropertyValue $resolvedFamily } elseif ([string]::IsNullOrWhiteSpace($TopicData.TopicFamily)) { $TopicData.TopicFamily = $resolvedFamily }
+        if (-not $TopicData.PSObject.Properties['Topic']) { $TopicData | Add-Member -NotePropertyName "Topic" -NotePropertyValue $topicValue } elseif ([string]::IsNullOrWhiteSpace($TopicData.Topic)) { $TopicData.Topic = $topicValue }
+        if (-not $TopicData.PSObject.Properties['TopicId']) { $TopicData | Add-Member -NotePropertyName "TopicId" -NotePropertyValue $tid }
+    } elseif ($TopicData -is [hashtable]) {
+        if ([string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain = $resolvedDomain }
+        if ([string]::IsNullOrWhiteSpace($TopicData.TopicFamily)) { $TopicData.TopicFamily = $resolvedFamily }
+        if ([string]::IsNullOrWhiteSpace($TopicData.Topic)) { $TopicData.Topic = $topicValue }
+    }
+
+    # --- OWNERSHIP DEEP RECOVERY ---
+    # If the LLM didn't provide Ownership or it's empty, we resolve it via Taxonomy defaults
+    if ($null -eq $TopicData.Ownership -or $TopicData.Ownership.PRIMARY_OWNER -eq "Unknown") {
+        $taxItem = $Taxonomy.Topics.$topicValue
+        if ($taxItem) {
+            $recoveredCapability = if ($taxItem.Capability) { $taxItem.Capability } else { "Unknown" }
+            $recoveredPhase      = if ($taxItem.Phase) { $taxItem.Phase } else { "Capability Operation" }
+            $recoveredGovernor   = if ($taxItem.Governor) { $taxItem.Governor } else { "Unknown" }
+            
+            $newOwnership = Resolve-Ownership -Capability $recoveredCapability -Phase $recoveredPhase -Governor $recoveredGovernor
+            if ($TopicData -is [pscustomobject]) {
+                if (-not $TopicData.PSObject.Properties['Ownership']) { $TopicData | Add-Member -NotePropertyName "Ownership" -NotePropertyValue $newOwnership }
+                else { $TopicData.Ownership = $newOwnership }
+            } else {
+                $TopicData.Ownership = $newOwnership
+            }
+        }
+    }
+
     # --- STRATEGIC RECOVERY ---
     $stratImpact = if ($TopicData.STRATEGIC_IMPACT) { $TopicData.STRATEGIC_IMPACT } else { "Unknown" }
     $execPrio    = if ($TopicData.EXECUTIVE_PRIORITY) { $TopicData.EXECUTIVE_PRIORITY } else { "Unknown" }
     $alignment   = if ($TopicData.ALIGNMENT_LEVEL) { $TopicData.ALIGNMENT_LEVEL } else { "Unknown" }
-
-    # Recover Domain and Family based on resolved Topic (handle null/empty strings)
-    $resolvedDomain = if (-not [string]::IsNullOrWhiteSpace($TopicData.Domain)) { $TopicData.Domain } else {
-        switch ($topicValue) {
-            { $_ -in @("Product Performance", "Product Quality", "Product Value", "Product Scope", "Development Execution") } { "Product" }
-            { $_ -in @("Delivery Progress", "Delivery Risk", "Delivery Confidence") } { "Governance" }
-            { $_ -in @("Cash Flow", "Cost Structure", "Revenue Performance", "Financial Risk") } { "Finance" }
-            { $_ -in @("Organisation", "Resource Allocation") } { "People" }
-            { $_ -in @("Operational Effectiveness") } { "Operations" }
-            { $_ -in @("Strategic Direction", "Product-Market Fit", "Growth") } { "Strategy" }
-            Default { "Unknown" }
-        }
-    }
-    $resolvedFamily = if (-not [string]::IsNullOrWhiteSpace($TopicData.TopicFamily)) { $TopicData.TopicFamily } else {
-        switch ($topicValue) {
-            { $_ -in @("Product Performance", "Product Quality", "Product Value", "Product Scope") } { "Product" }
-            { $_ -in @("Delivery Progress", "Delivery Risk", "Delivery Confidence", "Development Execution") } { "Delivery" }
-            { $_ -in @("Cash Flow", "Cost Structure", "Revenue Performance", "Financial Risk") } { "Commercial" }
-            { $_ -in @("Organisation", "Resource Allocation") } { "People" }
-            { $_ -in @("Operational Effectiveness") } { "Operations" }
-            { $_ -in @("Strategic Direction", "Product-Market Fit", "Growth") } { "Strategy" }
-            Default { "Unknown" }
-        }
-    }
     
     # Final Validation State
-    $validationStatus = if ($resolvedDomain -ne "Unknown" -and $resolvedFamily -ne "Unknown") { "PASS (Recovered)" } else { "FAIL" }
+    $validationStatus = if ($resolvedDomain -ne "Unknown" -and $resolvedFamily -ne "Unknown" -and $TopicData.Ownership.PRIMARY_OWNER -ne "Unknown") { "PASS (Recovered)" } else { "FAIL" }
 
     # Helper for list formatting
     function Get-ListString {
@@ -2225,10 +2249,12 @@ function Process-VttFile {
                 Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
             } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
-            # Mutual Linking: Summary -> Topic Record
-            $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
-            $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-            $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+            # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
+            if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
+                $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
+                $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+                $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+            }
         }
     }
 
@@ -2551,7 +2577,7 @@ if ($VttFile) {
     $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
     $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
     
-    $summaryWithLinks = $enrichedSummaryText
+    $summaryWithLinks = [string]$enrichedSummaryText
     foreach ($tr in $topicRecords3D) {
         $cleanLabel = if ($tr.Label) { $tr.Label } else { $tr.TopicName }
         $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
@@ -2562,7 +2588,7 @@ if ($VttFile) {
         # Mutual Linking: Topic Record -> Summary
         $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
             Subject = $subject; MeetingId = $mId; EventDate = $eventDate
-        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople
+        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy
         
         $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
         Write-Host "  [VTT] Uploading Topic Record: $trFileName"
@@ -2573,10 +2599,12 @@ if ($VttFile) {
             Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
         } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
-        # Mutual Linking: Summary -> Topic Record
-        $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
-        $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-        $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+        # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
+        if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
+            $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
+            $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+            $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+        }
     }
 
     $header = @"
@@ -3206,7 +3234,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                 $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
                 $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
                 
-                $summaryWithLinks = $enrichedSummaryText
+                $summaryWithLinks = [string]$enrichedSummaryText
                 foreach ($tr in $topicRecords3D) {
                     # Use canonical topic name for filename grouping
                     $safeTopicName = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.Label }
@@ -3230,10 +3258,12 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                         Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
                     } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
-                    # Mutual Linking: Summary -> Topic Record
-                    $pattern = "(?m)^" + [regex]::Escape("### Topic: $($tr.Label)") + "\s*$"
-                    $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-                    $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+                    # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
+                    if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
+                        $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
+                        $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+                        $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+                    }
                 }
 
                 $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
