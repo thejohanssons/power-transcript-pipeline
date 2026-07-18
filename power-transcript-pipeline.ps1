@@ -32,7 +32,7 @@ param(
 if ($FromDate) {
     if ($FromDate -isnot [datetime]) { $FromDate = [datetime]::Parse($FromDate) }
 } else {
-    $FromDate = (Get-Date).AddDays(-1).Date
+    $FromDate = (Get-Date).AddDays(-7).Date
 }
 
 if ($ToDate) {
@@ -1257,6 +1257,7 @@ function Validate-TopicRecord {
         STRAT_IMPACT    = if ($TopicData.STRATEGIC_IMPACT -ge 1 -and $TopicData.STRATEGIC_IMPACT -le 5) { "PASS" } else { "FAIL" }
         EXEC_PRIO       = if ($TopicData.EXECUTIVE_PRIORITY -match "Low|Medium|High|Critical") { "PASS" } else { "FAIL" }
         ALIGNMENT       = if ($TopicData.ALIGNMENT_LEVEL -match "Consensus|Majority|Divided|Conflicted|Unknown") { "PASS" } else { "FAIL" }
+        SUMMARY         = if (-not [string]::IsNullOrWhiteSpace($TopicData.Summary) -or -not [string]::IsNullOrWhiteSpace($TopicData.Content)) { "PASS" } else { "FAIL" }
     }
     
     $failCount = ($checks.Values | Where-Object { $_ -eq "FAIL" }).Count
@@ -1429,7 +1430,7 @@ function Format-TopicRecord {
 $keyFactsStr
 
 ## Summary
-$(if ($TopicData.Summary) { $TopicData.Summary } else { $TopicData.CONTENT })
+$(if ($TopicData.Summary) { $TopicData.Summary } elseif ($TopicData.Content) { $TopicData.Content } else { $displayTitle })
 
 ## Structured Intelligence
 ### Decisions
@@ -2383,7 +2384,12 @@ function Get-VttInboxFiles {
         $items = Invoke-RestMethod -Method GET `
             -Uri "https://graph.microsoft.com/v1.0/drives/$DriveId/root:/${FolderPath}:/children?`$top=100" `
             -Headers $hdrs -ErrorAction Stop
-        return @($items.value | Where-Object { $_.name -match '\.vtt$' -and -not $_.folder })
+        return @($items.value | Where-Object { 
+            $_.name -match '\.vtt$' -and 
+            -not $_.folder -and
+            $_.name -notmatch '^tmp_' -and
+            $_.parentReference.path -notmatch '/artifacts($|/)'
+        })
     } catch {
         Write-Warning "[VTT INBOX] Could not list inbox folder '${FolderPath}': $_"
         return @()
