@@ -1345,7 +1345,15 @@ function Format-TopicRecord {
             $recoveredCapability = if ($taxItem.Capability) { $taxItem.Capability } else { "Unknown" }
             $recoveredPhase      = if ($taxItem.Phase) { $taxItem.Phase } else { "Capability Operation" }
             $recoveredGovernor   = if ($taxItem.Governor) { $taxItem.Governor } else { "Unknown" }
-            
+
+            # Apply ContextOverride when MeetingMode is a COO meeting (e.g., Nick/Alison meetings)
+            # Default taxonomy now favours CPO for ambiguous topics. Override to COO when meeting context demands it.
+            if ($MeetingMode -eq "COO" -and $taxItem.ContextOverride -and $taxItem.ContextOverride.COO) {
+                $recoveredCapability = $taxItem.ContextOverride.COO.Capability
+                $recoveredGovernor   = $taxItem.ContextOverride.COO.Governor
+                Write-Host "  [OWNERSHIP CTX] Topic=$topicValue → COO context override applied (Capability: $recoveredCapability)"
+            }
+
             $newOwnership = Resolve-Ownership -Capability $recoveredCapability -Phase $recoveredPhase -Governor $recoveredGovernor
             if ($TopicData -is [pscustomobject]) {
                 if (-not $TopicData.PSObject.Properties['Ownership']) { $TopicData | Add-Member -NotePropertyName "Ownership" -NotePropertyValue $newOwnership }
@@ -2238,7 +2246,7 @@ function Process-VttFile {
             
             $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
                 Subject = $subject; MeetingId = $mId; EventDate = $eventDate
-            } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $script:taxonomy
+            } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $script:taxonomy -MeetingMode $mode
             
             $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
             Write-Host "  [VTT] Uploading Topic Record: $trFileName"
@@ -2588,7 +2596,7 @@ if ($VttFile) {
         # Mutual Linking: Topic Record -> Summary
         $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
             Subject = $subject; MeetingId = $mId; EventDate = $eventDate
-        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy
+        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy -MeetingMode $mode
         
         $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
         Write-Host "  [VTT] Uploading Topic Record: $trFileName"
@@ -3247,7 +3255,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     # Mutual Linking: Topic Record -> Summary
                     $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
                         Subject = $subject; MeetingId = $mId; EventDate = $start
-                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy
+                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy -MeetingMode $mode
                     
                     $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
                     Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"

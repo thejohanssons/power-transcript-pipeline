@@ -50,6 +50,16 @@
       "default_owner": "CPO"
     },
     {
+      "capability": "Product Delivery",
+      "default_owner": "CPO",
+      "notes": "Sprint delivery, feature progress, dev blockers — owned by CPO not COO"
+    },
+    {
+      "capability": "Engineering Operations",
+      "default_owner": "CPO",
+      "notes": "R&D team structure, dev resource allocation, engineering process efficiency"
+    },
+    {
       "capability": "Product Industrialisation",
       "default_owner": "CPO",
       "phase_owners": {
