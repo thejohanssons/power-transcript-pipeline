@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.5] — 2026-07-19
+
+### Fixed
+- **Context-aware ownership resolution (CPO vs COO)**: Ambiguous topics (Organisation, Resource Allocation, Operational Effectiveness, Delivery Progress, Delivery Risk) were incorrectly assigned to COO even in R&D/product meetings (e.g., Peter–Mandar). The pipeline now defaults these topics to CPO (`Engineering Operations` / `Product Delivery` capabilities) and only overrides to COO when the meeting mode is explicitly COO.
+
+### Added
+- **`Product Delivery` capability** (CPO): Covers sprint delivery, feature progress, and dev blockers. Now the default for T05 (Delivery Progress) and T06 (Delivery Risk) instead of COO-owned `Commercial Execution`.
+- **`Engineering Operations` capability** (CPO): Covers R&D team structure, dev resource allocation, and engineering process efficiency. Now the default for T12 (Organisation), T13 (Resource Allocation), and T14 (Operational Effectiveness).
+- **`ContextOverride` in `taxonomy.json`**: Five topics now carry a `COO` context override block. When a meeting is classified as COO mode (e.g., Nick, Alison), the pipeline automatically switches to `People Operations`, `Supply Operations`, or `Commercial Execution` as appropriate.
+- **`MeetingMode` parameter on `Format-TopicRecord`**: All three call sites (VTT inbox, VTT direct, calendar pipeline) now pass the resolved meeting mode into the ownership recovery layer.
+
 ## [1.7.4] — 2026-07-19
 
 ### Added
