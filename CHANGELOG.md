@@ -7,6 +7,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.6] — 2026-07-19
+
+### Changed
+- **Topic Records folder structure aligned with Meeting Transcripts**: Topic Records are now stored at `Topic Records/YYYY-MM/[meeting-id]/` (previously flat at `Topic Records/[meeting-id]/`). Matches the existing monthly folder structure used by Meeting Transcripts. Applied to all three pipeline call sites (VTT inbox, VTT direct, calendar loop).
+
+### Fixed
+- **SharePoint migration**: Migrated 82 existing meeting-level folders from flat `Topic Records/[meeting-id]/` into correct `Topic Records/YYYY-MM/[meeting-id]/` month subfolders.
+- **Test folder cleanup**: Removed 19 `source_snapshot` test folders from SharePoint left over from validation runs.
+
 ## [1.7.5] — 2026-07-19
 
 ### Fixed
