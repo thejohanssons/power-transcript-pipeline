@@ -7,6 +7,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.7] — 2026-07-19
+
+### Fixed
+- **Smart date parsing for `Sales_Call_*` VTT filenames**: `ConvertFrom-VttFilename` now parses the human-readable meeting date from filenames like `Sales_Call_US_Country_Manager_25_Mar_26` (→ 2026-03-25), placing Topic Records in the correct meeting-date month folder instead of the pipeline run date.
+- **`HoD_*` filename match relaxed**: Pattern now allows optional suffixes (e.g. `HoD_20260709_153911_2026-07-09`) without breaking date extraction.
+
 ## [1.7.6] — 2026-07-19
 
 ### Changed
