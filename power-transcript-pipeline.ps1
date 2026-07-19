@@ -2449,11 +2449,27 @@ function Remove-VttInboxFile {
 function ConvertFrom-VttFilename {
     param([string]$BaseName)
     $eventDate = $null; $subject = $null
-    
-    if ($BaseName -match "^HoD_(\d{8})_(\d{6})$") {
-        # Format: HoD_YYYYMMDD_HHMMSS
+
+    # Month name -> number map for human-readable date parsing
+    $monthMap = @{ Jan="01"; Feb="02"; Mar="03"; Apr="04"; May="05"; Jun="06"; Jul="07"; Aug="08"; Sep="09"; Oct="10"; Nov="11"; Dec="12" }
+
+    if ($BaseName -match "^HoD_(\d{8})_(\d{6})") {
+        # Format: HoD_YYYYMMDD_HHMMSS[_suffix]
         $eventDate = [datetime]::ParseExact($matches[1] + $matches[2], "yyyyMMddHHmmss", $null)
         $subject   = "Head of Department Meeting"
+    } elseif ($BaseName -match "^Sales_Call_(.+?)_(\d{1,2})_(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)_(\d{2})") {
+        # Format: Sales_Call_[Description]_DD_Mon_YY (e.g. Sales_Call_US_Country_Manager_25_Mar_26)
+        $desc      = $matches[1] -replace "_", " "
+        $day       = $matches[2].PadLeft(2, "0")
+        $mon       = $monthMap[$matches[3]]
+        $year      = "20$($matches[4])"
+        try {
+            $eventDate = [datetime]::ParseExact("$year-$mon-$day", "yyyy-MM-dd", $null)
+        } catch {
+            $eventDate = (Get-Date).Date
+            Write-Warning "  [VTT] Could not parse Sales Call date from: $BaseName — using today"
+        }
+        $subject = if ($desc) { "Sales Call - $desc".Trim() } else { "Sales Call" }
     } elseif ($BaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
         try {
             $eventDate = [datetime]::ParseExact($matches[1] + " " + $matches[2], "yyyy-MM-dd HHmm", $null)
