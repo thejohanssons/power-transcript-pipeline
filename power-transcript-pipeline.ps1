@@ -2233,7 +2233,8 @@ function Process-VttFile {
     # --- TOPIC RECORD GENERATION ---
     $summaryWithLinks = $enrichedSummaryText
     if ($cls.summary) {
-        $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+        $topicMonthFolder = $eventDate.ToString("yyyy-MM")
+        $topicRecordsDir = "Exec Intel Insights/Topic Records/$topicMonthFolder/$mId"
         $topicFolderId = Ensure-DriveFolder -DriveId $script:driveId -FolderPath $topicRecordsDir
         
         foreach ($tr in $topicRecords3D) {
@@ -2581,8 +2582,9 @@ if ($VttFile) {
     $resolvedPeople = Resolve-People -TranscriptText $plainText
 
     # --- STEP 4: GENERATE TOPIC RECORDS ---
-    # Path aligned with Exec Intel Insights root
-    $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+    # Path aligned with Meeting Transcripts: Topic Records/YYYY-MM/[meeting-id]/
+    $topicMonthFolder = $eventDate.ToString("yyyy-MM")
+    $topicRecordsDir = "Exec Intel Insights/Topic Records/$topicMonthFolder/$mId"
     $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
     
     $summaryWithLinks = [string]$enrichedSummaryText
@@ -3239,7 +3241,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             $uploadedSummary = $null
             if ($cls.summary) {
                 # --- STEP 4: GENERATE TOPIC RECORDS ---
-                $topicRecordsDir = "Exec Intel Insights/Topic Records/$mId"
+                # Path aligned with Meeting Transcripts: Topic Records/YYYY-MM/[meeting-id]/
+                $eventMonthFolder = (Get-Date $start -Format "yyyy-MM")
+                $topicRecordsDir = "Exec Intel Insights/Topic Records/$eventMonthFolder/$mId"
                 $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
                 
                 $summaryWithLinks = [string]$enrichedSummaryText
