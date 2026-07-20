@@ -32,7 +32,7 @@ param(
 if ($FromDate) {
     if ($FromDate -isnot [datetime]) { $FromDate = [datetime]::Parse($FromDate) }
 } else {
-    $FromDate = (Get-Date).AddDays(-7).Date
+    $FromDate = (Get-Date).AddDays(-5).Date
 }
 
 if ($ToDate) {
@@ -89,7 +89,7 @@ $spMeetingIntelLibrary  = "Transcripts"
 $rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
 $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 
-$PIPELINE_VERSION = "1.7.3"
+$PIPELINE_VERSION = "1.7.9"
 $TAXONOMY_VERSION = "1.1"
 $MAPPING_RULES_VERSION = "2.1"
 $ROLES_CONFIG_VERSION = "1.1"
@@ -2865,6 +2865,7 @@ foreach ($calendarEvent in $events) {
     $joinUrl   = $calendarEvent.onlineMeeting.joinUrl
     $organiser = $calendarEvent.organizer.emailAddress.address
     $start     = $calendarEvent.start.dateTime
+    $end       = $calendarEvent.end.dateTime
 
     Write-Host "--------------------------------------------------"
     Write-Host "Evaluating: $subject" -ForegroundColor Cyan
@@ -3068,6 +3069,21 @@ foreach ($calendarEvent in $events) {
         $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
 
         $eventStartTime = [datetime]$start
+        $eventEndTime   = if ($end) { [datetime]$end } else { $eventStartTime.AddHours(1) }
+
+        # --- ONGOING MEETING GUARD ---
+        # Do not process a transcript unless at least 2 hours have elapsed since the
+        # scheduled end time. This prevents partial transcripts from meetings that are
+        # still in progress (or have only just finished) from being analysed and locked
+        # in the Master Log as successful. The meeting will be retried automatically on
+        # the next pipeline run once the cooldown period has passed.
+        $earliestProcessTime = $eventEndTime.AddHours(2)
+        if ((Get-Date) -lt $earliestProcessTime) {
+            Write-Host "  [SKIP] Meeting may still be in progress or transcript not yet finalised. Earliest process time: $earliestProcessTime (2h after scheduled end). Will retry on next run." -ForegroundColor Yellow
+            # Do not write a log entry — absence from the log means the next run will retry.
+            continue
+        }
+
         $windowStart = $eventStartTime.AddHours(-2)
         $windowEnd   = $eventStartTime.AddHours(24)
         
