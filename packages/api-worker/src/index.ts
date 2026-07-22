@@ -23,7 +23,8 @@
 
 import { findFuzzyMatches } from './fuzzy';
 import type {
-  Topic, PostTopicBody, PostTranscriptBody, PatchQueueBody, PostSessionBody
+  Topic, PostTopicBody, PostTranscriptBody, PatchQueueBody, PostSessionBody,
+  PostParticipantsBatchBody
 } from './types';
 
 export interface Env {
@@ -121,6 +122,19 @@ export default {
       // --- Merge candidates ---
       if (path === '/merge-candidates' && method === 'GET') {
         return handleGetMergeCandidates(env);
+      }
+
+      // --- Participants ---
+      if (path === '/participants' && method === 'POST') {
+        return handlePostParticipants(env, request);
+      }
+      if (path.match(/^\/meetings\/[^/]+\/participants$/) && method === 'GET') {
+        return handleGetMeetingParticipants(env, path.split('/')[2]);
+      }
+
+      // --- Transcripts PATCH ---
+      if (path.match(/^\/transcripts\/[^/]+$/) && method === 'PATCH') {
+        return handlePatchTranscript(env, path.split('/')[2], request);
       }
 
       return errorResponse('Not found', 404);
@@ -472,4 +486,90 @@ async function handleGetMergeCandidates(env: Env): Promise<Response> {
     ORDER BY mc.similarity DESC
   `).all();
   return jsonResponse({ candidates: results, count: results.length });
+}
+
+// ---------------------------------------------------------------
+// POST /participants — batch upsert meeting participants
+// ---------------------------------------------------------------
+async function handlePostParticipants(env: Env, request: Request): Promise<Response> {
+  const body = await request.json() as PostParticipantsBatchBody;
+
+  if (!body.meeting_ref || !body.meeting_date || !Array.isArray(body.participants)) {
+    return errorResponse('Required fields: meeting_ref, meeting_date, participants[]');
+  }
+
+  const source = body.source ?? 'PeopleLog';
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const p of body.participants) {
+    if (!p.person_id) continue;
+    try {
+      await env.DB.prepare(`
+        INSERT INTO meeting_participants
+          (participant_id, meeting_ref, meeting_date, person_id,
+           display_name, role, was_organiser, source, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(meeting_ref, person_id) DO UPDATE SET
+          display_name = COALESCE(excluded.display_name, display_name),
+          role = COALESCE(excluded.role, role),
+          was_organiser = excluded.was_organiser
+      `).bind(
+        generateId(),
+        body.meeting_ref,
+        body.meeting_date,
+        p.person_id,
+        p.display_name ?? null,
+        p.role ?? null,
+        p.was_organiser ? 1 : 0,
+        source,
+        now()
+      ).run();
+      inserted++;
+    } catch (_e) {
+      skipped++;
+    }
+  }
+
+  return jsonResponse({
+    meeting_ref: body.meeting_ref,
+    inserted,
+    skipped,
+  }, 201);
+}
+
+// ---------------------------------------------------------------
+// GET /meetings/:ref/participants
+// ---------------------------------------------------------------
+async function handleGetMeetingParticipants(env: Env, meetingRef: string): Promise<Response> {
+  const decodedRef = decodeURIComponent(meetingRef);
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM meeting_participants WHERE meeting_ref = ? ORDER BY was_organiser DESC, display_name ASC'
+  ).bind(decodedRef).all();
+  return jsonResponse({ meeting_ref: decodedRef, participants: results, count: results.length });
+}
+
+// ---------------------------------------------------------------
+// PATCH /transcripts/:id — update transcript (e.g. mark processed, add r2_key)
+// ---------------------------------------------------------------
+async function handlePatchTranscript(env: Env, transcriptId: string, request: Request): Promise<Response> {
+  const body = await request.json() as { processed?: boolean; r2_key?: string };
+
+  const transcript = await env.DB.prepare(
+    'SELECT transcript_id FROM transcripts WHERE transcript_id = ?'
+  ).bind(transcriptId).first();
+  if (!transcript) return errorResponse('Transcript not found', 404);
+
+  await env.DB.prepare(`
+    UPDATE transcripts SET
+      processed = COALESCE(?, processed),
+      r2_key = COALESCE(?, r2_key)
+    WHERE transcript_id = ?
+  `).bind(
+    body.processed !== undefined ? (body.processed ? 1 : 0) : null,
+    body.r2_key ?? null,
+    transcriptId
+  ).run();
+
+  return jsonResponse({ transcript_id: transcriptId, updated: true });
 }

@@ -118,3 +118,37 @@ export interface PostSessionBody {
   agent_summary?: string;
   follow_up_flags?: string[];
 }
+
+export interface MeetingParticipant {
+  participant_id: string;
+  meeting_ref: string;
+  meeting_date: string;
+  person_id: string;
+  display_name: string | null;
+  role: string | null;
+  was_organiser: number;
+  source: string;
+  created_at: string;
+}
+
+export interface PostParticipantBody {
+  meeting_ref: string;
+  meeting_date: string;
+  person_id: string;
+  display_name?: string;
+  role?: string;
+  was_organiser?: boolean;
+  source?: string;
+}
+
+export interface PostParticipantsBatchBody {
+  meeting_ref: string;
+  meeting_date: string;
+  participants: Array<{
+    person_id: string;
+    display_name?: string;
+    role?: string;
+    was_organiser?: boolean;
+  }>;
+  source?: string;
+}
