@@ -130,6 +130,42 @@ $lifecyclePhasesConfig = if (Test-Path $lifecyclePhasesPath) { Get-Content $life
 $executionContextsPath = Join-Path $configDir "execution_contexts.json"
 $executionContextsConfig = if (Test-Path $executionContextsPath) { Get-Content $executionContextsPath | ConvertFrom-Json } else { $null }
 
+# Resolve-ExecutionContext: matches a meeting subject + organiser against ContextDetectionRules in execution_contexts.json.
+# Rules are evaluated in order — first subject_pattern match wins; organiser_patterns are a fallback.
+# Returns the matched context string, or "" if no rule matches (no bias applied).
+function Resolve-ExecutionContext {
+    param(
+        [string]$Subject,
+        [string]$Organiser = ""
+    )
+    if (-not $executionContextsConfig -or
+        -not $executionContextsConfig.PSObject.Properties.Name -contains 'ContextDetectionRules') {
+        return ""
+    }
+    $subjectLower  = $Subject.ToLower()
+    $organiserLower = $Organiser.ToLower()
+
+    foreach ($rule in $executionContextsConfig.ContextDetectionRules) {
+        # 1. Subject patterns (case-insensitive literal match)
+        foreach ($pattern in $rule.subject_patterns) {
+            if ($subjectLower -match [regex]::Escape($pattern.ToLower())) {
+                return $rule.context
+            }
+        }
+    }
+    # 2. Organiser fallback — only if no subject matched
+    foreach ($rule in $executionContextsConfig.ContextDetectionRules) {
+        if ($rule.PSObject.Properties.Name -contains 'organiser_patterns') {
+            foreach ($org in $rule.organiser_patterns) {
+                if ($org -and $organiserLower -match [regex]::Escape($org.ToLower())) {
+                    return $rule.context
+                }
+            }
+        }
+    }
+    return ""
+}
+
 if ($capabilitiesConfig -and $ownershipRulesConfig) {
     Write-Host "EIP 1.2 Ownership & Governance config loaded ✅"
 } else {
@@ -448,11 +484,22 @@ function Get-TopicSentiment {
 }
 
 function Classify-Topic {
-    param($topicText)
+    param(
+        $topicText,
+        # Optional: meeting context string (e.g. "NPI-managed", "Product Development").
+        # When supplied, context_bias multipliers and NpiContextGuard are applied to scoring.
+        [string]$MeetingContext = ""
+    )
 
     $cleanText = $topicText.ToLower()
-    $bestMatch = $null
-    $maxDensity = 0.0
+    $scores    = @{}   # TopicId -> weighted density score
+
+    # --- Resolve NpiContextGuard once (if context supplied) ---
+    $npiGuard = $null
+    if ($MeetingContext -and $mappingRules.PSObject.Properties.Name -contains 'SemanticIntegrityRules') {
+        $npiGuard = $mappingRules.SemanticIntegrityRules | Where-Object { $_.id -eq "NpiContextGuard" } | Select-Object -First 1
+    }
+    $npiActive = $npiGuard -and ($npiGuard.trigger_contexts -contains $MeetingContext)
 
     foreach ($rule in $mappingRules.Rules) {
         $hits = 0
@@ -461,28 +508,84 @@ function Classify-Topic {
             if ($cleanText -match $pattern) { $hits++ }
         }
 
-        if ($hits -gt 0) {
-            # Suppress keyword check — if any suppress_keywords match, penalise this rule heavily
-            $suppressed = $false
-            if ($rule.PSObject.Properties.Name -contains 'suppress_keywords' -and $rule.suppress_keywords) {
-                foreach ($sk in $rule.suppress_keywords) {
-                    if ($cleanText -match [regex]::Escape($sk.ToLower())) { $suppressed = $true; break }
+        if ($hits -eq 0) { continue }
+
+        # Suppress keyword check — if any suppress_keywords match, skip this rule entirely
+        $suppressed = $false
+        if ($rule.PSObject.Properties.Name -contains 'suppress_keywords' -and $rule.suppress_keywords) {
+            foreach ($sk in $rule.suppress_keywords) {
+                if ($cleanText -match [regex]::Escape($sk.ToLower())) { $suppressed = $true; break }
+            }
+        }
+        if ($suppressed) { continue }
+
+        # Base density score (hits relative to keywords available)
+        $density = $hits / $rule.Keywords.Count
+
+        # --- critical_keywords override ---
+        # If any critical_keyword matches, this topic bypasses ALL context suppression (3.0x multiplier).
+        # Used for unambiguous financial/risk escalation signals (e.g. "BOM overrun", "budget breach")
+        # that must reach CFO/CEO even when detected inside an NPI or product-dev meeting.
+        $criticalHit = $false
+        if ($rule.PSObject.Properties.Name -contains 'critical_keywords' -and $rule.critical_keywords) {
+            foreach ($ck in $rule.critical_keywords) {
+                if ($cleanText -match [regex]::Escape($ck.ToLower())) {
+                    $criticalHit = $true
+                    Write-Verbose "  [CRITICAL KW] $($rule.TopicId) critical_keyword matched: '$ck' — context suppression bypassed"
+                    break
                 }
             }
-            if ($suppressed) { continue }
+        }
 
-            # Density score (hits relative to keywords available)
-            $density = $hits / $rule.Keywords.Count
-            if ($density -gt $maxDensity) {
-                $maxDensity = $density
-                $bestMatch = $rule.TopicId
+        if ($criticalHit) {
+            # Bypass all context and NPI multipliers — use boosted raw density
+            $density *= 3.0
+            $scores[$rule.TopicId] = $density
+            continue
+        }
+
+        # --- context_bias multiplier ---
+        if ($MeetingContext -and $rule.PSObject.Properties.Name -contains 'context_bias' -and $rule.context_bias) {
+            $boostIn    = if ($rule.context_bias.PSObject.Properties.Name -contains 'boost_in')    { $rule.context_bias.boost_in }    else { @() }
+            $suppressIn = if ($rule.context_bias.PSObject.Properties.Name -contains 'suppress_in') { $rule.context_bias.suppress_in } else { @() }
+
+            if ($boostIn -contains $MeetingContext) {
+                $density *= 1.5
+                Write-Verbose "  [CTX BIAS] $($rule.TopicId) boosted (context: $MeetingContext)"
+            } elseif ($suppressIn -contains $MeetingContext) {
+                $density *= 0.3
+                Write-Verbose "  [CTX BIAS] $($rule.TopicId) suppressed (context: $MeetingContext)"
             }
+        }
+
+        # --- NpiContextGuard multiplier (applied on top of context_bias) ---
+        if ($npiActive) {
+            if ($npiGuard.promote_topics -contains $rule.TopicId) {
+                $density *= $npiGuard.promote_multiplier
+                Write-Verbose "  [NPI GUARD] $($rule.TopicId) promoted (NpiContextGuard)"
+            } elseif ($npiGuard.demote_topics -contains $rule.TopicId) {
+                $density *= $npiGuard.demote_multiplier
+                Write-Verbose "  [NPI GUARD] $($rule.TopicId) demoted (NpiContextGuard)"
+            }
+        }
+
+        $scores[$rule.TopicId] = $density
+    }
+
+    # Pick the highest scoring topic
+    $bestMatch  = $null
+    $maxDensity = 0.0
+    foreach ($tid in $scores.Keys) {
+        if ($scores[$tid] -gt $maxDensity) {
+            $maxDensity = $scores[$tid]
+            $bestMatch  = $tid
         }
     }
 
     if (-not $bestMatch) {
         # Fallback to Strategy (T15) — safest catch-all for executive discussion
-        $bestMatch = "T15"
+        # But if NPI guard is active, fall back to T07 (Development Execution) instead
+        $bestMatch = if ($npiActive) { "T07" } else { "T15" }
     }
 
     $topicInfo = $taxonomy.Topics.$bestMatch
@@ -501,6 +604,8 @@ function Classify-Topic {
         Domain         = $familyInfo.Domain
         CategoryHints  = $contextHints
         Score          = $maxDensity
+        ContextApplied = $MeetingContext
+        NpiGuardActive = $npiActive
     }
 }
 
@@ -611,7 +716,14 @@ function Select-Category {
 }
 
 function Enrich-Summary {
-    param($summaryText, $meetingId, $historyRecords, $InitialRecords = @())
+    param(
+        $summaryText,
+        $meetingId,
+        $historyRecords,
+        $InitialRecords = @(),
+        # Optional: meeting context for context-aware topic scoring (e.g. "NPI-managed", "Product Development")
+        [string]$MeetingContext = ""
+    )
 
     if (-not $summaryText) { return @{ Summary = $null; Records = @() } }
 
@@ -693,7 +805,7 @@ function Enrich-Summary {
         
         if (-not $bullets.Trim() -and $label -eq "General Discussion") { continue }
 
-        $cls = & "Classify-Topic" ($label + "`n" + $bullets)
+        $cls = & "Classify-Topic" ($label + "`n" + $bullets) -MeetingContext $MeetingContext
 
         # Brand conflict check on topic block
         $brandConflicts = Get-BrandConflicts -Text ($label + " " + $bullets)
@@ -818,7 +930,7 @@ function Enrich-Summary {
             $sublabel = if ($group.Name) { $group.Name } else { $stmts[0].StatementType }
             $finalSummary += "- ${sublabel}:`n"
             foreach ($s in $group.Group) {
-                $sCls = & "Classify-Topic" $s.Text
+                $sCls = & "Classify-Topic" $s.Text -MeetingContext $MeetingContext
                 $finalSummary += "  - [$($sCls.TopicId)] $($s.Text)`n"
             }
             $finalSummary += "`n"
@@ -917,7 +1029,11 @@ function Invoke-LLM {
         [hashtable]$Headers,
         [string]$Model,
         [int]$MaxTokens = 16000,
-        [string]$ResponseFormat = "text"
+        [string]$ResponseFormat = "text",
+        # Timeout and retry — read from LLMConfig if available, otherwise use these defaults
+        [int]$TimeoutSec = 300,
+        [int]$MaxRetries = 3,
+        [int]$RetryBackoffSec = 5
     )
     $bodyObj = @{
         model    = $Model
@@ -935,24 +1051,38 @@ function Invoke-LLM {
     
     $body = $bodyObj | ConvertTo-Json -Depth 10
 
-    try {
-        $response     = Invoke-RestMethod -Method Post -Uri $FullUri -Headers $Headers -Body $body
-        $finishReason = $response.choices[0].finish_reason
-        if ($finishReason -ne "stop") {
-            Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
-            
-            # If JSON was requested but truncated, we log the raw partial for debugging
-            if ($ResponseFormat -eq "json_object") {
-                $truncatedLog = "truncated_llm_$(Get-Date -Format 'HHmmss').json"
-                $response.choices[0].message.content | Set-Content -Path (Join-Path $outDir $truncatedLog) -Encoding utf8
-                Write-Warning "  [LLM DIAG] Partial JSON saved to $truncatedLog"
+    $attempt = 0
+    while ($attempt -le $MaxRetries) {
+        $attempt++
+        try {
+            $response     = Invoke-RestMethod -Method Post -Uri $FullUri -Headers $Headers -Body $body -TimeoutSec $TimeoutSec
+            $finishReason = $response.choices[0].finish_reason
+            if ($finishReason -ne "stop") {
+                Write-Warning "  [LLM DIAG] finish_reason=$finishReason — response may be truncated"
+                
+                # If JSON was requested but truncated, we log the raw partial for debugging
+                if ($ResponseFormat -eq "json_object") {
+                    $truncatedLog = "truncated_llm_$(Get-Date -Format 'HHmmss').json"
+                    $response.choices[0].message.content | Set-Content -Path (Join-Path $outDir $truncatedLog) -Encoding utf8
+                    Write-Warning "  [LLM DIAG] Partial JSON saved to $truncatedLog"
+                }
+            }
+            return $response.choices[0].message.content
+        } catch {
+            $errMsg = "$_"
+            $isRetryable = $errMsg -match "Connection reset|transport connection|forcibly closed|timed out|timeout|502|503|504|temporarily unavailable"
+            if ($isRetryable -and $attempt -le $MaxRetries) {
+                $backoff = $RetryBackoffSec * $attempt
+                Write-Warning "  [LLM] Retryable error (attempt $attempt/$MaxRetries) — waiting ${backoff}s before retry. Error: $errMsg"
+                Start-Sleep -Seconds $backoff
+                # continue loop
+            } else {
+                Write-Warning "  [LLM] Call failed (attempt $attempt, non-retryable or max retries reached): $errMsg"
+                return $null
             }
         }
-        return $response.choices[0].message.content
-    } catch {
-        Write-Warning "  [LLM] Call failed: $_"
-        return $null
     }
+    return $null
 }
 
 # =========================
@@ -1562,6 +1692,16 @@ function Get-MeetingClassification {
             $chunks = Split-TranscriptIntoChunks -Text $transcriptContent -ChunkSize $chunkSize -Overlap $overlap
             Write-Host "  [LLM DIAG] Chunks: $($chunks.Count) (chunk size: $chunkSize chars)"
 
+            # --- Read configurable token limits and retry/timeout settings (with safe defaults) ---
+            $chunkSummaryMaxTok = if ($rules.LLMConfig.ChunkSummaryMaxTokens)   { [int]$rules.LLMConfig.ChunkSummaryMaxTokens }   else { 4000 }
+            $synthesisMaxTok    = if ($rules.LLMConfig.SynthesisMaxTokens)      { [int]$rules.LLMConfig.SynthesisMaxTokens }      else { 6000 }
+            $summaryMaxTok      = if ($rules.LLMConfig.SummaryMaxTokens)        { [int]$rules.LLMConfig.SummaryMaxTokens }        else { 8000 }
+            $recordsMaxTok      = if ($rules.LLMConfig.RecordsMaxTokens)        { [int]$rules.LLMConfig.RecordsMaxTokens }        else { 32000 }
+            $maxCombinedChars   = if ($rules.LLMConfig.MaxCombinedSummaryChars) { [int]$rules.LLMConfig.MaxCombinedSummaryChars } else { 80000 }
+            $llmTimeoutSec      = if ($rules.LLMConfig.RequestTimeoutSec)       { [int]$rules.LLMConfig.RequestTimeoutSec }       else { 300 }
+            $llmMaxRetries      = if ($rules.LLMConfig.MaxRetries)              { [int]$rules.LLMConfig.MaxRetries }              else { 3 }
+            $llmRetryBackoff    = if ($rules.LLMConfig.RetryBackoffSec)         { [int]$rules.LLMConfig.RetryBackoffSec }         else { 5 }
+
             # --- PASS 1: Summarise each chunk (lightweight prompt) ---
             $chunkSummaryPrompt = @"
 You are summarising a section of a meeting transcript.
@@ -1576,7 +1716,8 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $raw = Invoke-LLM -SystemPrompt $chunkSummaryPrompt `
                                   -UserContent "Transcript section $chunkNum/$($chunks.Count):`n`n$chunk" `
                                   -FullUri $fullUri -Headers $llmHeaders `
-                                  -Model $rules.LLMConfig.Model -MaxTokens 4000
+                                  -Model $rules.LLMConfig.Model -MaxTokens $chunkSummaryMaxTok `
+                                  -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                 if ($raw) { $chunkSummaries += "### Section $chunkNum`n$raw" }
             }
 
@@ -1593,12 +1734,25 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                         if ($i+1 -lt $currentSummaries.Count) { $pair += "`n`n" + $currentSummaries[$i+1] }
                         
                         $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail."
-                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $rules.LLMConfig.Model -MaxTokens 6000
+                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $rules.LLMConfig.Model -MaxTokens $synthesisMaxTok `
+                                          -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                         if ($syn) { $nextTier += $syn }
                     }
                     $currentSummaries = $nextTier
                 }
                 $combinedSummaries = $currentSummaries -join "`n`n"
+
+                # --- Guard: trim combined summaries if over budget ---
+                # The records call needs headroom for the prompt + full JSON output.
+                # If combinedSummaries is very large, trim from the front (oldest sections) preserving the tail.
+                if ($combinedSummaries.Length -gt $maxCombinedChars) {
+                    Write-Warning "  [LLM DIAG] Combined summaries ($($combinedSummaries.Length) chars) exceeds MaxCombinedSummaryChars ($maxCombinedChars). Trimming oldest sections."
+                    $combinedSummaries = $combinedSummaries.Substring($combinedSummaries.Length - $maxCombinedChars)
+                    # Re-align to start of a section header if possible
+                    $sectionIdx = $combinedSummaries.IndexOf("### Section")
+                    if ($sectionIdx -gt 0) { $combinedSummaries = $combinedSummaries.Substring($sectionIdx) }
+                }
+                Write-Host "  [LLM DIAG] Combined summaries: $($combinedSummaries.Length) chars feeding Pass 3" -ForegroundColor Gray
                 
                 # --- PASS 3: Decoupled Output Calls ---
                 Write-Host "  [LLM DIAG] Synthesising final Leadership Summary..." -ForegroundColor Gray
@@ -1607,17 +1761,26 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
                                          -FullUri $fullUri -Headers $llmHeaders `
-                                         -Model $rules.LLMConfig.Model -MaxTokens 8000 `
-                                         -ResponseFormat "json_object"
+                                         -Model $rules.LLMConfig.Model -MaxTokens $summaryMaxTok `
+                                         -ResponseFormat "json_object" `
+                                         -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
 
-                Write-Host "  [LLM DIAG] Extracting Topic Records..." -ForegroundColor Gray
-                $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'records' array. Leave 'summary' as an empty string."
-                
-                $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
-                                         -UserContent $combinedSummaries `
-                                         -FullUri $fullUri -Headers $llmHeaders `
-                                         -Model $rules.LLMConfig.Model -MaxTokens 12000 `
-                                         -ResponseFormat "json_object"
+                # Fix C: Gate records call on summary success.
+                # If the summary call failed (connection reset, timeout, etc.) after all retries,
+                # skip the records call — it would produce orphaned output with no summary context.
+                if (-not $summaryRaw) {
+                    Write-Warning "  [LLM DIAG] Summary call failed after $llmMaxRetries retries — skipping records call. Will fall through to heuristic fallback."
+                } else {
+                    Write-Host "  [LLM DIAG] Extracting Topic Records (max tokens: $recordsMaxTok)..." -ForegroundColor Gray
+                    $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'records' array. Leave 'summary' as an empty string. Be thorough — include ALL topics identified in the summaries. Do not truncate."
+                    
+                    $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
+                                             -UserContent $combinedSummaries `
+                                             -FullUri $fullUri -Headers $llmHeaders `
+                                             -Model $rules.LLMConfig.Model -MaxTokens $recordsMaxTok `
+                                             -ResponseFormat "json_object" `
+                                             -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
+                }
 
                 $finalResult = @{
                     classification = "CEO"
@@ -1789,11 +1952,25 @@ function Publish-SummaryToConfluence {
     $headers = @{ Authorization = "Basic $encodedCreds"; "Content-Type" = "application/json"; Accept = "application/json" }
 
     try {
-        $spaceUrl = "$baseUrl/api/v2/spaces?keys=$SpaceKey"
+        # --- Resolve spaceId from SpaceKey ---
+        $spaceUrl      = "$baseUrl/api/v2/spaces?keys=$([uri]::EscapeDataString($SpaceKey))&limit=1"
         $spaceResponse = Invoke-RestMethod -Uri $spaceUrl -Headers $headers -Method Get
-        $spaceId = $spaceResponse.results[0].id
-        
-        $body = @{ spaceId = $spaceId; status = "current"; title = $Title; parentId = $ParentPageId; body = @{ representation = "storage"; value = $HtmlContent } } | ConvertTo-Json -Depth 10
+        $spaceId       = if ($spaceResponse.results -and $spaceResponse.results.Count -gt 0) { $spaceResponse.results[0].id } else { $null }
+
+        if (-not $spaceId) {
+            Write-Warning "  [CONFLUENCE] Cannot resolve spaceId for SpaceKey='$SpaceKey' — skipping mirror."
+            return $null
+        }
+
+        # --- Build page body (omit parentId if null/empty — avoids 404 on bad parent) ---
+        $pageBodyObj = @{
+            spaceId = $spaceId
+            status  = "current"
+            title   = $Title
+            body    = @{ representation = "storage"; value = $HtmlContent }
+        }
+        if ($ParentPageId) { $pageBodyObj.parentId = "$ParentPageId" }
+        $body = $pageBodyObj | ConvertTo-Json -Depth 10
 
         $targetPage = $null
         try {
@@ -1801,15 +1978,34 @@ function Publish-SummaryToConfluence {
             Write-Host "  [CONFLUENCE] Created new page: $($targetPage.id)"
         }
         catch {
-            if ($_.Exception.Message -match "400" -or $_.Exception.Message -match "Already exists") {
-                $searchUrl = "$baseUrl/api/v2/pages?spaceKey=$SpaceKey&title=$([uri]::EscapeDataString($Title))&limit=1"
-                $existing = (Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get).results[0]
+            $errMsg = "$($_.Exception.Message)"
+            if ($errMsg -match "400|409|Already exists|title already used") {
+                # Page already exists — find and update it
+                # Use v2 API with space-id filter (not spaceKey which is v1)
+                $searchUrl = "$baseUrl/api/v2/pages?space-id=$spaceId&title=$([uri]::EscapeDataString($Title))&limit=1"
+                $searchResponse = $null
+                try { $searchResponse = Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get } catch {}
+                $existing = if ($searchResponse -and $searchResponse.results) { $searchResponse.results[0] } else { $null }
+
                 if ($existing) {
-                    $updateBody = @{ id = $existing.id; status = "current"; title = $Title; spaceId = $spaceId; version = @{ number = $existing.version.number + 1 }; body = @{ representation = "storage"; value = $HtmlContent } } | ConvertTo-Json -Depth 10
+                    $updateBodyObj = @{
+                        id      = $existing.id
+                        status  = "current"
+                        title   = $Title
+                        spaceId = $spaceId
+                        version = @{ number = [int]$existing.version.number + 1 }
+                        body    = @{ representation = "storage"; value = $HtmlContent }
+                    }
+                    if ($ParentPageId) { $updateBodyObj.parentId = "$ParentPageId" }
+                    $updateBody = $updateBodyObj | ConvertTo-Json -Depth 10
                     $targetPage = Invoke-RestMethod -Uri "$baseUrl/api/v2/pages/$($existing.id)" -Headers $headers -Method Put -Body $updateBody
-                    Write-Host "  [CONFLUENCE] Updated page to v$($targetPage.version.number)"
+                    Write-Host "  [CONFLUENCE] Updated page '$Title' to v$($targetPage.version.number)"
+                } else {
+                    Write-Warning "  [CONFLUENCE] Page already exists but could not be found for update (space-id=$spaceId, title='$Title')"
                 }
-            } else { throw $_.Exception }
+            } else {
+                throw $_.Exception
+            }
         }
 
         if ($targetPage) {
@@ -1817,7 +2013,14 @@ function Publish-SummaryToConfluence {
             return "$($baseUrl.Replace('/wiki',''))/wiki$webui"
         }
     }
-    catch { Write-Warning "  [CONFLUENCE] Mirror failed: $($_.Exception.Message)" }
+    catch {
+        $errMsg = "$($_.Exception.Message)"
+        if ($errMsg -match "404") {
+            Write-Warning "  [CONFLUENCE] Mirror failed (404): SpaceKey='$SpaceKey' ParentPageId='$(if ($ParentPageId) { $ParentPageId } else { '(none)' })' Title='$Title' — check parent page ID exists in this space."
+        } else {
+            Write-Warning "  [CONFLUENCE] Mirror failed: $errMsg"
+        }
+    }
     return $null
 }
 
@@ -1826,15 +2029,20 @@ function Publish-TopicRecordToConfluence {
 
     if (-not $confMappings -or -not $script:pipelineConfig.enable_confluence_mirror) { return $null }
 
-    $mapping = $confMappings.domain_mappings.$Domain
-    $space = if ($mapping -and $mapping.space_key) { $mapping.space_key } else { $confMappings.default_space }
-    $parent = if ($mapping -and $mapping.parent_id) { $mapping.parent_id } else { $confMappings.default_parent_id }
+    $mapping = $confMappings.domain_mappings.PSObject.Properties | Where-Object { $_.Name -eq $Domain } | Select-Object -First 1
+    $mappingValue = if ($mapping) { $mapping.Value } else { $null }
+    $space  = if ($mappingValue -and $mappingValue.space_key) { $mappingValue.space_key } else { $confMappings.default_space }
+    $parent = if ($mappingValue -and $mappingValue.parent_id)  { $mappingValue.parent_id  } else { $confMappings.default_parent_id }
 
-    # If we have a space but no parent, we'll still attempt to publish (it may go to space root)
-    if (-not $space) { return $null }
+    if (-not $space) {
+        Write-Warning "  [CONFLUENCE] No space resolved for domain='$Domain' — skipping topic record mirror."
+        return $null
+    }
+
+    Write-Host "  [CONFLUENCE] Topic mirror: domain=$Domain → space=$space parent=$(if ($parent) { $parent } else { '(space root)' })"
 
     $title = "[$TopicId] $TopicLabel ($($EventDate.ToString('yyyy-MM-dd')))"
-    $html = Convert-SummaryToConfluenceHtml -SummaryText $TopicRecordText -Subject $Subject -MeetingId $MeetingId -EventDate $EventDate -Organiser $Organiser
+    $html  = Convert-SummaryToConfluenceHtml -SummaryText $TopicRecordText -Subject $Subject -MeetingId $MeetingId -EventDate $EventDate -Organiser $Organiser
     
     return Publish-SummaryToConfluence -HtmlContent $html -Title $title -SpaceKey $space -ParentPageId $parent
 }
@@ -2197,7 +2405,11 @@ function Process-VttFile {
 
     # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
     $initialRecords = if ($cls.records) { $cls.records } else { @() }
-    $enrichResult = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
+    # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
+    $vttExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
+    Write-Host "  [CTX] Execution context detected: $(if ($vttExecutionContext) { $vttExecutionContext } else { 'Unknown (no bias applied)' })"
+
+    $enrichResult = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $vttExecutionContext
     $enrichedSummaryText = $enrichResult.Summary
     
     # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
@@ -2254,8 +2466,9 @@ function Process-VttFile {
             Upload-FileToSharePoint -DriveId $script:driveId -FolderId $topicFolderId -FilePath $trLocalPath | Out-Null
             
             # Confluence Topic Record Mirror
+            $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
             try {
-                Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
+                Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
             } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
             # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
@@ -2580,7 +2793,11 @@ if ($VttFile) {
     
     # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
     $initialRecords = if ($cls.records) { $cls.records } else { @() }
-    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
+    # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
+    $vttDirectExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
+    Write-Host "  [CTX] Execution context detected: $(if ($vttDirectExecutionContext) { $vttDirectExecutionContext } else { 'Unknown (no bias applied)' })"
+
+    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $vttDirectExecutionContext
     $enrichedSummaryText = if ($enrichResult.Summary) { $enrichResult.Summary } else { $cls.summary }
     $topicRecords3D      = if ($enrichResult.Records) { $enrichResult.Records } else { $initialRecords }
     $modeResult          = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
@@ -2621,8 +2838,9 @@ if ($VttFile) {
         Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
         
         # Confluence Topic Record Mirror
+        $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
         try {
-            Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
+            Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
         } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
         # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
@@ -3193,7 +3411,10 @@ foreach ($calendarEvent in $events) {
             # Phase 1-4: Stable Topic Classification & Consolidation
             # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
             $initialRecords = if ($cls.records) { $cls.records } else { @() }
-            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords
+            # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
+            $calExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
+            Write-Host "  [CTX] Execution context detected: $(if ($calExecutionContext) { $calExecutionContext } else { 'Unknown (no bias applied)' })"
+            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $calExecutionContext
             $enrichedSummaryText = $enrichResult.Summary
             
             # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
@@ -3298,8 +3519,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
                     
                     # Confluence Topic Record Mirror
+                    $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
                     try {
-                        Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicName -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
+                        Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
                     } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
                     # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)

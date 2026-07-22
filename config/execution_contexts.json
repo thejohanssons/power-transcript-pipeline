@@ -12,5 +12,134 @@
     "Project",
     "Ad Hoc",
     "Unknown"
+  ],
+  "ContextDetectionRules": [
+    {
+      "context": "NPI-managed",
+      "description": "NPI stage meetings — product is the interpretive lens regardless of who attends",
+      "subject_patterns": [
+        "NPI Stage",
+        "NPI Stage 0",
+        "NPI Stage 1",
+        "NPI Stage 2",
+        "NPI Stage 3",
+        "NPI Stage 4",
+        "New Product Introduction",
+        "Weekly Progress- Pilot Readiness",
+        "MVP Updates",
+        "MVP Scope",
+        "MVP catch-up",
+        "MVP Status",
+        "FCT discussion",
+        "Bang Enclosures"
+      ],
+      "organiser_patterns": [
+        "NPIProcess@scanningpens.com"
+      ],
+      "notes": "NPI meetings may include finance, ops and other dept speakers — context lens is always product development"
+    },
+    {
+      "context": "R&D Project",
+      "description": "R&D, engineering and technical product development meetings",
+      "subject_patterns": [
+        "Weekly R&D update",
+        "R&D update",
+        "Image scanning",
+        "Maltese TTS",
+        "Difficulty score",
+        "Service Menu requirements",
+        "Discuss Service Menu",
+        "Open Item Discussions",
+        "Mandar-Peter",
+        "Theo-Peter",
+        "WebKorps: Daily Progress",
+        "WebKorps Weekly",
+        "WebKorps",
+        "Service Project: Triage",
+        "SSPC"
+      ],
+      "organiser_patterns": [
+        "ProductDevelopment-Strategic@scanningpens.com",
+        "Mangesh@wizcomtech.com",
+        "mandar@wizcomtech.com",
+        "theo@empoweringtech.com",
+        "bhavesh@wizcomtech.com"
+      ],
+      "notes": "Includes Wizcom/WebKorps engineering sessions and R&D 1-2-1s"
+    },
+    {
+      "context": "Product Development",
+      "description": "Broader product development, pilot and education product meetings",
+      "subject_patterns": [
+        "Pilot Guide",
+        "Wizcom Pilot Marketing",
+        "Education Call",
+        "Wizcom and OSIE",
+        "Wizcom - SuperPen",
+        "C-pen / WG",
+        "compliance",
+        "MDR compliance",
+        "Reinecke and MDR"
+      ],
+      "organiser_patterns": [
+        "julia@empoweringtech.com",
+        "alison@empoweringtech.com"
+      ],
+      "notes": "Includes compliance meetings which are product quality / regulatory — CPO domain"
+    },
+    {
+      "context": "Executive Governance",
+      "description": "ExCo, cross-functional executive and governance meetings",
+      "subject_patterns": [
+        "ExCo daily",
+        "ExCo Finance Call",
+        "ExCo",
+        "Patent and IP review",
+        "Quarterly Sales & Marketing Call",
+        "Sales > Marketing Split",
+        "2026 Survey Feedback",
+        "automation test",
+        "source snapshot",
+        "chat about teams"
+      ],
+      "organiser_patterns": [
+        "carolynn@empoweringtech.com",
+        "IntellectualProperty@scanningpens.com"
+      ],
+      "notes": "carolynn organises ExCo and cross-functional sessions — treated as CEO/executive lens"
+    },
+    {
+      "context": "Finance BAU",
+      "description": "Finance, payment strategy and CFO-domain meetings",
+      "subject_patterns": [
+        "Payment Strategy",
+        "Finance Call",
+        "ExCo Finance Call",
+        "Budget",
+        "Accounts",
+        "CFO"
+      ],
+      "organiser_patterns": [],
+      "notes": "Payment Strategy is high-frequency (18x) CEO/finance meeting"
+    },
+    {
+      "context": "Commercial BAU",
+      "description": "Sales, marketing and commercial meetings",
+      "subject_patterns": [
+        "Sales Call",
+        "Marketing Call",
+        "Squid Call",
+        "Squid Call General",
+        "Squid Call - BD",
+        "Declined: Squid Call"
+      ],
+      "organiser_patterns": [
+        "jack@empoweringtech.com",
+        "quin@empoweringtech.com",
+        "ed@empoweringtech.com",
+        "toby@empoweringtech.com"
+      ],
+      "notes": "Squid is a commercial/sales partner — all Squid calls are commercial context"
+    }
   ]
 }

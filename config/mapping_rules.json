@@ -1,7 +1,19 @@
 {
-  "Version": "2.1",
-  "Description": "Topic keyword mapping rules for the EIP pipeline. Used by Step 3 (Semantic Extraction) to match transcript segments to taxonomy topics. Version 2.1 adds comprehensive keyword expansion for all 18 topics, suppress_keywords for noise reduction, semantic integrity rules for brand conflict detection, and e-pens / product-specific vocabulary.",
+  "Version": "2.2",
+  "Description": "Topic keyword mapping rules for the EIP pipeline. Used by Step 3 (Semantic Extraction) to match transcript segments to taxonomy topics. Version 2.2 adds context_bias per topic for meeting-context-aware scoring, NpiContextGuard semantic integrity rule, product-component vocabulary in T01/T07, and strengthened suppress_keywords on T18 to prevent product-UI terms bleeding into executive reporting topics.",
   "Changelog": [
+    {
+      "version": "2.2",
+      "date": "2026-07-21",
+      "changes": [
+        "Added context_bias blocks to all 18 topic rules — boost_in / suppress_in execution context lists",
+        "Added NpiContextGuard to SemanticIntegrityRules — meeting-type-based topic demotion/promotion for NPI and Product Development meetings",
+        "Added product-component vocabulary to T01 (Product Performance): dashboard, home screen, menu, UI element, navigation screen, settings screen, widget, app screen",
+        "Added product-component vocabulary to T07 (Development Execution): dashboard, admin panel, product UI, SuperPen UI, app interface",
+        "Added suppress_keywords to T18 (Delivery Confidence) to prevent product-UI terms (dashboard, home screen, UI, widget, component, feature, NPI) triggering executive reporting match",
+        "Context scoring: NPI-managed and Product Development contexts boost CPO-domain topics (T01,T02,T04,T05,T06,T07) and suppress CEO-domain topics (T15,T18)"
+      ]
+    },
     {
       "version": "2.1",
       "date": "2026-07-01",
@@ -35,9 +47,15 @@
         "C-Pen performance", "SuperPen performance", "pen performance",
         "EP-XP-S2 performance", "e-pens performance",
         "boot time", "startup", "wake", "sleep mode", "power consumption",
-        "Wi-Fi", "Bluetooth", "connectivity", "pairing", "USB", "sync"
+        "Wi-Fi", "Bluetooth", "connectivity", "pairing", "USB", "sync",
+        "dashboard", "home screen", "menu", "UI element", "navigation screen",
+        "settings screen", "widget", "app screen", "product UI"
       ],
       "suppress_keywords": ["marketing performance", "sales performance", "financial performance", "operational performance"],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project"],
+        "suppress_in": ["Executive Governance", "Commercial BAU", "Finance BAU"]
+      },
       "CategoryHints": ["Execution", "Problem", "Risk", "Opportunity", "Learning"]
     },
     {
@@ -56,6 +74,18 @@
         "non-compliant", "pass rate", "test coverage", "regression test"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "product recall", "field safety notice", "mandatory recall", "safety recall",
+        "regulatory action", "market withdrawal", "enforcement action", "injunction",
+        "non-compliant", "compliance failure", "certification failed", "failed certification",
+        "regulatory breach", "safety breach", "CE failed", "FCC failed", "UKCA failed",
+        "UL failed", "RoHS breach", "REACH breach", "EMC failure", "type approval failed",
+        "production suspended", "shipment suspended", "customs hold", "customs seizure"
+      ],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project"],
+        "suppress_in": ["Executive Governance", "Commercial BAU", "Finance BAU"]
+      },
       "CategoryHints": ["Governance", "Risk", "Execution"]
     },
     {
@@ -73,6 +103,10 @@
         "feature request", "user research", "usability study", "beta feedback"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project", "Commercial BAU"],
+        "suppress_in": ["Finance BAU", "IT BAU"]
+      },
       "CategoryHints": ["Opportunity", "Problem", "Learning"]
     },
     {
@@ -90,6 +124,10 @@
         "new feature", "feature freeze", "scope change", "change request"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project"],
+        "suppress_in": ["Executive Governance", "Commercial BAU", "Finance BAU"]
+      },
       "CategoryHints": ["Strategy", "Execution", "Governance"]
     },
     {
@@ -109,6 +147,18 @@
         "launch readiness", "launch plan", "launch review"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "launch cancelled", "launch failed", "launch delayed significantly",
+        "not ready to launch", "launch on hold", "programme on hold",
+        "milestone missed", "gate failed", "gate review failed", "gate not passed",
+        "readiness review failed", "not ready for mass production",
+        "NPI cancelled", "product cancelled", "programme cancelled",
+        "major milestone slip", "quarter slip", "half year slip"
+      ],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project", "Programme"],
+        "suppress_in": ["Finance BAU", "IT BAU"]
+      },
       "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"]
     },
     {
@@ -126,6 +176,20 @@
         "red flag", "amber flag", "escalation", "at risk"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "production halt", "factory stop", "factory shutdown", "factory down",
+        "critical path breach", "critical path slip", "critical path at risk",
+        "hard stop", "NPI stopped", "NPI on hold", "programme stopped",
+        "launch blocked", "ship date missed", "ship date at risk",
+        "tooling failure", "tooling scrapped", "tooling rejected",
+        "supplier failure", "supplier collapse", "sole source risk",
+        "mass production blocked", "MP blocked", "MP at risk",
+        "DVT failure", "PVT failure", "EVT failure", "factory acceptance failed"
+      ],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project", "Programme"],
+        "suppress_in": ["Finance BAU", "IT BAU"]
+      },
       "CategoryHints": ["Problem", "Risk", "Execution"]
     },
     {
@@ -141,9 +205,14 @@
         "pull request", "PR", "merge", "branch", "commit", "CI", "CD",
         "pipeline", "build system", "release candidate", "RC",
         "bug fix", "patch", "hotfix", "sprint review", "demo",
-        "technical debt", "refactor", "architecture", "module"
+        "technical debt", "refactor", "architecture", "module",
+        "dashboard", "admin panel", "product UI", "SuperPen UI", "app interface"
       ],
       "suppress_keywords": ["pipeline strategy", "sales pipeline", "revenue pipeline"],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project"],
+        "suppress_in": ["Executive Governance", "Commercial BAU", "Finance BAU", "Operational BAU"]
+      },
       "CategoryHints": ["Execution", "Learning", "Problem", "Risk"]
     },
     {
@@ -159,6 +228,15 @@
         "cash burn", "burn rate", "monthly burn", "forecast cash"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "cash impact", "cash flow concern", "cash flow risk", "liquidity risk",
+        "capital request", "unbudgeted", "emergency funding", "funding gap",
+        "burn rate concern", "runway", "NPI cash", "cash shortfall"
+      ],
+      "context_bias": {
+        "boost_in": ["Finance BAU", "Executive Governance"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project"]
+      },
       "CategoryHints": ["Risk", "Strategy", "Governance"]
     },
     {
@@ -175,6 +253,16 @@
         "tariff impact", "duty", "import cost"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "cost overrun", "BOM overrun", "tooling cost", "tooling overrun",
+        "NPI budget", "over budget", "budget breach", "margin erosion",
+        "below margin", "below target margin", "write-off", "P&L impact",
+        "unbudgeted cost", "cost escalation", "capital expenditure overrun"
+      ],
+      "context_bias": {
+        "boost_in": ["Finance BAU", "Executive Governance", "NPI-managed"],
+        "suppress_in": ["R&D Project", "IT BAU"]
+      },
       "CategoryHints": ["Execution", "Risk", "Governance", "Strategy"]
     },
     {
@@ -192,6 +280,15 @@
         "C-Pen sales", "SuperPen sales", "e-pens sales", "Scanning Pens revenue"
       ],
       "suppress_keywords": ["development pipeline", "firmware pipeline"],
+      "critical_keywords": [
+        "revenue at risk", "revenue shortfall", "missed target", "deal lost",
+        "lost revenue", "revenue impact", "commercial breach", "contract penalty",
+        "customer cancellation", "churn impact", "revenue write-off"
+      ],
+      "context_bias": {
+        "boost_in": ["Commercial BAU", "Executive Governance"],
+        "suppress_in": ["NPI-managed", "R&D Project", "IT BAU"]
+      },
       "CategoryHints": ["Opportunity", "Risk", "Strategy", "Execution"]
     },
     {
@@ -207,6 +304,15 @@
         "financial forecast", "sensitivity", "scenario planning", "stress test"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "financial exposure", "forex risk", "currency risk", "credit risk",
+        "debt covenant", "covenant breach", "financial breach", "insolvency risk",
+        "bad debt", "credit note", "write-down", "impairment", "material risk"
+      ],
+      "context_bias": {
+        "boost_in": ["Finance BAU", "Executive Governance"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project"]
+      },
       "CategoryHints": ["Risk", "Strategy", "Governance"]
     },
     {
@@ -222,6 +328,10 @@
         "skills gap", "competency", "performance review"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["Executive Governance", "Operational BAU"],
+        "suppress_in": ["NPI-managed", "Finance BAU", "IT BAU"]
+      },
       "CategoryHints": ["Governance", "Execution", "Learning", "Risk"]
     },
     {
@@ -236,6 +346,10 @@
         "prioritise", "deprioritise", "trade-off", "opportunity cost"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["NPI-managed", "Product Development", "R&D Project", "Executive Governance"],
+        "suppress_in": ["Finance BAU", "IT BAU"]
+      },
       "CategoryHints": ["Execution", "Risk", "Problem", "Governance"]
     },
     {
@@ -252,7 +366,11 @@
         "returns", "RMA process", "after-sales", "support",
         "SLA", "KPI", "dashboard", "reporting", "metrics"
       ],
-      "suppress_keywords": [],
+      "suppress_keywords": ["product dashboard", "SuperPen dashboard", "C-Pen dashboard", "UI dashboard", "app dashboard"],
+      "context_bias": {
+        "boost_in": ["Operational BAU", "Commercial BAU"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project"]
+      },
       "CategoryHints": ["Execution", "Governance", "Problem", "Risk"]
     },
     {
@@ -270,6 +388,18 @@
         "exit strategy", "M&A", "acquisition", "divestiture"
       ],
       "suppress_keywords": [],
+      "critical_keywords": [
+        "business at risk", "company at risk", "existential risk", "existential threat",
+        "strategic pivot", "major pivot", "change of direction", "strategy abandoned",
+        "board escalation", "investor escalation", "investor concern", "investor pull-out",
+        "funding withdrawn", "funding collapse", "strategic partner lost",
+        "market exit", "product line exit", "business unit closure",
+        "CEO decision required", "board decision required", "board approval required"
+      ],
+      "context_bias": {
+        "boost_in": ["Executive Governance", "Programme"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project", "IT BAU"]
+      },
       "CategoryHints": ["Strategy", "Governance", "Opportunity", "Risk"]
     },
     {
@@ -288,6 +418,10 @@
         "WizCom competitor", "scanning pen competitor", "alternative product"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["Executive Governance", "Commercial BAU", "Programme"],
+        "suppress_in": ["NPI-managed", "R&D Project", "IT BAU"]
+      },
       "CategoryHints": ["Strategy", "Opportunity", "Learning"]
     },
     {
@@ -305,6 +439,10 @@
         "upsell opportunity", "cross-sell opportunity", "adjacent market"
       ],
       "suppress_keywords": [],
+      "context_bias": {
+        "boost_in": ["Executive Governance", "Commercial BAU", "Programme"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project", "IT BAU"]
+      },
       "CategoryHints": ["Opportunity", "Strategy", "Execution"]
     },
     {
@@ -319,7 +457,15 @@
         "RAG", "red amber green", "status report", "dashboard",
         "programme health", "portfolio review"
       ],
-      "suppress_keywords": [],
+      "suppress_keywords": [
+        "product dashboard", "SuperPen dashboard", "C-Pen dashboard", "UI dashboard", "app dashboard",
+        "home screen", "UI", "widget", "UI element", "app screen", "navigation screen", "settings screen",
+        "feature", "component", "NPI", "firmware", "sprint", "backlog", "build"
+      ],
+      "context_bias": {
+        "boost_in": ["Executive Governance", "Programme"],
+        "suppress_in": ["NPI-managed", "Product Development", "R&D Project"]
+      },
       "CategoryHints": ["Learning", "Risk", "Strategy"]
     }
   ],
@@ -360,6 +506,18 @@
       "conflict_type": "BrandCastConflict",
       "severity": "info",
       "suppress_keywords": ["banking", "funding", "overdraft", "account", "payment", "revenue", "cash flow"]
+    },
+    {
+      "id": "NpiContextGuard",
+      "description": "Segments from NPI-managed or Product Development meetings should have CEO-domain topics (T15 Strategic Direction, T18 Delivery Confidence) demoted and CPO-domain topics (T01 Product Performance, T05 Delivery Progress, T06 Delivery Risk, T07 Development Execution) promoted. Terms like 'dashboard', 'reporting', 'status', 'on track' in NPI/product dev context refer to product build state, NOT executive programme reporting. Note: NPI meetings may include speakers from across departments (finance, ops) but the interpretive lens is always product development.",
+      "trigger_contexts": ["NPI-managed", "Product Development", "R&D Project"],
+      "demote_topics": ["T15", "T18"],
+      "promote_topics": ["T01", "T05", "T06", "T07"],
+      "demote_multiplier": 0.3,
+      "promote_multiplier": 1.5,
+      "conflict_type": "NpiContextGuard",
+      "severity": "info",
+      "notes": "Speaker diversity does not change the context lens. Even if finance or ops are in an NPI meeting, topics discussed there are interpreted through the product development lens unless the segment is explicitly a standalone finance/ops update."
     }
   ],
 

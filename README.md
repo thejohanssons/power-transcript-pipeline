@@ -20,6 +20,7 @@ graph TD
 
 - **SDK-Free Graph Integration**: Uses standard REST API calls (`Invoke-RestMethod`) to avoid common "Assembly already loaded" SDK conflicts in Azure Functions.
 - **Azure Function Native**: Includes a pre-configured `TranscriptJob` with a daily timer trigger (Default: 2:00 AM).
+- **7-Day Retry Window**: Automated runs look back 7 days by default. This ensures that any transcripts that failed or were delayed in previous runs are retried, while built-in deduplication (SKIP logic) prevents duplicate processing.
 - **SharePoint Integration**: Automatically organizes transcripts into month-based folders (`YYYY-MM`) and maintains execution logs.
 - **Resilient Execution**: Configured with a 10-minute timeout to handle large batches of meetings.
 

@@ -1,15 +1,16 @@
 {
   "domain_mappings": {
-    "Product": { "space_key": "WPM", "parent_id": null },
-    "Technology": { "space_key": "RnD", "parent_id": null },
-    "Operations": { "space_key": "Manufacturing", "parent_id": null },
-    "SupplyChain": { "space_key": "SCM", "parent_id": null },
-    "Governance": { "space_key": "PWMN", "parent_id": "2102919177" },
-    "Finance": { "space_key": "PWMN", "parent_id": "2102919177" },
-    "People": { "space_key": "PWMN", "parent_id": "2102919177" },
-    "Sales": { "space_key": "PWMN", "parent_id": "2102919177" },
-    "Marketing": { "space_key": "PWMN", "parent_id": "2102919177" },
-    "IT": { "space_key": "DevOps", "parent_id": null }
+    "Product":     { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Technology":  { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Operations":  { "space_key": "PWMN", "parent_id": "2102919177" },
+    "SupplyChain": { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Governance":  { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Finance":     { "space_key": "PWMN", "parent_id": "2102919177" },
+    "People":      { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Sales":       { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Marketing":   { "space_key": "PWMN", "parent_id": "2102919177" },
+    "IT":          { "space_key": "PWMN", "parent_id": "2102919177" },
+    "Strategy":    { "space_key": "PWMN", "parent_id": "2102919177" }
   },
   "default_space": "PWMN",
   "default_parent_id": "2102919177"
