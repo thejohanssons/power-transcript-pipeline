@@ -3325,9 +3325,12 @@ foreach ($calendarEvent in $events) {
         
         $transcriptsForThisEvent = @($transcripts.value | Where-Object { 
             $_.createdDateTime -and ([datetime]$_.createdDateTime) -ge $windowStart -and ([datetime]$_.createdDateTime) -le $windowEnd
-        } | Sort-Object { [Math]::Abs(([datetime]$_.createdDateTime - $eventStartTime).Ticks) }) # Closest first
-        
+        } | Sort-Object { [datetime]$_.createdDateTime }) # Chronological order for concatenation
+
         Write-Host "  [DIAG] Found $($transcriptsForThisEvent.Count) matching transcript(s) for this date." -ForegroundColor Gray
+        if ($transcriptsForThisEvent.Count -gt 1) {
+            Write-Warning "  [DIAG] Multiple transcripts detected — meeting may have disconnected and restarted. Concatenating $($transcriptsForThisEvent.Count) segments into one."
+        }
 
         if (-not $transcriptsForThisEvent -or $transcriptsForThisEvent.Count -eq 0) {
             $isChannelCandidate = $joinUrl -match "threadId"
@@ -3354,21 +3357,17 @@ foreach ($calendarEvent in $events) {
             continue
         }
 
+        # --- Fetch and concatenate all transcript segments (handles split/reconnected meetings) ---
+        $contentSegments = [System.Collections.Generic.List[string]]::new()
         foreach ($t in $transcriptsForThisEvent) {
             $transcriptId = $t.id
-            $cleanSubject = $subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
-            $timestamp = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
-            $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
-
             $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
-            
-            # --- Robust Content Fetching (with retries for 404s) ---
-            $content = $null
+            $segmentContent = $null
             $retryLimit = 3
             $retryCount = 0
-            while ($null -eq $content -and $retryCount -lt $retryLimit) {
+            while ($null -eq $segmentContent -and $retryCount -lt $retryLimit) {
                 try {
-                    $content = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
+                    $segmentContent = Invoke-RestMethod -Method Get -Uri $contentUri -Headers $authHeader
                 } catch {
                     $err = $_.Exception.Message
                     if ($err -match "404") {
@@ -3377,16 +3376,31 @@ foreach ($calendarEvent in $events) {
                         Start-Sleep -Seconds (2 * $retryCount)
                     } elseif ($err -match "403") {
                         Write-Host "  [DIAG] Content access forbidden (403). Policy may still be propagating for $organiserId." -ForegroundColor Yellow
-                        break # Don't retry 403s
+                        break
                     } else {
-                        throw $_ # Re-throw other errors to be caught by the main meeting loop
+                        throw $_
                     }
                 }
             }
+            if ($segmentContent) { $contentSegments.Add($segmentContent) }
+        }
 
-            if ($null -eq $content) {
-                throw "Failed to fetch transcript content after $retryLimit attempts or due to terminal error."
-            }
+        if ($contentSegments.Count -eq 0) {
+            throw "Failed to fetch transcript content after $retryLimit attempts or due to terminal error."
+        }
+
+        # Concatenate segments — insert a session break marker between parts
+        $content = if ($contentSegments.Count -eq 1) {
+            $contentSegments[0]
+        } else {
+            $contentSegments -join "`n`n[SESSION BREAK — meeting reconnected]`n`n"
+        }
+
+        $cleanSubject = $subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
+        $timestamp = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
+        $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
+
+        if ($true) { # scope block to preserve indentation parity with original foreach
 
             # --- METADATA ENHANCEMENT ---
             $mId = Get-MeetingLogId -EventDate $start -Subject $subject
@@ -3705,7 +3719,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
                 }
             }
-        }
+        } # end if ($true) scope block
     }
     catch {
         $errMessage = $_.Exception.Message
