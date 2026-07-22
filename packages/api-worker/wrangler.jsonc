@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eip-api-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eip-platform",
+      "database_id": "9a989055-0e00-4c0d-a046-bd87af8001b0",
+      "migrations_dir": "../d1/migrations"
+    }
+  ],
+
+  // R2 binding — uncomment once R2 is enabled in Cloudflare Dashboard
+  // "r2_buckets": [
+  //   { "binding": "STORAGE", "bucket_name": "eip-platform" }
+  // ],
+
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+
+  "env": {
+    "staging": {
+      "name": "eip-api-worker-staging",
+      "vars": { "ENVIRONMENT": "staging" }
+    }
+  }
+}
