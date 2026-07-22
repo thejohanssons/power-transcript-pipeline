@@ -38,8 +38,8 @@ $apiWorkerBase = "https://eip-api-worker.homeassistant-8d3.workers.dev"
 $spHostname    = "scanningpens.sharepoint.com"
 $spSitePath    = "/sites/MeetingIntelligence"
 $tenantId      = if ($env:GRAPH_TENANT_ID)    { $env:GRAPH_TENANT_ID }    else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
-$clientId      = if ($env:GRAPH_CLIENT_ID)    { $env:GRAPH_CLIENT_ID }    else { throw "GRAPH_CLIENT_ID not set" }
-$clientSecret  = if ($env:GRAPH_CLIENT_SECRET){ $env:GRAPH_CLIENT_SECRET } else { throw "GRAPH_CLIENT_SECRET not set" }
+$clientId      = $env:GRAPH_CLIENT_ID
+$clientSecret  = $env:GRAPH_CLIENT_SECRET
 
 # ---------------------------------------------------------------
 # LOAD PEOPLE CONFIG (for display name + role lookup)
@@ -67,25 +67,10 @@ function Get-PersonInfo {
     $p = $peopleConfig | Where-Object { $_.id -eq $PersonId } | Select-Object -First 1
     if (-not $p) { return @{ display_name = $null; role = $null } }
     return @{
-        display_name = $p.display_name ?? $p.name ?? $null
+        display_name = $p.canonical_name ?? $p.display_name ?? $p.name ?? $null
         role         = $p.role ?? $p.title ?? $null
     }
 }
-
-# ---------------------------------------------------------------
-# GET GRAPH TOKEN
-# ---------------------------------------------------------------
-$tokenBody = @{
-    grant_type    = "client_credentials"
-    client_id     = $clientId
-    client_secret = $clientSecret
-    scope         = "https://graph.microsoft.com/.default"
-}
-$tokenResp  = Invoke-RestMethod -Method Post `
-    -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
-    -Body $tokenBody -ContentType "application/x-www-form-urlencoded"
-$authHeader = @{ Authorization = "Bearer $($tokenResp.access_token)" }
-Write-Host "Graph token acquired ✅"
 
 # ---------------------------------------------------------------
 # LOAD PEOPLE LOG
@@ -96,7 +81,19 @@ if ($PeopleLogPath -and (Test-Path $PeopleLogPath)) {
     Write-Host "Loading people log from: $PeopleLogPath"
     $peopleLog = Get-Content $PeopleLogPath -Raw | ConvertFrom-Json
 } else {
+    if (-not $clientId -or -not $clientSecret) { throw "GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET must be set to download from SharePoint" }
     Write-Host "Downloading master_people_log.json from SharePoint..."
+    $tokenBody = @{
+        grant_type    = "client_credentials"
+        client_id     = $clientId
+        client_secret = $clientSecret
+        scope         = "https://graph.microsoft.com/.default"
+    }
+    $tokenResp  = Invoke-RestMethod -Method Post `
+        -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
+        -Body $tokenBody -ContentType "application/x-www-form-urlencoded"
+    $authHeader = @{ Authorization = "Bearer $($tokenResp.access_token)" }
+    Write-Host "Graph token acquired ✅"
     $siteUri   = "https://graph.microsoft.com/v1.0/sites/${spHostname}:${spSitePath}"
     $site      = Invoke-RestMethod -Uri $siteUri -Headers $authHeader
     $driveUri  = "https://graph.microsoft.com/v1.0/sites/$($site.id)/drives"

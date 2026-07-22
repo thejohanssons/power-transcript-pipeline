@@ -34,8 +34,8 @@ $apiWorkerBase = "https://eip-api-worker.homeassistant-8d3.workers.dev"
 $spHostname    = "scanningpens.sharepoint.com"
 $spSitePath    = "/sites/MeetingIntelligence"
 $tenantId      = if ($env:GRAPH_TENANT_ID)    { $env:GRAPH_TENANT_ID }    else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
-$clientId      = if ($env:GRAPH_CLIENT_ID)    { $env:GRAPH_CLIENT_ID }    else { throw "GRAPH_CLIENT_ID not set" }
-$clientSecret  = if ($env:GRAPH_CLIENT_SECRET){ $env:GRAPH_CLIENT_SECRET } else { throw "GRAPH_CLIENT_SECRET not set" }
+$clientId      = $env:GRAPH_CLIENT_ID
+$clientSecret  = $env:GRAPH_CLIENT_SECRET
 
 # ---------------------------------------------------------------
 # LOAD MASTER LOG
@@ -46,6 +46,7 @@ if ($MasterLogPath -and (Test-Path $MasterLogPath)) {
     Write-Host "Loading master log from local path: $MasterLogPath"
     $masterLog = Get-Content $MasterLogPath -Raw | ConvertFrom-Json
 } else {
+    if (-not $clientId -or -not $clientSecret) { throw "GRAPH_CLIENT_ID and GRAPH_CLIENT_SECRET must be set to download from SharePoint" }
     Write-Host "Downloading master log from SharePoint..."
     $tokenBody = @{
         grant_type    = "client_credentials"
@@ -90,6 +91,9 @@ foreach ($meeting in $meetings) {
     $meetingDate = try { (Get-Date $eventDate -Format "yyyy-MM-dd") } catch { $eventDate.ToString().Substring(0,10) }
     $context     = $meeting.Classification ?? $meeting.Mode ?? "Unknown"
     $organiser   = $meeting.Organiser ?? ""
+
+    # Skip source_snapshot test/verification entries
+    if ($meetingId -match 'source_snapshot') { Write-Verbose "  Skipping source_snapshot: $meetingId"; continue }
 
     if (-not $meeting.TopicRecords -or $meeting.TopicRecords.Count -eq 0) { continue }
 

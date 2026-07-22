@@ -5,18 +5,19 @@
 # ============================================================
 <#
 .SYNOPSIS
-    Migrates EIP files from SharePoint to Cloudflare R2.
+    Migrates EIP transcript files from SharePoint to Cloudflare R2.
 
 .DESCRIPTION
-    One-time migration script. Enumerates transcript, summary, people, and log files
-    from SharePoint via Graph API and uploads them to the eip-platform R2 bucket.
-    Registers each transcript in D1 via the EIP API Worker.
+    One-time migration. Sources:
+    1. Petersplace site — Exec Intel Insights/Meeting transcripts/YYYY-MM/ (primary)
+       Includes transcripts, summaries, people files, and log files.
+    2. MeetingIntelligence site — Transcripts drive (HoD files only, not in Petersplace)
 
 .PARAMETER DryRun
-    If set, lists files that would be migrated without uploading.
+    Lists files that would be migrated without uploading.
 
 .PARAMETER FolderFilter
-    Optional YYYY-MM folder filter (e.g. "2026-06"). Migrates all folders if omitted.
+    Optional YYYY-MM folder filter (e.g. "2026-07"). All folders if omitted.
 
 .EXAMPLE
     ./migrate-to-r2.ps1 -DryRun
@@ -33,184 +34,216 @@ param(
 # ---------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------
-$apiWorkerBase   = "https://eip-api-worker.homeassistant-8d3.workers.dev"
-$r2BucketName    = "eip-platform"
-$spHostname      = "scanningpens.sharepoint.com"
-$spSitePath      = "/sites/MeetingIntelligence"
-$transcriptRoot  = "Meeting transcripts"  # root folder in SharePoint drive
+$apiWorkerBase  = "https://eip-api-worker.homeassistant-8d3.workers.dev"
+$r2BucketName   = "eip-platform"
+$tenantId       = if ($env:GRAPH_TENANT_ID) { $env:GRAPH_TENANT_ID } else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
+$clientId       = if ($env:GRAPH_CLIENT_ID) { $env:GRAPH_CLIENT_ID } else { throw "GRAPH_CLIENT_ID not set" }
+$clientSecret   = if ($env:GRAPH_CLIENT_SECRET) { $env:GRAPH_CLIENT_SECRET } else { throw "GRAPH_CLIENT_SECRET not set" }
 
-$tenantId        = if ($env:GRAPH_TENANT_ID)    { $env:GRAPH_TENANT_ID }    else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
-$clientId        = if ($env:GRAPH_CLIENT_ID)    { $env:GRAPH_CLIENT_ID }    else { throw "GRAPH_CLIENT_ID not set" }
-$clientSecret    = if ($env:GRAPH_CLIENT_SECRET){ $env:GRAPH_CLIENT_SECRET } else { throw "GRAPH_CLIENT_SECRET not set" }
+# Petersplace — primary source
+$ppSitePath     = "/sites/Petersplace"
+$ppTranscriptPath = "Exec Intel Insights/Meeting transcripts"
+
+# MeetingIntelligence — HoD files only
+$miSitePath     = "/sites/MeetingIntelligence"
+$miDriveName    = "Transcripts"
 
 # ---------------------------------------------------------------
 # AUTH
 # ---------------------------------------------------------------
-function Get-GraphToken {
-    $body = @{
-        grant_type    = "client_credentials"
-        client_id     = $clientId
-        client_secret = $clientSecret
-        scope         = "https://graph.microsoft.com/.default"
-    }
-    $resp = Invoke-RestMethod -Method Post `
-        -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
-        -Body $body -ContentType "application/x-www-form-urlencoded"
-    return @{ Authorization = "Bearer $($resp.access_token)" }
+$tokenBody = @{
+    grant_type    = "client_credentials"
+    client_id     = $clientId
+    client_secret = $clientSecret
+    scope         = "https://graph.microsoft.com/.default"
 }
-
-$authHeader = Get-GraphToken
+$tokenResp  = Invoke-RestMethod -Method Post `
+    -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
+    -Body $tokenBody -ContentType "application/x-www-form-urlencoded"
+$authHeader = @{ Authorization = "Bearer $($tokenResp.access_token)" }
 Write-Host "Graph token acquired ✅"
 
 # ---------------------------------------------------------------
-# GET DRIVE
+# HELPERS
 # ---------------------------------------------------------------
-$siteUri  = "https://graph.microsoft.com/v1.0/sites/${spHostname}:${spSitePath}"
-$site     = Invoke-RestMethod -Uri $siteUri -Headers $authHeader
-$driveUri = "https://graph.microsoft.com/v1.0/sites/$($site.id)/drives"
-$drives   = Invoke-RestMethod -Uri $driveUri -Headers $authHeader
-$drive    = $drives.value | Where-Object { $_.name -eq "Documents" } | Select-Object -First 1
-$driveId  = $drive.id
-Write-Host "SharePoint drive: $($drive.name) ($driveId) ✅"
-
-# ---------------------------------------------------------------
-# ENUMERATE FOLDERS (YYYY-MM)
-# ---------------------------------------------------------------
-$rootUri  = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$transcriptRoot:/children"
-$folders  = (Invoke-RestMethod -Uri $rootUri -Headers $authHeader).value |
-            Where-Object { $_.folder -and ($FolderFilter -eq "" -or $_.name -eq $FolderFilter) }
-
-Write-Host "Found $($folders.Count) folder(s) to migrate"
-
 $totalUploaded = 0
 $totalSkipped  = 0
 $totalFailed   = 0
 
-foreach ($folder in $folders) {
-    $folderName = $folder.name   # e.g. "2026-07"
-    Write-Host "`n📁 Processing folder: $folderName" -ForegroundColor Cyan
+function Upload-FileToR2 {
+    param($File, $R2Key, $FileType, $FolderName, $DriveId, $Auth, $DryRun)
 
-    # Get all files in this folder
-    $filesUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($folder.id)/children"
-    $files    = @()
-    $nextLink = $filesUri
-    do {
-        $resp      = Invoke-RestMethod -Uri $nextLink -Headers $authHeader
-        $files    += $resp.value | Where-Object { $_.file }
-        $nextLink  = $resp.'@odata.nextLink'
-    } while ($nextLink)
+    if ($DryRun) {
+        Write-Host "  [DRY RUN] $($File.name) → r2://$R2Key" -ForegroundColor Yellow
+        return "uploaded"
+    }
 
-    Write-Host "  Found $($files.Count) file(s)"
+    try {
+        $downloadUri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$($File.id)/content"
+        $tempFile    = [System.IO.Path]::GetTempFileName()
+        Invoke-RestMethod -Uri $downloadUri -Headers $Auth -OutFile $tempFile
 
-    foreach ($file in $files) {
-        $fileName = $file.name
+        $wranglerArgs = @("r2", "object", "put", "$($script:r2BucketName)/$R2Key", "--file", $tempFile)
+        $result = & wrangler @wranglerArgs 2>&1
+        Remove-Item $tempFile -Force
 
-        # Determine R2 key and file type
-        $r2Key = $null
-        $fileType = $null
+        if ($LASTEXITCODE -ne 0) { throw "Wrangler error: $result" }
 
-        if ($fileName -match '\.(vtt|txt)$' -and $fileName -notmatch 'People|Summary|master|log') {
-            $r2Key    = "transcripts/$folderName/$fileName"
-            $fileType = "transcript"
-        } elseif ($fileName -match 'People\.txt$') {
-            $r2Key    = "people/$folderName/$fileName"
-            $fileType = "people"
-        } elseif ($fileName -match 'Summary\.txt$' -or $fileName -match '-summary\.txt$') {
-            $r2Key    = "summaries/$folderName/$fileName"
-            $fileType = "summary"
-        } else {
-            Write-Verbose "  Skipping: $fileName (not a target file type)"
-            $totalSkipped++
-            continue
-        }
-
-        if ($DryRun) {
-            Write-Host "  [DRY RUN] Would upload: $fileName → r2://$r2Key" -ForegroundColor Yellow
-            $totalUploaded++
-            continue
-        }
-
-        try {
-            # Download from SharePoint
-            $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($file.id)/content"
-            $tempFile    = [System.IO.Path]::GetTempFileName()
-            Invoke-RestMethod -Uri $downloadUri -Headers $authHeader -OutFile $tempFile
-
-            # Upload to R2 via wrangler
-            $wranglerArgs = @("r2", "object", "put", "$r2BucketName/$r2Key", "--file", $tempFile)
-            $result = & wrangler @wranglerArgs 2>&1
-            Remove-Item $tempFile -Force
-
-            if ($LASTEXITCODE -ne 0) { throw "Wrangler upload failed: $result" }
-
-            Write-Host "  ✅ $fileName → r2://$r2Key"
-
-            # Register transcript in D1
-            if ($fileType -eq "transcript") {
-                # Extract meeting_ref from filename (strip extension)
-                $meetingRef  = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
-                # Extract YYYY-MM-DD from folder name pattern
-                $meetingDate = if ($folderName -match '(\d{4}-\d{2})') { "$($matches[1])-01" } else { $folderName }
-
-                $body = @{
-                    meeting_ref   = $meetingRef
-                    meeting_date  = $meetingDate
-                    source_system = "M365"
-                    segment_count = 1
-                    r2_key        = $r2Key
-                } | ConvertTo-Json
-
-                try {
-                    Invoke-RestMethod -Method Post -Uri "$apiWorkerBase/transcripts" `
-                        -Body $body -ContentType "application/json" | Out-Null
-                    Write-Host "    → Registered in D1" -ForegroundColor Gray
-                } catch {
-                    Write-Warning "    D1 registration failed for $meetingRef: $_"
-                }
-            }
-
-            $totalUploaded++
-        } catch {
-            Write-Warning "  ❌ Failed: $fileName — $_"
-            $totalFailed++
-        }
+        Write-Host "  ✅ $($File.name) → r2://$R2Key"
+        return "uploaded"
+    } catch {
+        Write-Warning "  ❌ Failed: $($File.name) — $_"
+        return "failed"
     }
 }
 
-# ---------------------------------------------------------------
-# UPLOAD LOG FILES
-# ---------------------------------------------------------------
-Write-Host "`n📄 Uploading log files..." -ForegroundColor Cyan
-$logFiles = @("master_log.json", "master_people_log.json", "master_log.txt", "master_people_log.txt")
-$logFolderUri = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$transcriptRoot:/children"
-$rootFiles = (Invoke-RestMethod -Uri $logFolderUri -Headers $authHeader).value | Where-Object { $_.file }
-
-foreach ($logFile in $logFiles) {
-    $spFile = $rootFiles | Where-Object { $_.name -eq $logFile }
-    if (-not $spFile) { Write-Warning "  Not found on SharePoint: $logFile"; continue }
-
-    $r2Key = "logs/$logFile"
-    if ($DryRun) { Write-Host "  [DRY RUN] Would upload: $logFile → r2://$r2Key" -ForegroundColor Yellow; continue }
-
+function Register-TranscriptInD1 {
+    param($FileName, $R2Key, $MeetingDate)
+    $meetingRef = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $body = @{
+        meeting_ref   = $meetingRef
+        meeting_date  = $MeetingDate
+        source_system = "M365"
+        segment_count = 1
+        r2_key        = $R2Key
+    } | ConvertTo-Json
     try {
-        $downloadUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($spFile.id)/content"
-        $tempFile    = [System.IO.Path]::GetTempFileName()
-        Invoke-RestMethod -Uri $downloadUri -Headers $authHeader -OutFile $tempFile
-        & wrangler r2 object put "$r2BucketName/$r2Key" --file $tempFile 2>&1 | Out-Null
-        Remove-Item $tempFile -Force
-        Write-Host "  ✅ $logFile → r2://$r2Key"
-        $totalUploaded++
+        Invoke-RestMethod -Method Post -Uri "$($script:apiWorkerBase)/transcripts" `
+            -Body $body -ContentType "application/json" | Out-Null
     } catch {
-        Write-Warning "  ❌ Failed: $logFile — $_"
-        $totalFailed++
+        Write-Verbose "    D1 registration skipped (may already exist): $_"
     }
+}
+
+function Get-DateFromFilename {
+    param([string]$FileName)
+    if ($FileName -match '(\d{4})-(\d{2})-(\d{2})') {
+        return "$($matches[1])-$($matches[2])-$($matches[3])"
+    } elseif ($FileName -match '(\d{4})(\d{2})(\d{2})') {
+        return "$($matches[1])-$($matches[2])-$($matches[3])"
+    }
+    return $null
+}
+
+# ---------------------------------------------------------------
+# SOURCE 1: PETERSPLACE — YYYY-MM folders
+# ---------------------------------------------------------------
+Write-Host "`n=== SOURCE 1: Petersplace ===" -ForegroundColor Magenta
+
+$ppSite   = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com:$($ppSitePath)" -Headers $authHeader
+$ppDrives = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/$($ppSite.id)/drives" -Headers $authHeader
+$ppDrive  = $ppDrives.value | Where-Object { $_.name -eq "Documents" } | Select-Object -First 1
+$ppDriveId = $ppDrive.id
+Write-Host "Drive: $($ppDrive.name) ($ppDriveId) ✅"
+
+# Get YYYY-MM folders
+$foldersUri = "https://graph.microsoft.com/v1.0/drives/$ppDriveId/root:/$($ppTranscriptPath):/children"
+$folders = (Invoke-RestMethod -Uri $foldersUri -Headers $authHeader).value |
+    Where-Object { $_.folder -and $_.name -match '^\d{4}-\d{2}$' -and ($FolderFilter -eq "" -or $_.name -eq $FolderFilter) }
+
+Write-Host "Found $($folders.Count) YYYY-MM folder(s)"
+
+# Get log files from root
+$rootItems = (Invoke-RestMethod -Uri $foldersUri -Headers $authHeader).value | Where-Object { $_.file }
+
+foreach ($folder in ($folders | Sort-Object name)) {
+    $folderName = $folder.name
+    Write-Host "`n📁 $folderName" -ForegroundColor Cyan
+
+    $filesUri = "https://graph.microsoft.com/v1.0/drives/$ppDriveId/items/$($folder.id)/children"
+    $files = @()
+    $nextLink = $filesUri
+    do {
+        $resp     = Invoke-RestMethod -Uri $nextLink -Headers $authHeader
+        $files   += $resp.value | Where-Object { $_.file }
+        $nextLink = $resp.'@odata.nextLink'
+    } while ($nextLink)
+
+    Write-Host "  $($files.Count) files"
+
+    foreach ($file in $files) {
+        $name = $file.name
+
+        # Skip non-transcript files and source_snapshot test entries
+        if ($name -notmatch '\.(vtt|txt)$') { $totalSkipped++; continue }
+        if ($name -match 'source_snapshot') { Write-Verbose "  Skipping source_snapshot: $name"; $totalSkipped++; continue }
+
+        # Determine type and R2 key
+        if ($name -match '-People\.txt$') {
+            $r2Key   = "people/$folderName/$name"
+            $type    = "people"
+        } elseif ($name -match '-Summary\.txt$') {
+            $r2Key   = "summaries/$folderName/$name"
+            $type    = "summary"
+        } else {
+            $r2Key   = "transcripts/$folderName/$name"
+            $type    = "transcript"
+        }
+
+        $result = Upload-FileToR2 -File $file -R2Key $r2Key -FileType $type -FolderName $folderName -DriveId $ppDriveId -Auth $authHeader -DryRun $DryRun
+
+        if ($result -eq "uploaded") {
+            $totalUploaded++
+            if ($type -eq "transcript" -and -not $DryRun) {
+                $meetingDate = Get-DateFromFilename -FileName $name
+                if (-not $meetingDate) { $meetingDate = "$folderName-01" }
+                Register-TranscriptInD1 -FileName $name -R2Key $r2Key -MeetingDate $meetingDate
+            }
+        } elseif ($result -eq "failed") { $totalFailed++ }
+    }
+}
+
+# Upload log files from root
+Write-Host "`n📄 Log files from Petersplace root..." -ForegroundColor Cyan
+$logFiles = @("master_log.json", "master_people_log.json", "master_log.txt", "master_people_log.txt")
+foreach ($logName in $logFiles) {
+    $logFile = $rootItems | Where-Object { $_.name -eq $logName }
+    if (-not $logFile) { Write-Warning "  Not found: $logName"; continue }
+    $r2Key = "logs/$logName"
+    $result = Upload-FileToR2 -File $logFile -R2Key $r2Key -FileType "log" -FolderName "logs" -DriveId $ppDriveId -Auth $authHeader -DryRun $DryRun
+    if ($result -eq "uploaded") { $totalUploaded++ } elseif ($result -eq "failed") { $totalFailed++ }
+}
+
+# ---------------------------------------------------------------
+# SOURCE 2: MEETINGINTELLIGENCE — HoD files only (not in Petersplace)
+# ---------------------------------------------------------------
+Write-Host "`n=== SOURCE 2: MeetingIntelligence (HoD files only) ===" -ForegroundColor Magenta
+
+$miSite    = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com:$($miSitePath)" -Headers $authHeader
+$miDrives  = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/$($miSite.id)/drives" -Headers $authHeader
+$miDrive   = $miDrives.value | Where-Object { $_.name -eq $miDriveName } | Select-Object -First 1
+$miDriveId = $miDrive.id
+Write-Host "Drive: $($miDrive.name) ($miDriveId) ✅"
+
+$miFiles = @()
+$nextLink = "https://graph.microsoft.com/v1.0/drives/$miDriveId/root/children"
+do {
+    $resp     = Invoke-RestMethod -Uri $nextLink -Headers $authHeader
+    $miFiles += $resp.value | Where-Object { $_.file -and $_.name -match '^HoD_' }
+    $nextLink = $resp.'@odata.nextLink'
+} while ($nextLink)
+
+Write-Host "Found $($miFiles.Count) HoD file(s)"
+
+foreach ($file in $miFiles) {
+    $name    = $file.name
+    if ($FolderFilter -ne "" -and $name -notmatch $FolderFilter) { $totalSkipped++; continue }
+    $r2Key   = "transcripts/$name"
+    $result  = Upload-FileToR2 -File $file -R2Key $r2Key -FileType "transcript" -FolderName "" -DriveId $miDriveId -Auth $authHeader -DryRun $DryRun
+    if ($result -eq "uploaded") {
+        $totalUploaded++
+        if (-not $DryRun) {
+            $meetingDate = Get-DateFromFilename -FileName $name
+            if ($meetingDate) { Register-TranscriptInD1 -FileName $name -R2Key $r2Key -MeetingDate $meetingDate }
+        }
+    } elseif ($result -eq "failed") { $totalFailed++ }
 }
 
 # ---------------------------------------------------------------
 # SUMMARY
 # ---------------------------------------------------------------
 Write-Host "`n=============================" -ForegroundColor Green
-Write-Host "Migration complete$(if ($DryRun) { ' (DRY RUN)' })"
+Write-Host "R2 Migration complete$(if ($DryRun) { ' (DRY RUN)' })"
 Write-Host "  Uploaded : $totalUploaded"
 Write-Host "  Skipped  : $totalSkipped"
 Write-Host "  Failed   : $totalFailed"
