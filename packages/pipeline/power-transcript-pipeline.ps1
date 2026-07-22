@@ -92,7 +92,12 @@ $spMeetingIntelLibrary  = "Transcripts"
 # =========================
 # REST AUTH HELPER
 # =========================
-$rulesPath = Join-Path $PSScriptRoot "classification_rules.json"
+# Resolve classification_rules.json: repo root (local dev) or alongside script (Azure deploy)
+$rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
+    (Resolve-Path (Join-Path $PSScriptRoot "../../classification_rules.json")).Path
+} else {
+    Join-Path $PSScriptRoot "classification_rules.json"
+}
 $rules = Get-Content -Path $rulesPath | ConvertFrom-Json
 
 $PIPELINE_VERSION = "1.7.9"
@@ -1183,7 +1188,7 @@ function Resolve-People {
     }
 
     if ($unresolved.Count -gt 0) {
-        $recPath = Join-Path $PSScriptRoot "config/people_recommendations.json"
+        $recPath = Join-Path $configDir "people_recommendations.json"
         $existing = if (Test-Path $recPath) { Get-Content $recPath | ConvertFrom-Json } else { [PSCustomObject]@{ unresolved = @() } }
         foreach ($u in $unresolved) {
             $found = $existing.unresolved | Where-Object { $_.name -eq $u }
