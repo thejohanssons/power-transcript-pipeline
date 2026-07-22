@@ -19,10 +19,9 @@
     }
   ],
 
-  // R2 binding — uncomment once R2 is enabled in Cloudflare Dashboard
-  // "r2_buckets": [
-  //   { "binding": "STORAGE", "bucket_name": "eip-platform" }
-  // ],
+  "r2_buckets": [
+    { "binding": "STORAGE", "bucket_name": "eip-platform" }
+  ],
 
   "vars": {
     "ENVIRONMENT": "production"
