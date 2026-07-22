@@ -1,5 +1,6 @@
 {
-  "process_governors": {
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "process_governors": {
     "ExCo": {
       "governance_owner": "CEO",
       "description": "Executive Committee governance."

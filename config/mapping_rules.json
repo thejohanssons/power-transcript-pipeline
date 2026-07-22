@@ -1,5 +1,6 @@
 {
-  "Version": "2.2",
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "Version": "2.2",
   "Description": "Topic keyword mapping rules for the EIP pipeline. Used by Step 3 (Semantic Extraction) to match transcript segments to taxonomy topics. Version 2.2 adds context_bias per topic for meeting-context-aware scoring, NpiContextGuard semantic integrity rule, product-component vocabulary in T01/T07, and strengthened suppress_keywords on T18 to prevent product-UI terms bleeding into executive reporting topics.",
   "Changelog": [
     {

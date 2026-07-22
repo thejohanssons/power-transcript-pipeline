@@ -1,3 +1,9 @@
+# ============================================================
+# Copyright (c) 2026 Virrata AB. All rights reserved.
+# Executive Insights Pipeline (EIP) — Proprietary & Confidential
+# Unauthorised use or distribution is strictly prohibited.
+# ============================================================
+
 param($Timer)
 
 # Role: Daily trigger for meeting transcript processing

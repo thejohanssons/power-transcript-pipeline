@@ -185,3 +185,7 @@ Who is involved?
 ```
 
 If that works consistently, the change is considered complete.
+
+
+---
+*Copyright © 2026 Virrata AB. All rights reserved. Proprietary and confidential.*

@@ -1,5 +1,6 @@
 {
-  "domain_mappings": {
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "domain_mappings": {
     "Product":     { "space_key": "PWMN", "parent_id": "2102919177" },
     "Technology":  { "space_key": "PWMN", "parent_id": "2102919177" },
     "Operations":  { "space_key": "PWMN", "parent_id": "2102919177" },

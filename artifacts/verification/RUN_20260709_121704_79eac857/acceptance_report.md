@@ -15,3 +15,7 @@
 - schools want pens
 - 10 pens per school
 - possible increase to 20 pens per school
+
+
+---
+*Copyright © 2026 Virrata AB. All rights reserved. Proprietary and confidential.*

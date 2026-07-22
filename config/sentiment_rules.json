@@ -1,5 +1,6 @@
 {
-  "Version": "1.1",
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "Version": "1.1",
   "Description": "Sentiment and resolution vocabulary for the EIP pipeline. Used by Step 3 (Semantic Extraction) Get-TopicSentiment to classify topic sentiment. Version 1.1 adds negation handling, severity tiers, neutral/in-progress state, and NPI/compliance domain vocabulary.",
   "Changelog": [
     {

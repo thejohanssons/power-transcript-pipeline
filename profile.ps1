@@ -1,3 +1,9 @@
+# ============================================================
+# Copyright (c) 2026 Virrata AB. All rights reserved.
+# Executive Insights Pipeline (EIP) — Proprietary & Confidential
+# Unauthorised use or distribution is strictly prohibited.
+# ============================================================
+
 # Azure Functions profile.ps1
 #
 # This profile.ps1 will get executed every "cold start" of your Function App.

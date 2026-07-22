@@ -1,5 +1,6 @@
 {
-  "Version": "1.1",
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "Version": "1.1",
   "Description": "Role-to-mode mappings for the EIP pipeline. Used by Step 3 (Semantic Extraction) to select the appropriate reasoning mode when processing speaker contributions. Version 1.1 fixes stale Theo email, corrects Peter mode, adds 8 missing people, and adds FallbackMode and TypeMappings extensions.",
   "Changelog": [
     {

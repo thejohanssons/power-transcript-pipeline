@@ -652,3 +652,7 @@ Standard header (MEETING ID, SUBJECT, DATE, PIPELINE_VERSION, TYPE: People Intel
 ---
 
 *End of EIP Implementation Description v1.7.7*
+
+
+---
+*Copyright © 2026 Virrata AB. All rights reserved. Proprietary and confidential.*

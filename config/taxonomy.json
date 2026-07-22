@@ -1,5 +1,6 @@
 {
-  "Version": "4.2",
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "Version": "4.2",
   "Description": "Frozen EIP 1.1 Taxonomy. Implements versioned topics and canonical 9-axis metadata schema.",
   "Changelog": [
     {

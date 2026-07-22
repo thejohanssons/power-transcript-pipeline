@@ -1,5 +1,6 @@
 {
-  "ownership_rules": [
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "ownership_rules": [
     {
       "capability": "Corporate Strategy",
       "default_owner": "CEO",

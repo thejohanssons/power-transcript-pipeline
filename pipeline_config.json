@@ -1,5 +1,6 @@
 {
-  "confluence_user": "peter@empoweringtech.com",
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "confluence_user": "peter@empoweringtech.com",
   "confluence_token": "SET_VIA_ENV_VAR_CONFLUENCE_TOKEN",
   "confluence_base_url": "https://etpd.atlassian.net/wiki",
   "confluence_space_key": "PWMN",

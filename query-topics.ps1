@@ -1,3 +1,9 @@
+# ============================================================
+# Copyright (c) 2026 Virrata AB. All rights reserved.
+# Executive Insights Pipeline (EIP) — Proprietary & Confidential
+# Unauthorised use or distribution is strictly prohibited.
+# ============================================================
+
 # query-topics.ps1
 # Utility to query Topic Records based on EIP 1.2 Metadata
 
