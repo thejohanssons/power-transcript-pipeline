@@ -102,7 +102,14 @@ $ROLES_CONFIG_VERSION = "1.1"
 $SENTIMENT_RULES_VERSION = "1.1"
 
 # --- EIP CONFIG LOADING ---
-$configDir = Join-Path $PSScriptRoot "config"
+# Resolve config dir: support both monorepo local dev (../../config) and Azure deployment (./config)
+$configDir = if (Test-Path (Join-Path $PSScriptRoot "../../config")) {
+    (Resolve-Path (Join-Path $PSScriptRoot "../../config")).Path
+} elseif (Test-Path (Join-Path $PSScriptRoot "config")) {
+    Join-Path $PSScriptRoot "config"
+} else {
+    Join-Path $PSScriptRoot "config"
+}
 $taxonomy = if (Test-Path (Join-Path $configDir "taxonomy.json")) { Get-Content -Path (Join-Path $configDir "taxonomy.json") | ConvertFrom-Json } else { @{} }
 $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get-Content -Path (Join-Path $configDir "mapping_rules.json") | ConvertFrom-Json } else { @{ Rules = @() } }
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
