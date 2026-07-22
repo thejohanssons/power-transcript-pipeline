@@ -1,0 +1,19 @@
+name: Deploy Sync Worker to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/sync-worker/**'
+      - 'config/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # This workflow is a skeleton — no deployment steps yet.
+    # Will be implemented when packages/sync-worker is scaffolded.
+    steps:
+      - name: 'Placeholder'
+        run: echo "Sync Worker deployment not yet configured."

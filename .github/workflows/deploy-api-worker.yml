@@ -1,0 +1,19 @@
+name: Deploy API Worker to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/api-worker/**'
+      - 'config/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # This workflow is a skeleton — no deployment steps yet.
+    # Will be implemented when packages/api-worker is scaffolded.
+    steps:
+      - name: 'Placeholder'
+        run: echo "API Worker deployment not yet configured."
