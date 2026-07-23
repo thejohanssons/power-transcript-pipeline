@@ -1,0 +1,35 @@
+name: Deploy API Worker to Cloudflare (Staging)
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'packages/api-worker/**'
+      - 'config/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy EIP API Worker (Staging)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/api-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/api-worker
+        run: npm ci
+
+      - name: Deploy Worker (staging)
+        working-directory: packages/api-worker
+        run: npx wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

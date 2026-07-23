@@ -30,7 +30,18 @@
   "env": {
     "staging": {
       "name": "eip-api-worker-staging",
-      "vars": { "ENVIRONMENT": "staging" }
+      "vars": { "ENVIRONMENT": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eip-platform-staging",
+          "database_id": "6222238e-9e78-43f2-a1a2-90baddda8080",
+          "migrations_dir": "../d1/migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "STORAGE", "bucket_name": "eip-platform-staging" }
+      ]
     }
   }
 }
