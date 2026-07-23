@@ -234,6 +234,8 @@ async function handlePostTopic(env: Env, request: Request): Promise<Response> {
         current_priority = ?,
         owner = COALESCE(?, owner),
         confluence_url = COALESCE(?, confluence_url),
+        domain = CASE WHEN ? IS NOT NULL AND length(?) > 0 AND length(?) < 40 THEN ? ELSE domain END,
+        category = CASE WHEN ? IS NOT NULL AND length(?) > 0 THEN ? ELSE category END,
         updated_at = ?
       WHERE topic_id = ?
     `).bind(
@@ -241,6 +243,8 @@ async function handlePostTopic(env: Env, request: Request): Promise<Response> {
       body.priority ?? 'Medium',
       body.owner ?? null,
       body.confluence_url ?? null,
+      body.domain ?? null, body.domain ?? '', body.domain ?? '', body.domain ?? null,
+      body.category ?? null, body.category ?? '', body.category ?? null,
       now(),
       canonicalTopicId
     ).run();
