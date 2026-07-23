@@ -1987,6 +1987,12 @@ function Convert-SummaryToConfluenceHtml {
 function Publish-SummaryToConfluence {
     param($HtmlContent, $Title, $SpaceKey, $ParentPageId)
 
+    # STAGING MODE: skip Confluence summary mirror
+    if ($script:skipSharePoint) {
+        Write-Verbose "  [STAGING] Confluence summary mirror skipped: $Title"
+        return $null
+    }
+
     Write-Host "  [CONFLUENCE] Attempting to mirror summary: $Title"
 
     $config = $null; if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json }
@@ -3588,6 +3594,13 @@ BACK-LINK (MASTER LOG): $masterLogUrl
             $contentWithHeader = $header + $content
             $contentWithHeader | Out-File -FilePath $localFile -Encoding utf8
             $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
+            # [CF] Register transcript in D1 (CALENDAR path)
+            Invoke-CloudflareSync -Method "Post" -Endpoint "transcripts" -Body @{
+                meeting_ref   = $mId
+                meeting_date  = $start.ToString("yyyy-MM-dd")
+                source_system = "M365"
+                segment_count = if ($contentSegments -and $contentSegments.Count) { $contentSegments.Count } else { 1 }
+            }
 
             # 2. Save and Upload SUMMARY (if available)
             $uploadedSummary = $null
@@ -3622,6 +3635,20 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     try {
                         Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
                     } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
+                    # [CF] Upsert topic to D1 (CALENDAR path)
+                    Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
+                        topic_id     = $tr.TopicId
+                        topic_name   = $safeTopicNameForConf
+                        domain       = $tr.Domain
+                        category     = $tr.Category
+                        priority     = if ($tr.EXECUTIVE_PRIORITY -and $tr.EXECUTIVE_PRIORITY -ne "Unknown") { $tr.EXECUTIVE_PRIORITY } else { "Medium" }
+                        owner        = if ($tr.Ownership -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
+                        summary      = $tr.Summary
+                        meeting_ref  = $mId
+                        meeting_date = $start.ToString("yyyy-MM-dd")
+                        context      = if ($script:meetingContext) { $script:meetingContext } else { "Unknown" }
+                        source       = "Transcript"
+                    }
 
                     # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
                     if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
