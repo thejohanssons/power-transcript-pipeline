@@ -2534,6 +2534,7 @@ function Process-VttFile {
                 Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
             } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
             # [CF] Upsert topic to D1
+            $cfMeetingDate = if ($null -ne $start -and $start -is [datetime]) { $start.ToString("yyyy-MM-dd") } elseif ($null -ne $eventDate -and $eventDate -is [datetime]) { $eventDate.ToString("yyyy-MM-dd") } else { (Get-Date -Format "yyyy-MM-dd") }
             Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
                 topic_id     = $tr.TopicId
                 topic_name   = $safeTopicNameForConf
@@ -2543,7 +2544,7 @@ function Process-VttFile {
                 owner        = if ($tr.Ownership -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
                 summary      = $tr.Summary
                 meeting_ref  = $mId
-                meeting_date = $eventDate.ToString("yyyy-MM-dd")
+                meeting_date = $cfMeetingDate
                 context      = if ($script:meetingContext) { $script:meetingContext } else { "Unknown" }
                 source       = "Transcript"
             }
