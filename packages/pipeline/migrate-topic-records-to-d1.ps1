@@ -37,6 +37,9 @@ param(
 
 $apiWorkerBase = "https://eip-api-worker.homeassistant-8d3.workers.dev"
 $r2BucketName  = "eip-platform"
+$scriptDir     = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+$wranglerBin   = Join-Path $scriptDir "../api-worker/node_modules/.bin/wrangler"
+if (-not (Test-Path $wranglerBin)) { $wranglerBin = (Get-Command wrangler -ErrorAction SilentlyContinue)?.Source ?? "wrangler" }
 $spHostname    = "scanningpens.sharepoint.com"
 $ppSitePath    = "/sites/Petersplace"
 $topicRecordsPath = "Exec Intel Insights/Topic Records"
@@ -226,7 +229,7 @@ foreach ($month in $months) {
                 $mdContent   = [System.IO.File]::ReadAllText($tempFile, [System.Text.Encoding]::UTF8)
 
                 # 2. Upload to R2
-                & wrangler r2 object put "$r2BucketName/$r2Key" --file $tempFile --remote 2>&1 | Out-Null
+                & $script:wranglerBin r2 object put "$r2BucketName/$r2Key" --file $tempFile --remote 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) { throw "R2 upload failed" }
                 $totalUploaded++
 

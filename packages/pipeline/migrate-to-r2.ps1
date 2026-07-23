@@ -36,6 +36,9 @@ param(
 # ---------------------------------------------------------------
 $apiWorkerBase  = "https://eip-api-worker.homeassistant-8d3.workers.dev"
 $r2BucketName   = "eip-platform"
+$scriptDir      = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+$wranglerBin    = Join-Path $scriptDir "../api-worker/node_modules/.bin/wrangler"
+if (-not (Test-Path $wranglerBin)) { $wranglerBin = (Get-Command wrangler -ErrorAction SilentlyContinue)?.Source ?? "wrangler" }
 $tenantId       = if ($env:GRAPH_TENANT_ID) { $env:GRAPH_TENANT_ID } else { "f9e144a5-228f-4e5a-86c4-2cc253376402" }
 $clientId       = if ($env:GRAPH_CLIENT_ID) { $env:GRAPH_CLIENT_ID } else { throw "GRAPH_CLIENT_ID not set" }
 $clientSecret   = if ($env:GRAPH_CLIENT_SECRET) { $env:GRAPH_CLIENT_SECRET } else { throw "GRAPH_CLIENT_SECRET not set" }
@@ -84,7 +87,7 @@ function Upload-FileToR2 {
         Invoke-RestMethod -Uri $downloadUri -Headers $Auth -OutFile $tempFile
 
         $wranglerArgs = @("r2", "object", "put", "$($script:r2BucketName)/$R2Key", "--file", $tempFile, "--remote")
-        $result = & wrangler @wranglerArgs 2>&1
+        $result = & $script:wranglerBin @wranglerArgs 2>&1
         Remove-Item $tempFile -Force
 
         if ($LASTEXITCODE -ne 0) { throw "Wrangler error: $result" }
