@@ -226,7 +226,7 @@ foreach ($month in $months) {
                 $mdContent   = [System.IO.File]::ReadAllText($tempFile, [System.Text.Encoding]::UTF8)
 
                 # 2. Upload to R2
-                & wrangler r2 object put "$r2BucketName/$r2Key" --file $tempFile 2>&1 | Out-Null
+                & wrangler r2 object put "$r2BucketName/$r2Key" --file $tempFile --remote 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) { throw "R2 upload failed" }
                 $totalUploaded++
 
@@ -244,9 +244,11 @@ foreach ($month in $months) {
                     ($fileNameStem -replace '^.+?--','') -replace '-',' '
                 }
 
-                # Fall back domain/category from filename if parser missed them
+                # Fall back domain/category — use "Details" rather than filename if parser missed
                 if (-not $parsed.domain -or $parsed.domain -eq "") {
-                    $parsed.domain = ($fileNameStem -replace '^.+?-T\d+-','') -replace '-',' '
+                    # Try to extract taxonomy label from filename T-suffix (e.g. -T10-Cost-Structure → "Cost Structure")
+                    $domainFromFile = ($fileNameStem -replace '^.+?--?T\d+-','') -replace '-',' '
+                    $parsed.domain = if ($domainFromFile -and $domainFromFile.Length -lt 40 -and $domainFromFile -notmatch '^\d') { $domainFromFile } else { "Details" }
                 }
                 if (-not $parsed.category -or $parsed.category -eq "") {
                     $parsed.category = "Insight"  # safe default

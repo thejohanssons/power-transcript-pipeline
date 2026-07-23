@@ -83,7 +83,7 @@ function Upload-FileToR2 {
         $tempFile    = [System.IO.Path]::GetTempFileName()
         Invoke-RestMethod -Uri $downloadUri -Headers $Auth -OutFile $tempFile
 
-        $wranglerArgs = @("r2", "object", "put", "$($script:r2BucketName)/$R2Key", "--file", $tempFile)
+        $wranglerArgs = @("r2", "object", "put", "$($script:r2BucketName)/$R2Key", "--file", $tempFile, "--remote")
         $result = & wrangler @wranglerArgs 2>&1
         Remove-Item $tempFile -Force
 
