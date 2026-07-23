@@ -2078,6 +2078,11 @@ function Publish-SummaryToConfluence {
 }
 
 function Publish-TopicRecordToConfluence {
+    # STAGING MODE: skip Confluence writes to avoid contaminating production pages
+    if ($script:skipSharePoint) {
+        Write-Verbose "  [STAGING] Confluence publish skipped"
+        return $null
+    }
     param($TopicRecordText, $TopicId, $TopicLabel, $Domain, $MeetingId, $EventDate, $Subject, $Organiser)
 
     if (-not $confMappings -or -not $script:pipelineConfig.enable_confluence_mirror) { return $null }
