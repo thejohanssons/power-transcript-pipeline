@@ -129,6 +129,10 @@ $script:cfApiBase     = if ($pipelineConfig.eip_cloudflare_sync -eq "production"
     $pipelineConfig.eip_api_worker_url_staging
 } else { $null }
 if ($script:cfSyncEnabled) { Write-Host "  [CF] Cloudflare sync enabled → $($script:cfApiBase)" -ForegroundColor Cyan }
+
+# SharePoint skip flag — set true on develop/staging branch to avoid contaminating Petersplace
+$script:skipSharePoint = ($pipelineConfig.skip_sharepoint -eq $true)
+if ($script:skipSharePoint) { Write-Warning "  [STAGING] SharePoint writes DISABLED — staging mode active" }
 $peopleConfigPath = Join-Path $configDir "people_config.json"
 $peopleConfig = if (Test-Path $peopleConfigPath) { Get-Content -Path $peopleConfigPath | ConvertFrom-Json } else { $null }
 if ($peopleConfig) { Write-Host "People config loaded ($($peopleConfig.people.Count) people) ✅" } else { Write-Warning "people_config.json not found — people intelligence disabled" }
@@ -2203,6 +2207,11 @@ function Ensure-DriveFolder {
 }
 
 function Upload-FileToSharePoint {
+    # STAGING MODE: skip all SharePoint writes to protect Petersplace
+    if ($script:skipSharePoint) {
+        Write-Verbose "  [STAGING] SharePoint upload skipped: $($args | Where-Object { $_ -match '\.txt|\.json|\.md' } | Select-Object -First 1)"
+        return $null
+    }
     param($DriveId, $FolderId, $FilePath)
     
     # Ensure token is valid for upload
