@@ -2083,33 +2083,8 @@ function Publish-SummaryToConfluence {
     return $null
 }
 
-function Publish-TopicRecordToConfluence {
-    # STAGING MODE: skip Confluence writes to avoid contaminating production pages
-    if ($script:skipSharePoint) {
-        Write-Verbose "  [STAGING] Confluence publish skipped"
-        return $null
-    }
-    param($TopicRecordText, $TopicId, $TopicLabel, $Domain, $MeetingId, $EventDate, $Subject, $Organiser)
-
-    if (-not $confMappings -or -not $script:pipelineConfig.enable_confluence_mirror) { return $null }
-
-    $mapping = $confMappings.domain_mappings.PSObject.Properties | Where-Object { $_.Name -eq $Domain } | Select-Object -First 1
-    $mappingValue = if ($mapping) { $mapping.Value } else { $null }
-    $space  = if ($mappingValue -and $mappingValue.space_key) { $mappingValue.space_key } else { $confMappings.default_space }
-    $parent = if ($mappingValue -and $mappingValue.parent_id)  { $mappingValue.parent_id  } else { $confMappings.default_parent_id }
-
-    if (-not $space) {
-        Write-Warning "  [CONFLUENCE] No space resolved for domain='$Domain' — skipping topic record mirror."
-        return $null
-    }
-
-    Write-Host "  [CONFLUENCE] Topic mirror: domain=$Domain → space=$space parent=$(if ($parent) { $parent } else { '(space root)' })"
-
-    $title = "[$TopicId] $TopicLabel ($($EventDate.ToString('yyyy-MM-dd')))"
-    $html  = Convert-SummaryToConfluenceHtml -SummaryText $TopicRecordText -Subject $Subject -MeetingId $MeetingId -EventDate $EventDate -Organiser $Organiser
-    
-    return Publish-SummaryToConfluence -HtmlContent $html -Title $title -SpaceKey $space -ParentPageId $parent
-}
+# Publish-TopicRecordToConfluence removed — topic records are saved to SharePoint only.
+# Only meeting summaries are mirrored to Confluence via Publish-SummaryToConfluence.
 
 function Send-TeamsNotification {
     param($MessageBlock)
@@ -2534,11 +2509,7 @@ function Process-VttFile {
             Write-Host "  [VTT] Uploading Topic Record: $trFileName"
             Upload-FileToSharePoint -DriveId $script:driveId -FolderId $topicFolderId -FilePath $trLocalPath | Out-Null
             
-            # Confluence Topic Record Mirror
             $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-            try {
-                Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
-            } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
             # [CF] Upsert topic to D1
             $cfMeetingDate = if ($null -ne $start -and $start -is [datetime]) { $start.ToString("yyyy-MM-dd") } elseif ($null -ne $eventDate -and $eventDate -is [datetime]) { $eventDate.ToString("yyyy-MM-dd") } else { (Get-Date -Format "yyyy-MM-dd") }
             Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
@@ -2921,11 +2892,7 @@ if ($VttFile) {
         Write-Host "  [VTT] Uploading Topic Record: $trFileName"
         Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
         
-        # Confluence Topic Record Mirror
         $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-        try {
-            Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
-        } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
 
         # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
         if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
@@ -3630,11 +3597,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"
                     Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
                     
-                    # Confluence Topic Record Mirror
                     $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-                    try {
-                        Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $start -Organiser $organiser | Out-Null
-                    } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
                     # [CF] Upsert topic to D1 (CALENDAR path)
                     Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
                         topic_id     = $tr.TopicId
