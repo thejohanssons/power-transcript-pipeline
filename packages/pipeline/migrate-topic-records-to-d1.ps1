@@ -102,44 +102,45 @@ function Parse-TopicRecord {
     foreach ($line in $lines) {
         $line = $line.TrimEnd()
 
-        # Metadata fields
-        if ($line -match '^\*\*TITLE:\*\*\s*(.+)$')              { $result.title = $matches[1].Trim() }
-        elseif ($line -match '^\*\*TOPIC_FAMILY:\*\*\s*(.+)$')    { $result.topic_family = $matches[1].Trim() }
-        elseif ($line -match '^\*\*TOPIC:\*\*\s*(.+)$')          { if (-not $result.topic_family) { $result.topic_family = $matches[1].Trim() } }
-        elseif ($line -match '^\*\*DOMAIN:\*\*\s*(.+)$')         { $result.domain = $matches[1].Trim() }
-        elseif ($line -match '^\*\*CATEGORY:\*\*\s*(.+)$')       { $result.category = $matches[1].Trim() }
-        elseif ($line -match '^\*\*EXECUTIVE_PRIORITY:\*\*\s*(.+)$') {
+        # Metadata fields — match both "- **FIELD:** value" (list format) and "**FIELD:** value" (inline format)
+        # Primary: heading line (always present in all versions)
+        if ($line -match '^#\s+Topic Record:\s*(.+)$') { $result.title = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*TITLE:\*\*\s*(.+)$')             { if (-not $result.title) { $result.title = $matches[1].Trim() } }
+        elseif ($line -match '^-?\s*\*\*TOPIC_FAMILY:\*\*\s*(.+)$')      { $result.topic_family = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*TOPIC:\*\*\s*(.+)$')             { if (-not $result.topic_family) { $result.topic_family = $matches[1].Trim() } }
+        elseif ($line -match '^-?\s*\*\*DOMAIN:\*\*\s*(.+)$')            { $result.domain = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*CATEGORY:\*\*\s*(.+)$')          { $result.category = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*EXECUTIVE_PRIORITY:\*\*\s*(.+)$') {
             $p = $matches[1].Trim()
             if ($p -notin @("Unknown","")) { $result.priority = $p }
         }
-        elseif ($line -match '^\*\*PRIMARY_OWNER:\*\*\s*(.+)$')  { $result.owner = $matches[1].Trim() }
-        elseif ($line -match '^\*\*STATUS:\*\*\s*(.+)$')         { if ($matches[1].Trim()) { $result.status = $matches[1].Trim() } }
-        elseif ($line -match '^\*\*TRAJECTORY:\*\*\s*(.+)$')     {
+        elseif ($line -match '^-?\s*\*\*PRIMARY_OWNER:\*\*\s*(.+)$')     { $result.owner = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*STATUS:\*\*\s*(.+)$')            { if ($matches[1].Trim()) { $result.status = $matches[1].Trim() } }
+        elseif ($line -match '^-?\s*\*\*TRAJECTORY:\*\*\s*(.+)$')        {
             $t = $matches[1].Trim()
             $tMap = @{ "Improving" = "Resolving"; "Escalating" = "Escalating"; "Stable" = "Stable"; "Declining" = "Escalating"; "Resolving" = "Resolving" }
             if ($tMap.ContainsKey($t)) { $result.trend = $tMap[$t] }
         }
-        elseif ($line -match '^\*\*DATE:\*\*\s*(.+)$') {
+        elseif ($line -match '^-?\s*\*\*DATE:\*\*\s*(.+)$') {
             $dateStr = $matches[1].Trim()
             try { $result.meeting_date = (Get-Date $dateStr -Format "yyyy-MM-dd") } catch { $result.meeting_date = $dateStr.Substring(0, [Math]::Min(10, $dateStr.Length)) }
         }
-        elseif ($line -match '^\*\*SOURCE_MEETING:\*\*') {
-            # Extract meeting ref from the filename pattern
+        elseif ($line -match '^-?\s*\*\*SOURCE_MEETING:\*\*') {
             if ($FileName -match '^(.+?)--') { $result.meeting_ref = $matches[1] }
         }
-        elseif ($line -match '^\*\*EIP_VALIDATION:\*\*\s*(.+)$') { $result.eip_validation = $matches[1].Trim() }
+        elseif ($line -match '^-?\s*\*\*EIP_VALIDATION:\*\*\s*(.+)$') { $result.eip_validation = $matches[1].Trim() }
 
         # Retrieval anchors
-        elseif ($line -match '^\*\*PEOPLE:\*\*\s*(.+)$') {
+        elseif ($line -match '^-?\s*\*\*PEOPLE:\*\*\s*(.+)$') {
             $result.retrieval_anchors.people = @($matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne "None" })
         }
-        elseif ($line -match '^\*\*PROJECTS:\*\*\s*(.+)$') {
+        elseif ($line -match '^-?\s*\*\*PROJECTS:\*\*\s*(.+)$') {
             $result.retrieval_anchors.projects = @($matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne "None" })
         }
-        elseif ($line -match '^\*\*PRODUCTS:\*\*\s*(.+)$') {
+        elseif ($line -match '^-?\s*\*\*PRODUCTS:\*\*\s*(.+)$') {
             $result.retrieval_anchors.products = @($matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne "None" })
         }
-        elseif ($line -match '^\*\*SYSTEMS:\*\*\s*(.+)$') {
+        elseif ($line -match '^-?\s*\*\*SYSTEMS:\*\*\s*(.+)$') {
             $result.retrieval_anchors.systems = @($matches[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne "None" })
         }
 
