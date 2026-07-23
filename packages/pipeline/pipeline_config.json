@@ -7,5 +7,8 @@
   "confluence_parent_id": "2102919177",
   "enable_confluence_mirror": true,
   "enable_stable_topic_classification": true,
-  "teams_webhook_url": "https://webhookbot.c-toss.com/api/bot/webhooks/528ec50e-056b-4bce-80d9-dcdf4891d903"
+  "teams_webhook_url": "https://webhookbot.c-toss.com/api/bot/webhooks/528ec50e-056b-4bce-80d9-dcdf4891d903",
+  "eip_cloudflare_sync": "staging",
+  "eip_api_worker_url_staging": "https://eip-api-worker-staging.homeassistant-8d3.workers.dev",
+  "eip_api_worker_url": "https://eip-api-worker.homeassistant-8d3.workers.dev"
 }

@@ -120,6 +120,15 @@ $mappingRules = if (Test-Path (Join-Path $configDir "mapping_rules.json")) { Get
 $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-Content -Path (Join-Path $configDir "roles_config.json") | ConvertFrom-Json } else { @{ Mappings = @(); TypeMappings = @{} } }
 $sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
 $pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { @{ enable_stable_topic_classification = $false } }
+
+# Cloudflare sync config
+$script:cfSyncEnabled = ($pipelineConfig.eip_cloudflare_sync -eq "staging" -or $pipelineConfig.eip_cloudflare_sync -eq "production")
+$script:cfApiBase     = if ($pipelineConfig.eip_cloudflare_sync -eq "production") {
+    $pipelineConfig.eip_api_worker_url
+} elseif ($pipelineConfig.eip_cloudflare_sync -eq "staging") {
+    $pipelineConfig.eip_api_worker_url_staging
+} else { $null }
+if ($script:cfSyncEnabled) { Write-Host "  [CF] Cloudflare sync enabled → $($script:cfApiBase)" -ForegroundColor Cyan }
 $peopleConfigPath = Join-Path $configDir "people_config.json"
 $peopleConfig = if (Test-Path $peopleConfigPath) { Get-Content -Path $peopleConfigPath | ConvertFrom-Json } else { $null }
 if ($peopleConfig) { Write-Host "People config loaded ($($peopleConfig.people.Count) people) ✅" } else { Write-Warning "people_config.json not found — people intelligence disabled" }
@@ -1039,6 +1048,28 @@ function Split-TranscriptIntoChunks {
 # =========================
 # LLM HELPER: Single LLM call — returns raw content string or $null on failure
 # =========================
+# ---------------------------------------------------------------
+# Cloudflare Sync Helper — fire-and-forget, never blocks pipeline
+# ---------------------------------------------------------------
+function Invoke-CloudflareSync {
+    param(
+        [string]$Method,
+        [string]$Endpoint,
+        [hashtable]$Body
+    )
+    if (-not $script:cfSyncEnabled -or -not $script:cfApiBase) { return }
+    try {
+        Invoke-RestMethod -Method $Method `
+            -Uri "$($script:cfApiBase)/$Endpoint" `
+            -Body ($Body | ConvertTo-Json -Depth 8) `
+            -ContentType "application/json" `
+            -TimeoutSec 10 | Out-Null
+        Write-Verbose "  [CF] $Method /$Endpoint ✅"
+    } catch {
+        Write-Warning "  [CF] Sync skipped ($Method /$Endpoint): $($_.Exception.Message)"
+    }
+}
+
 function Invoke-LLM {
     param(
         [string]$SystemPrompt,
@@ -2488,6 +2519,20 @@ function Process-VttFile {
             try {
                 Publish-TopicRecordToConfluence -TopicRecordText $trContent -TopicId $tr.TopicId -TopicLabel $safeTopicNameForConf -Domain $tr.Domain -MeetingId $mId -EventDate $eventDate -Subject $subject -Organiser $organiser | Out-Null
             } catch { Write-Warning "  [CONFLUENCE] Topic Record mirror failed: $_" }
+            # [CF] Upsert topic to D1
+            Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
+                topic_id     = $tr.TopicId
+                topic_name   = $safeTopicNameForConf
+                domain       = $tr.Domain
+                category     = $tr.Category
+                priority     = if ($tr.EXECUTIVE_PRIORITY -and $tr.EXECUTIVE_PRIORITY -ne "Unknown") { $tr.EXECUTIVE_PRIORITY } else { "Medium" }
+                owner        = if ($tr.Ownership -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
+                summary      = $tr.Summary
+                meeting_ref  = $mId
+                meeting_date = $eventDate.ToString("yyyy-MM-dd")
+                context      = if ($script:meetingContext) { $script:meetingContext } else { "Unknown" }
+                source       = "Transcript"
+            }
 
             # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
             if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
@@ -2909,6 +2954,13 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         $eventFolderId      = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
         $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
         Write-Host "  [VTT] Transcript uploaded to SharePoint"
+        # [CF] Register transcript in D1
+        Invoke-CloudflareSync -Method "Post" -Endpoint "transcripts" -Body @{
+            meeting_ref   = $mId
+            meeting_date  = $eventDate.ToString("yyyy-MM-dd")
+            source_system = "M365"
+            segment_count = if ($contentSegments -and $contentSegments.Count) { $contentSegments.Count } else { 1 }
+        }
         if ($localSummaryFile) {
             $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
             Write-Host "  [VTT] Summary uploaded to SharePoint"
@@ -3634,6 +3686,24 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                             # 4. Upload to SharePoint (same folder as transcript and summary)
                             $uploadedPeopleFile = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localPeopleFile
                             Write-Host "  [PEOPLE] People file uploaded: $($uploadedPeopleFile.webUrl)"
+                            # [CF] Register participants in D1
+                            if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
+                                $cfParticipants = @($resolvedPeople | ForEach-Object {
+                                    $personId = if ($_.PSObject.Properties['PersonId']) { $_.PersonId } elseif ($_.PSObject.Properties['Id']) { $_.Id } else { $null }
+                                    @{
+                                        person_id    = $personId
+                                        display_name = if ($_.PSObject.Properties['DisplayName']) { $_.DisplayName } elseif ($_.PSObject.Properties['Name']) { $_.Name } else { $null }
+                                        role         = if ($_.PSObject.Properties['Role']) { $_.Role } else { $null }
+                                        was_organiser = ($personId -and $personId -eq $organiserId)
+                                    }
+                                })
+                                Invoke-CloudflareSync -Method "Post" -Endpoint "participants" -Body @{
+                                    meeting_ref  = $mId
+                                    meeting_date = $start.ToString("yyyy-MM-dd")
+                                    participants = $cfParticipants
+                                    source       = "PeopleFile"
+                                }
+                            }
                             $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $start -PeopleFileUrl $uploadedPeopleFile.webUrl -ResolvedPeople $resolvedPeople
                         }
                     } else {
