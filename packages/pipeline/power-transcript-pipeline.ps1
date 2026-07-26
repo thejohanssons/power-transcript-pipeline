@@ -1705,12 +1705,16 @@ function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
     # --- Case 1: Transcript exists - Use LLM with map-reduce chunking ---
-    if ($transcriptContent -and $rules.LLMConfig.Endpoint) {
+    # Resolve LLM config: env vars take priority over classification_rules.json
+    $llmEndpointResolved = if ($env:AZURE_OPENAI_ENDPOINT) { $env:AZURE_OPENAI_ENDPOINT } `
+                           elseif ($rules -and $rules.LLMConfig) { $rules.LLMConfig.Endpoint } `
+                           else { $null }
+    if ($transcriptContent -and $llmEndpointResolved) {
         try {
             # --- Build shared LLM connection config ---
             $keySource     = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
             $llmKey        = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-            $authMode      = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+            $authMode      = if ($llmEndpointResolved -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
             $llmHeaders    = if ($authMode -eq "api-key") {
                 @{ "api-key" = $llmKey; "Content-Type" = "application/json" }
             } else {
@@ -1718,24 +1722,27 @@ function Get-MeetingClassification {
             }
             # Azure OpenAI specific: ensure the api-key is also in the URI if headers are tricky in some environments
             # but usually the header is sufficient. 
-            $deploymentName = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-            $fullUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+            $llmModel       = if ($env:AZURE_OPENAI_MODEL) { $env:AZURE_OPENAI_MODEL } `
+                             elseif ($rules -and $rules.LLMConfig) { if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model } } `
+                             else { "gpt-4o" }
+            $deploymentName = $llmModel
+            $fullUri        = if ($llmEndpointResolved -match "openai\.azure\.com") {
+                $base = $llmEndpointResolved -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                 "$base/openai/deployments/$deploymentName/chat/completions?api-version=2024-02-15-preview"
-            } elseif ($rules.LLMConfig.Endpoint -match "/v1/?$") {
-                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
+            } elseif ($llmEndpointResolved -match "/v1/?$") {
+                "$($llmEndpointResolved -replace '/$', '')/chat/completions"
             } else {
-                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
+                "$($llmEndpointResolved -replace '/$', '')/chat/completions"
             }
 
             Write-Host "  [LLM DIAG] Endpoint: $fullUri"
-            Write-Host "  [LLM DIAG] Model: $($rules.LLMConfig.Model)"
+            Write-Host "  [LLM DIAG] Model: $llmModel"
             Write-Host "  [LLM DIAG] Key source: $keySource"
             Write-Host "  [LLM DIAG] Auth mode: $authMode"
 
             # --- Chunk config (configurable via LLMConfig, with safe defaults) ---
-            $chunkSize = if ($rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
-            $overlap   = if ($rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
+            $chunkSize = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
+            $overlap   = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
 
             # --- Split transcript into chunks ---
             $chunks = Split-TranscriptIntoChunks -Text $transcriptContent -ChunkSize $chunkSize -Overlap $overlap
@@ -1765,7 +1772,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $raw = Invoke-LLM -SystemPrompt $chunkSummaryPrompt `
                                   -UserContent "Transcript section $chunkNum/$($chunks.Count):`n`n$chunk" `
                                   -FullUri $fullUri -Headers $llmHeaders `
-                                  -Model $rules.LLMConfig.Model -MaxTokens $chunkSummaryMaxTok `
+                                  -Model $llmModel -MaxTokens $chunkSummaryMaxTok `
                                   -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                 if ($raw) { $chunkSummaries += "### Section $chunkNum`n$raw" }
             }
@@ -1783,7 +1790,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                         if ($i+1 -lt $currentSummaries.Count) { $pair += "`n`n" + $currentSummaries[$i+1] }
                         
                         $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail."
-                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $rules.LLMConfig.Model -MaxTokens $synthesisMaxTok `
+                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $llmModel -MaxTokens $synthesisMaxTok `
                                           -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                         if ($syn) { $nextTier += $syn }
                     }
@@ -1810,7 +1817,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
                                          -FullUri $fullUri -Headers $llmHeaders `
-                                         -Model $rules.LLMConfig.Model -MaxTokens $summaryMaxTok `
+                                         -Model $llmModel -MaxTokens $summaryMaxTok `
                                          -ResponseFormat "json_object" `
                                          -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
 
@@ -1826,7 +1833,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                     $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
                                              -UserContent $combinedSummaries `
                                              -FullUri $fullUri -Headers $llmHeaders `
-                                             -Model $rules.LLMConfig.Model -MaxTokens $recordsMaxTok `
+                                             -Model $llmModel -MaxTokens $recordsMaxTok `
                                              -ResponseFormat "json_object" `
                                              -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                 }
@@ -3009,7 +3016,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                     -Subject $subject `
                     -FullUri $vttLlmUri `
                     -Headers $vttLlmHeaders `
-                    -Model $rules.LLMConfig.Model
+                    -Model $llmModel
 
                 if ($vttPeopleRaw) {
                     $vttPeopleContent = Format-PeopleFile -LLMOutput $vttPeopleRaw -MeetingId $mId -Subject $subject -EventDate $eventDate -PipelineVersion $PIPELINE_VERSION
@@ -3670,7 +3677,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
                             -Subject $subject `
                             -FullUri $pUri `
                             -Headers $pHeaders `
-                            -Model $rules.LLMConfig.Model
+                            -Model $llmModel
 
                         if ($peopleRaw) {
                             # 3. Format and save *-People.txt
