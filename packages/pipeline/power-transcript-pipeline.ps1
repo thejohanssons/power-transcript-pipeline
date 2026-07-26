@@ -1812,7 +1812,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 
                 # --- PASS 3: Decoupled Output Calls ---
                 Write-Host "  [LLM DIAG] Synthesising final Leadership Summary..." -ForegroundColor Gray
-                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []."
+                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Respond in JSON format. Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []."
                 
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
@@ -1828,7 +1828,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                     Write-Warning "  [LLM DIAG] Summary call failed after $llmMaxRetries retries — skipping records call. Will fall through to heuristic fallback."
                 } else {
                     Write-Host "  [LLM DIAG] Extracting Topic Records (max tokens: $recordsMaxTok)..." -ForegroundColor Gray
-                    $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'records' array. Leave 'summary' as an empty string. Be thorough — include ALL topics identified in the summaries. Do not truncate."
+                    $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Respond in JSON format. Generate only the 'records' array. Leave 'summary' as an empty string. Be thorough — include ALL topics identified in the summaries. Do not truncate."
                     
                     $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
                                              -UserContent $combinedSummaries `
