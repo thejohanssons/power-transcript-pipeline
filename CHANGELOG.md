@@ -7,6 +7,49 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.1] — 2026-07-26
+
+### Fixed (Production)
+- **LLM prompt always available on Azure** — `classification_rules.json` (sanitised, no secrets) now committed to `config/` folder and deployed automatically via CI/CD. Previously the file was gitignored and not deployed, causing the full system prompt to be missing on Azure.
+- **LLM config reads from env vars** — `FOUNDRY_API_KEY`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_MODEL` now take priority over `classification_rules.json`. ApiKey and Endpoint auto-merged into `$rules` when file has empty values (sanitised version).
+- **Pass 3 JSON format error** — Added `"Respond in JSON format."` to both summary and records FOCUS prompt suffixes. OpenAI's `response_format: json_object` requires the word "json" in the prompt; the deployed prompt lacked it, causing every synthesis call to fail with `invalid_request_error`.
+- **Root cause of multi-week production outage** — All CALENDAR path meetings were producing 0 topics, no summaries, no topic records. Fix chain: stale `classification_rules.json` → missing/wrong prompt → LLM rejected → `[REPAIR] Summary generation failed` on every meeting.
+
+### Changed
+- `.gitignore` updated: `/classification_rules.json` (root-anchored) instead of global pattern, allowing `config/classification_rules.json` to be tracked
+- Pipeline version bumped to 1.8.1
+
+### Azure App Settings Required
+| Setting | Value |
+|---------|-------|
+| `FOUNDRY_API_KEY` or `AZURE_OPENAI_API_KEY` | LLM API key |
+| `AZURE_OPENAI_ENDPOINT` | `https://atlassian-rovo-forge.openai.azure.com/openai/v1` |
+| `AZURE_OPENAI_MODEL` | `gpt-5.1` |
+
+---
+
+## [1.8.0] — 2026-07-23 (develop — not yet merged to main)
+
+### Added
+- **`Invoke-MeetingProcessing`** — shared processing function replacing ~820 lines of duplicated code across all 3 pipeline paths (VTT Inbox, VTT Direct, CALENDAR). Single authoritative implementation for: classify → normalise IDs → execution context → enrich → mode/validation → topic records → SharePoint → CF sync → people → log entry.
+- **`Normalize-TopicIds`** — post-LLM normalisation maps freeform topic IDs (slugs, version-suffixed names) to canonical T-codes from `mapping_rules.json`. Matches on `Topic`/`TopicName` field first, falls back to `TopicId` slug matching.
+- **R2 file storage** — Worker endpoints `POST /files`, `GET /files/{key}`, `DELETE /files/{key}`. Pipeline uploads transcript, summary, topic records, and people files to R2 alongside SharePoint.
+- **`PATCH /topics/:id`** Worker endpoint — renames `topic_id` with cascade to `topic_occurrences` and `topic_merge_candidates`. Supports merge: if target T-code already exists, re-points all occurrences and deletes old row.
+- **`normalize-topic-ids-d1.ps1`** — one-off script to normalise all non-canonical `topic_id` values in a D1 instance (production or staging) using the same taxonomy matching logic as the pipeline.
+
+### Fixed
+- **Context field always "Unknown"** — `$script:meetingContext` (never assigned) replaced with `$meetingCtx` local variable correctly passed through to CF sync body on all paths.
+- **Topic ID inconsistency** — VTT paths generated slug IDs, CALENDAR path generated T-codes. All paths now go through `Normalize-TopicIds` post-LLM.
+- **`$ExecutionContext` reserved variable clash** — PowerShell's built-in `$ExecutionContext` variable (case-insensitive) was being overwritten. Renamed to `$meetingCtx`.
+- **Inline `if` in `Add-Member -Value`** — PowerShell runtime error `'if' is not recognized`. Pre-computed as `$mergedSummary`/`$mergedTags`.
+- **Duplicate topic record uploads** — Same named topic appearing multiple times in LLM output now deduplicated by label before upload loop (longest summary wins).
+
+### Architecture
+- All 3 pipeline paths now identical after content acquisition
+- R2 key convention: `transcripts/yyyy-MM/`, `summaries/yyyy-MM/`, `topic-records/yyyy-MM/{meeting_id}/`, `people/yyyy-MM/`, `logs/`
+
+---
+
 ## [1.7.7] — 2026-07-19
 
 ### Fixed

@@ -117,7 +117,7 @@ if ($rules -and $rules.LLMConfig -and [string]::IsNullOrWhiteSpace($rules.LLMCon
     if ($env:AZURE_OPENAI_ENDPOINT) { $rules.LLMConfig.Endpoint = $env:AZURE_OPENAI_ENDPOINT }
 }
 
-$PIPELINE_VERSION = "1.7.9"
+$PIPELINE_VERSION = "1.8.1"
 $TAXONOMY_VERSION = "1.1"
 $MAPPING_RULES_VERSION = "2.1"
 $ROLES_CONFIG_VERSION = "1.1"
