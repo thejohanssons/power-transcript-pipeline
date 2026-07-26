@@ -92,13 +92,30 @@ $spMeetingIntelLibrary  = "Transcripts"
 # =========================
 # REST AUTH HELPER
 # =========================
-# Resolve classification_rules.json: repo root (local dev) or alongside script (Azure deploy)
-$rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
+# Resolve classification_rules.json
+# Priority: 1) config/ folder (committed, no secrets) — works both locally and on Azure
+#           2) repo root (local dev, full file with ApiKey)
+#           3) alongside script (legacy Azure deploy location)
+$rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")) {
+    (Resolve-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")).Path
+} elseif (Test-Path (Join-Path $PSScriptRoot "config/classification_rules.json")) {
+    (Resolve-Path (Join-Path $PSScriptRoot "config/classification_rules.json")).Path
+} elseif (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
     (Resolve-Path (Join-Path $PSScriptRoot "../../classification_rules.json")).Path
 } else {
     Join-Path $PSScriptRoot "classification_rules.json"
 }
-$rules = Get-Content -Path $rulesPath | ConvertFrom-Json
+$rules = Get-Content -Path $rulesPath -ErrorAction SilentlyContinue | ConvertFrom-Json
+if (-not $rules) { Write-Warning "[STARTUP] classification_rules.json not found or invalid at: $rulesPath" }
+
+# Merge ApiKey from env var if the file has an empty one (sanitised/committed version)
+if ($rules -and $rules.LLMConfig -and [string]::IsNullOrWhiteSpace($rules.LLMConfig.ApiKey)) {
+    $envKey = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $null }
+    if ($envKey) { $rules.LLMConfig.ApiKey = $envKey }
+}
+if ($rules -and $rules.LLMConfig -and [string]::IsNullOrWhiteSpace($rules.LLMConfig.Endpoint)) {
+    if ($env:AZURE_OPENAI_ENDPOINT) { $rules.LLMConfig.Endpoint = $env:AZURE_OPENAI_ENDPOINT }
+}
 
 $PIPELINE_VERSION = "1.7.9"
 $TAXONOMY_VERSION = "1.1"

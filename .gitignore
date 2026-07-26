@@ -6,7 +6,8 @@ appsettings.json
 local.settings.json
 
 # Local secrets - contains API keys and credentials, do not commit
-classification_rules.json
+# classification_rules.json: ignore secret versions, allow sanitised config/ version
+/classification_rules.json
 pipeline_config.json
 packages/pipeline/classification_rules.json
 packages/pipeline/pipeline_config.json
