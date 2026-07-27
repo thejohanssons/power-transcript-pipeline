@@ -1,0 +1,949 @@
+{
+  "unresolved": [
+    {
+      "name": "Keval-Ann Boome",
+      "first_seen": "2026-06-30",
+      "count": 2
+    },
+    {
+      "name": "Abhijeet Borah",
+      "first_seen": "2026-06-30",
+      "count": 1
+    },
+    {
+      "name": "Claudia Borg",
+      "first_seen": "2026-07-01",
+      "count": 3
+    },
+    {
+      "name": "Himank",
+      "first_seen": "2026-07-01",
+      "count": 28
+    },
+    {
+      "name": "Hi Bhavesh",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Theo Theo",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Lead Hardware",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Daughterboard Tape",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Theo From",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Dear Theo",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Regards Bhavesh",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Hardware Project",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Sense Check",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Nick",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Bhavesh Please",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Team",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Decode Reference",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Context Enrichment",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Syllables Reference",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Define Context",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Related Words",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Examples Enrichment",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Collective Nouns",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Team Lead",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Data Engineer",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Bob Holt",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Bang Creations",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Manufacturer Custom",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Top",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Bottom",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Right",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Left",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Navigation",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Centre",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Button",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Side",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Camera",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Microphone",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Ltd Best",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Bob From",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Stefan Knox",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Bob",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Nick Nick",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Global Head",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Supply Chain",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Dear Nick",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Worldwide Service",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "United Kingdom",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hello Theo",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Immediate Shipment",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Existing Parts",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Electronics Pte",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Global Projects",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Logistics Center",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Penjuru Lane",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Warehouse Contact",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Delivery Coordination",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Contact Person",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Theo",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Material Declaration",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Material Selection",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Manufacturer Which",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Approved By",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Empowering Tech",
+      "first_seen": "2026-07-02",
+      "count": 4
+    },
+    {
+      "name": "Yes Theo",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi All",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "High Resilience",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Yellow Card",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Davies Lead",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hardware Designer",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Related Requirements",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Likely More",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Thanks Bob",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Best Peter",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Chief Product",
+      "first_seen": "2026-07-02",
+      "count": 4
+    },
+    {
+      "name": "Dear Peter",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Peter Peter",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Johansson Chief",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Product Officer",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Peter",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Thanks Peter",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Bob Following",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Smoky Tint",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Use Elastalan",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Thanks Theo",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Top Level",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Reference Fluxuator",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Next Steps",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Provide Elastalan",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Manager From",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Outline Laser",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Steel Punching",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Drilling Minimum",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Critical Functional",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Features Tolerances",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Safe Design",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Known Risks",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Open Issues",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Surface Finish",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Material Specification",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Handling Requirements",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Model Intent",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Revision Control",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Documentation Package",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Index Please",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Nick Boards",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Latest Drawings",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Quin Quin",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Managing Director",
+      "first_seen": "2026-07-02",
+      "count": 3
+    },
+    {
+      "name": "Bruce Please",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Kristine Scott",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Next Shipment",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Thanks Krissy",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Xu Gang",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Krissy Kristine",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Senior Finance",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Assistant Kristine",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Hi Bruce",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Thanks Nick",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Barnes Global",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Mohammad Safiudin",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Bambang Kurniawan",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Jonni Herianto",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Fang Jun",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Heru Setiawan",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Sing Sim",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Tee Soon",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Aditya Rajpurkar",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "June Once",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Theo Nick",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Daniel Bhavesh",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Daniel Thanks",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "No Mfr",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Supplier Name",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Jan Wizcom",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Wizcom Requested",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Is Oatey",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Samira Naik",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Vayo Rules",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Indonesia Wizcom",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Material Dispatch",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Helen Lewis",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Grant Offer",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Project Work",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Joint Commitment",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Kind Regards",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Knowledge Transfer",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Project Manager",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "External Engagement",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Bristol Telephone",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Ria Eyers",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Collaboration Agreement",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Hi Ria",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "The Company",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Research Purposes",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "Intellectual Property",
+      "first_seen": "2026-07-02",
+      "count": 2
+    },
+    {
+      "name": "In June",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Alison Alison",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Process Improvement",
+      "first_seen": "2026-07-02",
+      "count": 1
+    },
+    {
+      "name": "Toby Toby",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Chief Operating",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Salary Saved",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Marketing Salary",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Redundancy Payout",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Annual Leave",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Saved Salary",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Education Sales",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "My Additional",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Salary Request",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Remaining The",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Education Salesperson",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Welsh Update",
+      "first_seen": "2026-07-07",
+      "count": 1
+    },
+    {
+      "name": "Max Davis",
+      "first_seen": "2026-07-09",
+      "count": 25
+    },
+    {
+      "name": "Abhi",
+      "first_seen": "2026-07-10",
+      "count": 25
+    },
+    {
+      "name": "Alihussain Photowala",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Harsh Gupta",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Prathamesh Birje",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Terry Neill",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Sharon Fraser-Tan",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Ann Conlon",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Jim Bowen",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Julie Blackburn",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Rachael Bills",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Emanuele Restivo",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Claudine Lees",
+      "first_seen": "2026-07-15",
+      "count": 6
+    },
+    {
+      "name": "Meeting",
+      "first_seen": "2026-07-15",
+      "count": 14
+    },
+    {
+      "name": "Anu Kaura",
+      "first_seen": "2026-07-15",
+      "count": 5
+    },
+    {
+      "name": "Vanita Pawar",
+      "first_seen": "2026-07-15",
+      "count": 5
+    },
+    {
+      "name": "Jagnesh Tamore",
+      "first_seen": "2026-07-15",
+      "count": 5
+    }
+  ]
+}

@@ -94,15 +94,12 @@ $spMeetingIntelLibrary  = "Transcripts"
 # =========================
 # Resolve classification_rules.json
 # Priority: 1) repo root (local dev, full file with ApiKey) — highest priority
-#           2) config/ folder (committed, sanitised, no secrets) — Azure fallback
-#           3) alongside script (legacy Azure deploy location)
+#           2) packages/pipeline/config/ (deployed with Azure, sanitised, no secrets)
 $rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
-    # Local dev: repo root (full file with ApiKey) — highest priority
+    # Local dev: repo root (full file with ApiKey)
     (Resolve-Path (Join-Path $PSScriptRoot "../../classification_rules.json")).Path
-} elseif (Test-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")) {
-    # Azure / config folder: sanitised version (ApiKey from env vars)
-    (Resolve-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")).Path
 } elseif (Test-Path (Join-Path $PSScriptRoot "config/classification_rules.json")) {
+    # Azure deploy: config/ inside packages/pipeline/
     (Resolve-Path (Join-Path $PSScriptRoot "config/classification_rules.json")).Path
 } else {
     Join-Path $PSScriptRoot "classification_rules.json"
@@ -127,10 +124,12 @@ $SENTIMENT_RULES_VERSION = "1.1"
 
 # --- EIP CONFIG LOADING ---
 # Resolve config dir: support both monorepo local dev (../../config) and Azure deployment (./config)
-$configDir = if (Test-Path (Join-Path $PSScriptRoot "../../config")) {
+$configDir = if (Test-Path (Join-Path $PSScriptRoot "config")) {
+    # Primary: packages/pipeline/config/ — works both locally and on Azure
+    (Resolve-Path (Join-Path $PSScriptRoot "config")).Path
+} elseif (Test-Path (Join-Path $PSScriptRoot "../../config")) {
+    # Fallback: repo root config/ (legacy)
     (Resolve-Path (Join-Path $PSScriptRoot "../../config")).Path
-} elseif (Test-Path (Join-Path $PSScriptRoot "config")) {
-    Join-Path $PSScriptRoot "config"
 } else {
     Join-Path $PSScriptRoot "config"
 }
