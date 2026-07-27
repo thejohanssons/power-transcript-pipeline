@@ -93,15 +93,17 @@ $spMeetingIntelLibrary  = "Transcripts"
 # REST AUTH HELPER
 # =========================
 # Resolve classification_rules.json
-# Priority: 1) config/ folder (committed, no secrets) — works both locally and on Azure
-#           2) repo root (local dev, full file with ApiKey)
+# Priority: 1) repo root (local dev, full file with ApiKey) — highest priority
+#           2) config/ folder (committed, sanitised, no secrets) — Azure fallback
 #           3) alongside script (legacy Azure deploy location)
-$rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")) {
+$rulesPath = if (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
+    # Local dev: repo root (full file with ApiKey) — highest priority
+    (Resolve-Path (Join-Path $PSScriptRoot "../../classification_rules.json")).Path
+} elseif (Test-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")) {
+    # Azure / config folder: sanitised version (ApiKey from env vars)
     (Resolve-Path (Join-Path $PSScriptRoot "../../config/classification_rules.json")).Path
 } elseif (Test-Path (Join-Path $PSScriptRoot "config/classification_rules.json")) {
     (Resolve-Path (Join-Path $PSScriptRoot "config/classification_rules.json")).Path
-} elseif (Test-Path (Join-Path $PSScriptRoot "../../classification_rules.json")) {
-    (Resolve-Path (Join-Path $PSScriptRoot "../../classification_rules.json")).Path
 } else {
     Join-Path $PSScriptRoot "classification_rules.json"
 }
