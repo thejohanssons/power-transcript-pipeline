@@ -137,6 +137,22 @@ export default {
         return handlePatchTranscript(env, path.split('/')[2], request);
       }
 
+      // --- Topics PATCH ---
+      if (path.match(/^\/topics\/[^/]+$/) && method === 'PATCH') {
+        return handlePatchTopic(env, decodeURIComponent(path.split('/')[2]), request);
+      }
+
+      // --- Files (R2) ---
+      if (path === '/files' && method === 'POST') {
+        return handlePostFile(env, request);
+      }
+      if (path.match(/^\/files\/.+$/) && method === 'GET') {
+        return handleGetFile(env, path.slice('/files/'.length));
+      }
+      if (path.match(/^\/files\/.+$/) && method === 'DELETE') {
+        return handleDeleteFile(env, path.slice('/files/'.length));
+      }
+
       return errorResponse('Not found', 404);
     } catch (err) {
       console.error('EIP API Worker error:', err);
@@ -576,4 +592,165 @@ async function handlePatchTranscript(env: Env, transcriptId: string, request: Re
   ).run();
 
   return jsonResponse({ transcript_id: transcriptId, updated: true });
+}
+
+// ============================================================
+// Topics PATCH
+// PATCH /topics/:id  { topic_id?, topic_name?, domain?, category?,
+//                      current_status?, current_priority?, owner?,
+//                      confluence_url?, sp_list_item_id? }
+// Used by normalize-topic-ids-d1.ps1 to remap topic_id to canonical T-codes.
+// When topic_id is changed, all topic_occurrences rows are updated to match.
+// ============================================================
+
+async function handlePatchTopic(env: Env, topicId: string, request: Request): Promise<Response> {
+  const body = await request.json() as Record<string, string | null>;
+
+  // Verify topic exists
+  const existing = await env.DB.prepare(
+    'SELECT topic_id FROM topics WHERE topic_id = ?'
+  ).bind(topicId).first();
+  if (!existing) return errorResponse(`Topic not found: ${topicId}`, 404);
+
+  const newTopicId = body.topic_id ?? null;
+
+  // If renaming topic_id, ensure the new one doesn't already exist
+  // (if it does, we merge — update occurrences to point to existing, delete old)
+  if (newTopicId && newTopicId !== topicId) {
+    const collision = await env.DB.prepare(
+      'SELECT topic_id FROM topics WHERE topic_id = ?'
+    ).bind(newTopicId).first();
+
+    if (collision) {
+      // Merge: point all occurrences of old ID to existing canonical row, then delete old row
+      await env.DB.prepare(
+        'UPDATE topic_occurrences SET topic_id = ? WHERE topic_id = ?'
+      ).bind(newTopicId, topicId).run();
+      await env.DB.prepare(
+        'DELETE FROM topics WHERE topic_id = ?'
+      ).bind(topicId).run();
+      return jsonResponse({ topic_id: newTopicId, action: 'merged', merged_from: topicId });
+    }
+
+    // No collision — rename in place + cascade to occurrences
+    // SQLite doesn't support FK cascade on UPDATE, so do it manually
+    await env.DB.batch([
+      env.DB.prepare('UPDATE topic_occurrences SET topic_id = ? WHERE topic_id = ?').bind(newTopicId, topicId),
+      env.DB.prepare('UPDATE topic_merge_candidates SET topic_id_a = ? WHERE topic_id_a = ?').bind(newTopicId, topicId),
+      env.DB.prepare('UPDATE topic_merge_candidates SET topic_id_b = ? WHERE topic_id_b = ?').bind(newTopicId, topicId),
+      env.DB.prepare('UPDATE topics SET topic_id = ? WHERE topic_id = ?').bind(newTopicId, topicId),
+    ]);
+  }
+
+  // Apply any other field updates
+  const effectiveId = newTopicId ?? topicId;
+  const fields: string[] = [];
+  const values: (string | null)[] = [];
+  const allowed = ['topic_name','domain','category','current_status','current_priority','owner','confluence_url','sp_list_item_id'];
+  for (const key of allowed) {
+    if (key in body) { fields.push(`${key} = ?`); values.push(body[key]); }
+  }
+  if (fields.length > 0) {
+    values.push(effectiveId);
+    await env.DB.prepare(
+      `UPDATE topics SET ${fields.join(', ')} WHERE topic_id = ?`
+    ).bind(...values).run();
+  }
+
+  return jsonResponse({ topic_id: effectiveId, updated: true, renamed_from: newTopicId ? topicId : null });
+}
+
+// ============================================================
+// R2 File Store
+// ------------------------------------------------------------
+// Key convention (enforced by pipeline, not the Worker):
+//   transcripts/{yyyy-MM}/{meeting_id}.txt
+//   summaries/{yyyy-MM}/{meeting_id}-summary.txt
+//   topic-records/{yyyy-MM}/{meeting_id}/{topic_id}-{label}.md
+//   people/{yyyy-MM}/{meeting_id}-people.txt
+//   logs/{filename}
+//
+// POST /files   { key, content, content_type? }
+//   → writes text content to R2 under the given key
+//   → if key matches "transcripts/*/...", updates D1 transcript r2_key
+//   Returns: { key, size, updated_transcript }
+//
+// GET  /files/{key}   → returns raw file content
+// DELETE /files/{key} → deletes file from R2
+// ============================================================
+
+interface PostFileBody {
+  key: string;
+  content: string;       // UTF-8 text content
+  content_type?: string; // default: text/plain; charset=utf-8
+}
+
+async function handlePostFile(env: Env, request: Request): Promise<Response> {
+  const body = await request.json() as PostFileBody;
+
+  if (!body.key || !body.content) {
+    return errorResponse('Required fields: key, content');
+  }
+
+  // Sanitise key: no leading slash, no path traversal
+  const key = body.key.replace(/^\/+/, '').replace(/\.\.\//g, '');
+  if (!key) return errorResponse('Invalid key');
+
+  const contentType = body.content_type ?? 'text/plain; charset=utf-8';
+  const bytes = new TextEncoder().encode(body.content);
+
+  await env.STORAGE.put(key, bytes, {
+    httpMetadata: { contentType },
+    customMetadata: { uploaded_at: now(), environment: env.ENVIRONMENT },
+  });
+
+  // If this is a transcript file, update r2_key on the matching D1 transcript row
+  let updatedTranscript: string | null = null;
+  const transcriptKeyMatch = key.match(/^transcripts\/[\d-]+\/([^/]+?)(?:-[^/]+)?\.txt$/);
+  if (transcriptKeyMatch) {
+    const meetingRef = transcriptKeyMatch[1];
+    const result = await env.DB.prepare(`
+      UPDATE transcripts SET r2_key = ? WHERE meeting_ref = ? AND (r2_key IS NULL OR r2_key = '')
+    `).bind(key, meetingRef).run();
+    if (result.meta.changes > 0) updatedTranscript = meetingRef;
+  }
+
+  return jsonResponse({
+    key,
+    size: bytes.length,
+    content_type: contentType,
+    updated_transcript: updatedTranscript,
+  }, 201);
+}
+
+async function handleGetFile(env: Env, key: string): Promise<Response> {
+  const decodedKey = decodeURIComponent(key).replace(/^\/+/, '');
+  if (!decodedKey) return errorResponse('Invalid key', 400);
+
+  const object = await env.STORAGE.get(decodedKey);
+  if (!object) return errorResponse('File not found', 404);
+
+  const contentType = object.httpMetadata?.contentType ?? 'text/plain; charset=utf-8';
+  const text = await object.text();
+  return new Response(text, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'ETag': object.etag,
+      'Last-Modified': object.uploaded.toUTCString(),
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+async function handleDeleteFile(env: Env, key: string): Promise<Response> {
+  const decodedKey = decodeURIComponent(key).replace(/^\/+/, '');
+  if (!decodedKey) return errorResponse('Invalid key', 400);
+
+  // Verify it exists first
+  const head = await env.STORAGE.head(decodedKey);
+  if (!head) return errorResponse('File not found', 404);
+
+  await env.STORAGE.delete(decodedKey);
+  return jsonResponse({ key: decodedKey, deleted: true });
 }
