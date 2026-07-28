@@ -2785,12 +2785,13 @@ function Ensure-DriveFolder {
 }
 
 function Upload-FileToSharePoint {
+    param($DriveId, $FolderId, $FilePath)
+
     # STAGING MODE: skip all SharePoint writes to protect Petersplace
     if ($script:skipSharePoint) {
-        Write-Verbose "  [STAGING] SharePoint upload skipped: $($args | Where-Object { $_ -match '\.txt|\.json|\.md' } | Select-Object -First 1)"
+        Write-Verbose "  [STAGING] SharePoint upload skipped: $FilePath"
         return $null
     }
-    param($DriveId, $FolderId, $FilePath)
     
     # Ensure token is valid for upload
     Ensure-GraphToken
