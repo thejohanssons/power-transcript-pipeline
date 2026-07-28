@@ -1,0 +1,65 @@
+name: CI Validation
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  typecheck-api-worker:
+    runs-on: ubuntu-latest
+    name: Typecheck API Worker (tsc)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/api-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/api-worker
+        run: npm ci
+
+      - name: Run TypeScript typecheck
+        working-directory: packages/api-worker
+        run: npx tsc --noEmit
+
+  lint-pipeline:
+    runs-on: ubuntu-latest
+    name: Lint Pipeline Script (PSScriptAnalyzer)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell
+        uses: actions/setup-powershell@v1
+        with:
+          powershell-version: '7.x'
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer `
+            -Path ./packages/pipeline/power-transcript-pipeline.ps1 `
+            -Severity Error,Warning `
+            -ExcludeRule PSAvoidUsingWriteHost,PSAvoidGlobalVars,PSUseDeclaredVarsMoreThanAssignments
+          if ($results) {
+            $results | Format-Table -AutoSize
+            Write-Error "PSScriptAnalyzer found $($results.Count) issue(s)."
+            exit 1
+          } else {
+            Write-Host "PSScriptAnalyzer: no issues found ✅"
+          }
