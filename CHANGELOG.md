@@ -7,6 +7,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.9.0] — 2026-07-28
+
+### Added
+- **`Invoke-MeetingProcessing` shared core**: Extracted a single shared processing function used by all three pipeline paths (VTT inbox, VTT direct, CALENDAR), eliminating ~820 lines of duplicated code.
+- **`Normalize-TopicIds` function**: Maps LLM-generated free-form topic slugs to canonical T-codes via `mapping_rules.json`. Runs after `Get-MeetingClassification` on every path.
+- **R2 file API** (`packages/api-worker`): New endpoints `POST /files`, `GET /files/{key}`, `DELETE /files/{key}` for uploading and retrieving files from Cloudflare R2. Auto-updates D1 `r2_key` for transcript registrations.
+- **`PATCH /topics/:id`** (`packages/api-worker`): Rename or merge topic IDs. Cascades changes to `topic_occurrences` and `topic_merge_candidates`.
+- **Canonical T-code taxonomy injected into LLM records prompt**: T01–T18 list now included in the Pass 3 prompt, eliminating invented topic IDs. Records call now uses `TopicName` from the taxonomy directly.
+- **Strengthened records FOCUS instruction**: Enforces schema completeness (all fields), one-record-per-theme, no collapsing of distinct topics, and no truncation.
+- **Minimum record count guard**: After Pass 3, compares returned record count against `### Topic:` section count in summary. Logs a warning when the LLM underdelivers.
+- **CI validation workflow** (`.github/workflows/ci.yml`): Runs on push/PR to `develop` and `main`. Typechecks API worker with `tsc --noEmit` and lints pipeline script with `PSScriptAnalyzer` (Error severity only).
+
+### Fixed
+- **`Format-TopicRecord` missing `-MeetingMode` parameter**: Caused crash on T05/T06 topics when `Invoke-MeetingProcessing` passed the new parameter to a function whose signature hadn't been updated.
+- **Teams notification always showing "0 new"**: Counter was checking `$_.Status -eq "processed"` but the field is `AgentState`. Now counts all non-skipped, non-error `AgentState` values.
+- **`Get-ListString` nested function**: Moved from inside `Format-TopicRecord` to top-level scope to avoid redefinition issues on repeated calls.
+- **"Parameter set cannot be resolved" crash on multi-record meetings** (root cause): `Add-Member -Force` on a bare `PSCustomObject` from `Enrich-Summary`'s merge loop fails in PowerShell 7 when `enrichResult.Records` returns a single unwrapped object. Fixed with `@()` force-wrap and `PSObject.Properties.Add(PSNoteProperty::new(...))` to bypass PS7 parameter binding entirely.
+- **`Get-StalledWork` positional argument binding**: Switched from `& "Get-StalledWork" $arr1 $arr2` to named parameters to avoid PS7 parameter set ambiguity with two array arguments.
+
+---
+
 ## [1.8.1] — 2026-07-26
 
 ### Fixed (Production)
