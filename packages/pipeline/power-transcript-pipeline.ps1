@@ -969,8 +969,8 @@ function Enrich-Summary {
     }
 
     # Trends & Persistence
-    $topicRecords = $topicRecordsMap.Values | ForEach-Object { $_ }
-    $trends = & "Get-StalledWork" $topicRecords $historyRecords
+    $topicRecords = @($topicRecordsMap.Values)
+    $trends = Get-StalledWork -currentRecords $topicRecords -historyRecords $historyRecords
     if ($trends.Count -gt 0) {
         $finalSummary += "## TOPIC TRENDS & PERSISTENCE`n"
         foreach ($t in $trends) {
@@ -1224,20 +1224,22 @@ function Invoke-MeetingProcessing {
     # Merge LLM deep metadata back onto enriched records
     $topicRecords3D = @()
     if ($enrichResult.Records) {
-        foreach ($er in $enrichResult.Records) {
+        foreach ($er in @($enrichResult.Records)) {
+            # Ensure $er is a PSCustomObject (not a hashtable or other type) before Add-Member
+            if ($er -is [hashtable]) { $er = [pscustomobject]$er }
             $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
             if ($ir) {
                 $mergedSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
                 $mergedTags    = if ($ir.Tags)    { $ir.Tags }    else { $er.Tags }
-                $er | Add-Member -NotePropertyName "Summary"          -Value $mergedSummary       -Force
-                $er | Add-Member -NotePropertyName "KeyFacts"         -Value $ir.KeyFacts         -Force
-                $er | Add-Member -NotePropertyName "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
-                $er | Add-Member -NotePropertyName "Decisions"        -Value $ir.Decisions        -Force
-                $er | Add-Member -NotePropertyName "Actions"          -Value $ir.Actions          -Force
-                $er | Add-Member -NotePropertyName "NextSteps"        -Value $ir.NextSteps        -Force
-                $er | Add-Member -NotePropertyName "Risks"            -Value $ir.Risks            -Force
-                $er | Add-Member -NotePropertyName "TopicName"        -Value $ir.TopicName        -Force
-                $er | Add-Member -NotePropertyName "Tags"             -Value $mergedTags          -Force
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Summary",          $mergedSummary))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("KeyFacts",         $ir.KeyFacts))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("RetrievalAnchors", $ir.RetrievalAnchors))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Decisions",        $ir.Decisions))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Actions",          $ir.Actions))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("NextSteps",        $ir.NextSteps))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Risks",            $ir.Risks))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("TopicName",        $ir.TopicName))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Tags",             $mergedTags))
             }
             $topicRecords3D += $er
         }
@@ -1906,6 +1908,26 @@ function Format-PeopleFile {
 }
 
 # --- STEP 1 & 3: TOPIC RECORD MODEL & ENTITY EXTRACTION ---
+function Get-ListString {
+    param($items)
+    if (-not $items -or ($items -is [array] -and $items.Count -eq 0)) { return "None" }
+    if ($items -is [string]) { return $items }
+    if ($items -is [array]) {
+        return ($items | ForEach-Object { 
+            if ($_ -is [hashtable] -or $_ -is [pscustomobject]) { 
+                # Handle Decision/Action objects from LLM
+                $text = if ($_.Decision) { "$($_.Decision) (Rationale: $($_.Rationale))" } 
+                        elseif ($_.Action) { "$($_.Action) (Owner: $($_.Owner), Deadline: $($_.Deadline))" }
+                        else { $_ | ConvertTo-Json -Compress }
+                "- $text"
+            } else {
+                "- $_" 
+            }
+        }) -join "`n"
+    }
+    return "None"
+}
+
 function Get-TopicEntities {
     param([string]$Text, $ResolvedPeople)
     
@@ -2068,27 +2090,6 @@ function Format-TopicRecord {
     
     # Final Validation State
     $validationStatus = if ($resolvedDomain -ne "Unknown" -and $resolvedFamily -ne "Unknown" -and $TopicData.Ownership.PRIMARY_OWNER -ne "Unknown") { "PASS (Recovered)" } else { "FAIL" }
-
-    # Helper for list formatting
-    function Get-ListString {
-        param($items)
-        if (-not $items -or ($items -is [array] -and $items.Count -eq 0)) { return "None" }
-        if ($items -is [string]) { return $items }
-        if ($items -is [array]) {
-            return ($items | ForEach-Object { 
-                if ($_ -is [hashtable] -or $_ -is [pscustomobject]) { 
-                    # Handle Decision/Action objects from LLM
-                    $text = if ($_.Decision) { "$($_.Decision) (Rationale: $($_.Rationale))" } 
-                            elseif ($_.Action) { "$($_.Action) (Owner: $($_.Owner), Deadline: $($_.Deadline))" }
-                            else { $_ | ConvertTo-Json -Compress }
-                    "- $text"
-                } else {
-                    "- $_" 
-                }
-            }) -join "`n"
-        }
-        return "None"
-    }
 
     $keyFactsStr = Get-ListString -items $TopicData.KeyFacts
     $decisionsStr = Get-ListString -items $TopicData.Decisions
