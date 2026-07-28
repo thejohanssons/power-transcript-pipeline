@@ -1229,8 +1229,10 @@ function Invoke-MeetingProcessing {
             if ($er -is [hashtable]) { $er = [pscustomobject]$er }
             $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
             if ($ir) {
-                $mergedSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
-                $mergedTags    = if ($ir.Tags)    { $ir.Tags }    else { $er.Tags }
+                $mergedSummary  = if ($ir.Summary)   { $ir.Summary }   else { $er.Content }
+                $mergedTags     = if ($ir.Tags)       { $ir.Tags }       else { $er.Tags }
+                $mergedLabel    = if ($er.Label -and $er.Label -ne $er.TopicId) { $er.Label } elseif ($ir.Label) { $ir.Label } else { $ir.TopicName }
+                $mergedTopicName = if ($er.TopicName) { $er.TopicName } elseif ($ir.TopicName) { $ir.TopicName } else { $null }
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Summary",          $mergedSummary))
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("KeyFacts",         $ir.KeyFacts))
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("RetrievalAnchors", $ir.RetrievalAnchors))
@@ -1238,8 +1240,9 @@ function Invoke-MeetingProcessing {
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Actions",          $ir.Actions))
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("NextSteps",        $ir.NextSteps))
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Risks",            $ir.Risks))
-                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("TopicName",        $ir.TopicName))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("TopicName",        $mergedTopicName))
                 $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Tags",             $mergedTags))
+                $er.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Label",            $mergedLabel))
             }
             $topicRecords3D += $er
         }
