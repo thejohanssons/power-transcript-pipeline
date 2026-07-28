@@ -1074,6 +1074,519 @@ function Invoke-CloudflareSync {
     }
 }
 
+# ---------------------------------------------------------------
+# Normalize-TopicIds — maps LLM-generated topic IDs to canonical
+# T-codes from mapping_rules.json. Runs after Get-MeetingClassification
+# on all paths so D1 always receives consistent IDs.
+# ---------------------------------------------------------------
+function Normalize-TopicIds {
+    param([object[]]$Records)
+    if (-not $Records -or $Records.Count -eq 0) { return $Records }
+    $rules = $null
+    if (Get-Variable -Name "mappingRules" -Scope Script -ErrorAction SilentlyContinue) {
+        $rules = (Get-Variable -Name "mappingRules" -Scope Script).Value
+    }
+    if (-not $rules -or -not $rules.Rules) { return $Records }
+
+    foreach ($rec in $Records) {
+        # Extract TopicId and TopicName from record (handle multiple field name variants)
+        $tid = if ($rec -is [pscustomobject] -and $rec.PSObject.Properties['TopicId']) { $rec.TopicId } `
+               elseif ($rec -is [hashtable] -and $rec.ContainsKey('TopicId')) { $rec['TopicId'] } `
+               else { $null }
+        $topicName = if ($rec -is [pscustomobject]) {
+            if ($rec.PSObject.Properties['Topic']) { $rec.Topic } `
+            elseif ($rec.PSObject.Properties['TopicName']) { $rec.TopicName } `
+            else { $null }
+        } elseif ($rec -is [hashtable]) {
+            if ($rec.ContainsKey('Topic')) { $rec['Topic'] } `
+            elseif ($rec.ContainsKey('TopicName')) { $rec['TopicName'] } `
+            else { $null }
+        } else { $null }
+
+        # Already a valid T-code — nothing to do
+        if ($tid -and $tid -match '^T\d+$') { continue }
+
+        # Match against taxonomy: try TopicName first (most reliable), fall back to TopicId slug
+        $match = $null
+        if ($topicName) {
+            # Strip version suffix (e.g. " v1.0") and normalize
+            $nameClean = ($topicName -replace '\s*v\d+\.\d+\s*$', '' -replace '[^a-zA-Z0-9]', '').ToLower()
+            $match = $rules.Rules | Where-Object {
+                $rName = ($_.Name -replace '[^a-zA-Z0-9]', '').ToLower()
+                $rName -eq $nameClean -or $rName -like "*$nameClean*" -or $nameClean -like "*$rName*"
+            } | Select-Object -First 1
+        }
+        # Fall back to TopicId slug matching if TopicName match failed
+        if (-not $match -and $tid) {
+            $tidClean = ($tid -replace '[^a-zA-Z0-9]', '').ToLower()
+            $match = $rules.Rules | Where-Object {
+                $rName = ($_.Name -replace '[^a-zA-Z0-9]', '').ToLower()
+                $rId   = ($_.TopicId -replace '[^a-zA-Z0-9]', '').ToLower()
+                $tidClean -and ($rName -like "*$tidClean*" -or $tidClean -like "*$rName*" -or $rId -like "*$tidClean*" -or $tidClean -like "*$rId*")
+            } | Select-Object -First 1
+        }
+
+        $canonical = if ($match) { $match.TopicId } else { "T00" }
+        if ($rec -is [pscustomobject]) {
+            if ($rec.PSObject.Properties['TopicId']) { $rec.TopicId = $canonical }
+            else { $rec | Add-Member -NotePropertyName "TopicId" -NotePropertyValue $canonical -Force }
+            # Back-fill TopicName if blank and we have a match
+            $existingName = if ($rec.PSObject.Properties['TopicName']) { $rec.TopicName } else { $null }
+            if ($match -and $canonical -ne "T00" -and [string]::IsNullOrWhiteSpace($existingName)) {
+                if ($rec.PSObject.Properties['TopicName']) { $rec.TopicName = $match.Name }
+                else { $rec | Add-Member -NotePropertyName "TopicName" -NotePropertyValue $match.Name -Force }
+            }
+        } elseif ($rec -is [hashtable]) {
+            $rec['TopicId'] = $canonical
+            if ($match -and $canonical -ne "T00" -and [string]::IsNullOrWhiteSpace($rec['TopicName'])) {
+                $rec['TopicName'] = $match.Name
+            }
+        }
+        $matchSource = if ($match -and $topicName) { "TopicName='$topicName'" } elseif ($match -and $tid) { "TopicId='$tid'" } else { "no match" }
+        Write-Verbose "  [NID] Normalised $matchSource -> '$canonical' ($($match.Name))"
+    }
+    return $Records
+}
+
+# ---------------------------------------------------------------
+# Invoke-MeetingProcessing — shared processing core for all 3 paths.
+# Called after content acquisition. Handles classify -> normalise ->
+# enrich -> topic records -> SharePoint -> CF sync -> people -> log entry.
+# Returns a hashtable: LogEntry, TeamsMessage, UploadedTranscript,
+# UploadedSummary, UploadedPeopleFile, ConfluenceUrl, LocalFile,
+# LocalSummaryFile, TopicRecords, EnrichedSummary.
+# ---------------------------------------------------------------
+function Invoke-MeetingProcessing {
+    param(
+        [string]   $PlainText,
+        [string]   $Subject,
+        [string]   $Organiser,
+        [datetime] $EventDate,
+        [string]   $MeetingId,
+        [string]   $MeetingType,
+        [string]   $PathLabel,      # "VTT", "CALENDAR" etc — for log prefixes only
+        [string]   $DriveId,
+        [string]   $OutDir,
+        [int]      $SegmentCount = 1,
+        [string]   $AgentState = "processed",
+        [string]   $RunId = "local"
+    )
+
+    $timestamp    = $EventDate.ToString("yyyy-MM-dd_HHmm")
+    $cleanSubject = $Subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
+    $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
+
+    # ── 1. CLASSIFY & SUMMARISE ──────────────────────────────────
+    $repairReason    = $null
+    $repairAttempted = $false
+    $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser -transcriptContent $PlainText
+    if (-not $cls.summary) {
+        Write-Warning "  [$PathLabel] Summary generation failed. Retrying once..."
+        $repairAttempted = $true
+        $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser -transcriptContent $PlainText
+        if (-not $cls.summary) { $repairReason = "llm_summary_missing_after_retry" }
+    }
+
+    # ── 2. NORMALISE TOPIC IDs ───────────────────────────────────
+    $initialRecords = if ($cls.records) { @(Normalize-TopicIds -Records @($cls.records)) } else { @() }
+
+    # ── 3. EXECUTION CONTEXT ────────────────────────────────────
+    $meetingCtx = Resolve-ExecutionContext -Subject $Subject -Organiser $Organiser
+    Write-Host "  [CTX] Execution context detected: $(if ($meetingCtx) { $meetingCtx } else { 'Unknown (no bias applied)' })"
+
+    # ── 4. ENRICH SUMMARY ────────────────────────────────────────
+    $historyTopicRecords = @()
+    $logSource = $null
+    if (Get-Variable -Name "masterLogData" -Scope Script -ErrorAction SilentlyContinue) {
+        $logSource = (Get-Variable -Name "masterLogData" -Scope Script).Value
+    } elseif (Get-Variable -Name "masterLogData" -ErrorAction SilentlyContinue) {
+        $logSource = $masterLogData
+    }
+    if ($logSource -and $logSource.Meetings) {
+        foreach ($mE in $logSource.Meetings) {
+            if ($mE.TopicRecords) {
+                foreach ($tr in $mE.TopicRecords) {
+                    $historyTopicRecords += [pscustomobject]@{
+                        TopicId   = $tr.TopicId
+                        TopicName = $tr.TopicName
+                        Content   = $tr.Content
+                        Signal    = $tr.Signal
+                        EventDate = $mE.EventDate
+                    }
+                }
+            }
+        }
+    }
+
+    $enrichResult    = Enrich-Summary -summaryText $cls.summary -meetingId $MeetingId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $meetingCtx
+    $enrichedSummary = if ($enrichResult.Summary) { $enrichResult.Summary } else { $cls.summary }
+
+    # Merge LLM deep metadata back onto enriched records
+    $topicRecords3D = @()
+    if ($enrichResult.Records) {
+        foreach ($er in $enrichResult.Records) {
+            $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
+            if ($ir) {
+                $mergedSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
+                $mergedTags    = if ($ir.Tags)    { $ir.Tags }    else { $er.Tags }
+                $er | Add-Member -NotePropertyName "Summary"          -Value $mergedSummary       -Force
+                $er | Add-Member -NotePropertyName "KeyFacts"         -Value $ir.KeyFacts         -Force
+                $er | Add-Member -NotePropertyName "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
+                $er | Add-Member -NotePropertyName "Decisions"        -Value $ir.Decisions        -Force
+                $er | Add-Member -NotePropertyName "Actions"          -Value $ir.Actions          -Force
+                $er | Add-Member -NotePropertyName "NextSteps"        -Value $ir.NextSteps        -Force
+                $er | Add-Member -NotePropertyName "Risks"            -Value $ir.Risks            -Force
+                $er | Add-Member -NotePropertyName "TopicName"        -Value $ir.TopicName        -Force
+                $er | Add-Member -NotePropertyName "Tags"             -Value $mergedTags          -Force
+            }
+            $topicRecords3D += $er
+        }
+    } else {
+        $topicRecords3D = $initialRecords
+    }
+
+    # ── 5. MODE & VALIDATION ─────────────────────────────────────
+    $modeResult = Assign-Mode -type $MeetingType -organiser $Organiser -topicRecords $topicRecords3D
+    $topicCount = ($topicRecords3D | Select-Object -Property TopicId -Unique).Count
+    $t00Count   = ($topicRecords3D | Where-Object { $_.TopicId -eq "T00" }).Count
+    $t00Pct     = if ($topicCount -gt 0) { (($t00Count / $topicCount) * 100).ToString('F1') } else { "0,0" }
+    Write-Host "  [VALIDATION] Topics detected: $topicCount"
+    Write-Host "  [VALIDATION] T00 Usage: $t00Pct%"
+    Write-Host "  [VALIDATION] Mode Assigned: $($modeResult.mode) ($($modeResult.source))"
+    if ($topicCount -eq 0 -and $cls.summary) {
+        Write-Warning "  [VALIDATION] No topics extracted from summary. Check LLM prompt compliance."
+    }
+
+    # ── 6. RESOLVE PEOPLE ────────────────────────────────────────
+    $resolvedPeople = Resolve-People -TranscriptText $PlainText
+
+    # ── 7. BUILD FILE HEADER ──────────────────────────────────────
+    $header = @"
+---
+MEETING ID: $MeetingId
+SUBJECT: $Subject
+ORGANISER: $Organiser
+EVENT DATE: $($EventDate.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+TYPE: $MeetingType
+PRIORITY: normal
+MODE: $($modeResult.mode)
+MODE_SOURCE: $($modeResult.source)
+MODE_CONFIDENCE: $($modeResult.confidence)
+PIPELINE_VERSION: $PIPELINE_VERSION
+PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
+STATUS: success
+BACK-LINK (MASTER LOG): $masterLogUrl
+---
+
+"@
+
+    # ── 8. SAVE TRANSCRIPT LOCALLY ───────────────────────────────
+    if (-not (Test-Path $OutDir)) { $null = New-Item -ItemType Directory -Path $OutDir -Force }
+    $localFile = Join-Path $OutDir "$timestamp-$cleanSubject.txt"
+    ($header + $PlainText) | Out-File -FilePath $localFile -Encoding utf8
+
+    $summaryWithLinks = [string]$enrichedSummary
+    $localSummaryFile = $null
+
+    # ── 9. TOPIC RECORDS → SHAREPOINT + CF ───────────────────────
+    $topicMonthFolder = $EventDate.ToString("yyyy-MM")
+    $topicRecordsDir  = "Exec Intel Insights/Topic Records/$topicMonthFolder/$MeetingId"
+    $topicFolderId    = Ensure-DriveFolder -DriveId $DriveId -FolderPath $topicRecordsDir
+
+    # Deduplicate topic records by specific topic label — same named topic discussed
+    # multiple times in a meeting should be collapsed into one record (longest wins).
+    # Note: dedup is on Label/TopicName (the specific topic), NOT TopicId (the taxonomy code).
+    # Multiple distinct topics can legitimately share the same TopicId (taxonomy category).
+    $deduped = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($tr in $topicRecords3D) {
+        $label = if ($tr.Label -and $tr.Label -ne $tr.TopicId) { $tr.Label } `
+                 elseif ($tr.TopicName) { $tr.TopicName } `
+                 else { $tr.TopicId }   # last resort: only dedup within same T-code when no name
+        if (-not $deduped.ContainsKey($label)) {
+            $deduped[$label] = $tr
+        } else {
+            $existingLen = if ($deduped[$label].Summary) { $deduped[$label].Summary.Length } else { 0 }
+            $newLen      = if ($tr.Summary)              { $tr.Summary.Length }              else { 0 }
+            if ($newLen -gt $existingLen) { $deduped[$label] = $tr }
+        }
+    }
+    $beforeCount    = $topicRecords3D.Count
+    $topicRecords3D = @($deduped.Values)
+    if ($topicRecords3D.Count -lt $beforeCount) {
+        Write-Host "  [NID] Topic record dedup: $beforeCount → $($topicRecords3D.Count) records (collapsed duplicate labels)"
+    }
+
+    foreach ($tr in $topicRecords3D) {
+        $cleanLabel     = if ($tr.Label) { $tr.Label } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.TopicId }
+        $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
+        if (-not $sanitizedLabel) { $sanitizedLabel = "Details" }
+        $trFileName  = "$MeetingId-$($tr.TopicId)-$sanitizedLabel.md"
+        $trLocalPath = Join-Path $OutDir $trFileName
+
+        $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
+            Subject = $Subject; MeetingId = $MeetingId; EventDate = $EventDate
+        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy -MeetingMode $modeResult.mode
+        $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
+
+        Write-Host "  [$PathLabel] Uploading Topic Record: $trFileName"
+        Upload-FileToSharePoint -DriveId $DriveId -FolderId $topicFolderId -FilePath $trLocalPath | Out-Null
+
+        # [CF/R2] Store topic record in R2
+        $r2TopicKey = "topic-records/$($EventDate.ToString('yyyy-MM'))/$MeetingId/$trFileName"
+        Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
+            key          = $r2TopicKey
+            content      = (Get-Content -Path $trLocalPath -Raw -Encoding utf8)
+            content_type = "text/markdown; charset=utf-8"
+        }
+
+        # [CF] Upsert topic to D1
+        $safeTopicName  = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
+        $safePriority   = if ($tr.EXECUTIVE_PRIORITY -and $tr.EXECUTIVE_PRIORITY -ne "Unknown") { $tr.EXECUTIVE_PRIORITY } else { "Medium" }
+        $safeOwner      = if ($tr.Ownership -and $tr.Ownership.PSObject.Properties['PRIMARY_OWNER'] -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
+        $safeContext    = if ($meetingCtx) { $meetingCtx } else { "Unknown" }
+        Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
+            topic_id     = $tr.TopicId
+            topic_name   = $safeTopicName
+            domain       = $tr.Domain
+            category     = $tr.Category
+            priority     = $safePriority
+            owner        = $safeOwner
+            summary      = $tr.Summary
+            meeting_ref  = $MeetingId
+            meeting_date = $EventDate.ToString("yyyy-MM-dd")
+            context      = $safeContext
+            source       = "Transcript"
+        }
+
+        # Mutual Linking: Summary -> Topic Record
+        if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
+            $pattern     = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
+            $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
+            $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
+        }
+    }
+
+    # ── 10. UPLOAD TRANSCRIPT + SUMMARY → SHAREPOINT + CF ────────
+    $uploadedTranscript = $null
+    $uploadedSummary    = $null
+    $evtFolderPath      = "Exec Intel Insights/Meeting Transcripts/$($EventDate.ToString('yyyy-MM'))"
+    $evtFolderId        = Ensure-DriveFolder -DriveId $DriveId -FolderPath $evtFolderPath
+
+    try {
+        $uploadedTranscript = Upload-FileToSharePoint -DriveId $DriveId -FolderId $evtFolderId -FilePath $localFile
+        Write-Host "  [$PathLabel] Transcript uploaded to SharePoint"
+
+        # [CF/R2] Store transcript in R2
+        $r2TranscriptKey = "transcripts/$($EventDate.ToString('yyyy-MM'))/$MeetingId.txt"
+        Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
+            key          = $r2TranscriptKey
+            content      = (Get-Content -Path $localFile -Raw -Encoding utf8)
+            content_type = "text/plain; charset=utf-8"
+        }
+        Write-Host "  [$PathLabel] Transcript stored in R2: $r2TranscriptKey"
+
+        # [CF/D1] Register transcript
+        Invoke-CloudflareSync -Method "Post" -Endpoint "transcripts" -Body @{
+            meeting_ref   = $MeetingId
+            meeting_date  = $EventDate.ToString("yyyy-MM-dd")
+            source_system = "M365"
+            segment_count = $SegmentCount
+            r2_key        = $r2TranscriptKey
+        }
+        if ($cls.summary) {
+            $localSummaryFile = Join-Path $OutDir "$timestamp-$cleanSubject-Summary.txt"
+            ($header + $summaryWithLinks) | Out-File -FilePath $localSummaryFile -Encoding utf8
+            $uploadedSummary = Upload-FileToSharePoint -DriveId $DriveId -FolderId $evtFolderId -FilePath $localSummaryFile
+            Write-Host "  [$PathLabel] Summary uploaded to SharePoint"
+
+            # [CF/R2] Store summary in R2
+            $r2SummaryKey = "summaries/$($EventDate.ToString('yyyy-MM'))/$MeetingId-summary.txt"
+            Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
+                key          = $r2SummaryKey
+                content      = (Get-Content -Path $localSummaryFile -Raw -Encoding utf8)
+                content_type = "text/plain; charset=utf-8"
+            }
+            Write-Host "  [$PathLabel] Summary stored in R2: $r2SummaryKey"
+        }
+    } catch {
+        Write-Warning "  [$PathLabel] SharePoint upload failed: $_"
+    }
+
+    # ── 11. CONFLUENCE MIRROR ─────────────────────────────────────
+    $confluenceUrl   = $null
+    $cfgPath         = Join-Path $PSScriptRoot "pipeline_config.json"
+    $cfgLocal        = if (Test-Path $cfgPath) { Get-Content $cfgPath | ConvertFrom-Json } else { $null }
+    $hasConfCreds    = ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
+    $isMirrorEnabled = ($cfgLocal -and $cfgLocal.enable_confluence_mirror) -or $hasConfCreds
+    if ($isMirrorEnabled -and $Organiser -ne "carolynn@empoweringtech.com" -and $cls.summary) {
+        $confSpace  = if ($env:CONFLUENCE_SPACE_KEY)  { $env:CONFLUENCE_SPACE_KEY }  else { $cfgLocal.confluence_space_key }
+        $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $cfgLocal.confluence_parent_id }
+        if ($confSpace -and $confParent) {
+            try {
+                $confHtml      = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummary -Subject $Subject -MeetingId $MeetingId -EventDate $EventDate -Organiser $Organiser
+                $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $MeetingId -SpaceKey $confSpace -ParentPageId $confParent
+            } catch { Write-Warning "  [$PathLabel] Confluence mirror failed: $_" }
+        } else {
+            Write-Host "  [CONFLUENCE] Skip: Missing Space Key or Parent ID."
+        }
+    }
+
+    # ── 12. PEOPLE INTELLIGENCE ───────────────────────────────────
+    $uploadedPeopleFile = $null
+    $rulesRef = $null
+    if (Get-Variable -Name "rules" -Scope Script -ErrorAction SilentlyContinue) { $rulesRef = (Get-Variable -Name "rules" -Scope Script).Value }
+    elseif (Get-Variable -Name "rules" -ErrorAction SilentlyContinue) { $rulesRef = $rules }
+    elseif (Get-Variable -Name "script:rules" -ErrorAction SilentlyContinue) { $rulesRef = $script:rules }
+    $peopleConfigRef = $null
+    if (Get-Variable -Name "peopleConfig" -Scope Script -ErrorAction SilentlyContinue) { $peopleConfigRef = (Get-Variable -Name "peopleConfig" -Scope Script).Value }
+    elseif (Get-Variable -Name "peopleConfig" -ErrorAction SilentlyContinue) { $peopleConfigRef = $peopleConfig }
+
+    if ($rulesRef -and $peopleConfigRef -and $cls.summary -and $PlainText) {
+        try {
+            Write-Host "  [PEOPLE] Running people intelligence extraction..."
+            $speakerNames   = Get-TranscriptSpeakers -TranscriptText $PlainText
+            $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $peopleConfigRef
+            if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
+                $pLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rulesRef.LLMConfig.ApiKey }
+                $pAuthMode   = if ($rulesRef.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+                $pHeaders    = if ($pAuthMode -eq "api-key") { @{ "api-key" = $pLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $pLlmKey"; "Content-Type" = "application/json" } }
+                $pDeployment = if ($rulesRef.LLMConfig.DeploymentName) { $rulesRef.LLMConfig.DeploymentName } else { $rulesRef.LLMConfig.Model }
+                $pBase       = $rulesRef.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+                $pUri        = if ($rulesRef.LLMConfig.Endpoint -match "openai\.azure\.com") {
+                    "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
+                } else { "$($rulesRef.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
+
+                $peopleRaw = Get-PeopleIntelligence `
+                    -TranscriptText $PlainText -ChunkSummaries $enrichedSummary `
+                    -ResolvedPeople $resolvedPeople -TopicRecords $topicRecords3D `
+                    -MeetingId $MeetingId -Subject $Subject `
+                    -FullUri $pUri -Headers $pHeaders -Model $rulesRef.LLMConfig.Model
+
+                if ($peopleRaw) {
+                    $peopleContent   = Format-PeopleFile -LLMOutput $peopleRaw -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate -PipelineVersion $PIPELINE_VERSION
+                    $localPeopleFile = Join-Path $OutDir "$timestamp-$cleanSubject-People.txt"
+                    $peopleContent | Out-File -FilePath $localPeopleFile -Encoding utf8
+                    $uploadedPeopleFile = Upload-FileToSharePoint -DriveId $DriveId -FolderId $evtFolderId -FilePath $localPeopleFile
+                    Write-Host "  [PEOPLE] People file uploaded: $($uploadedPeopleFile.webUrl)"
+
+                    # [CF/R2] Store people file in R2
+                    $r2PeopleKey = "people/$($EventDate.ToString('yyyy-MM'))/$MeetingId-people.txt"
+                    Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
+                        key          = $r2PeopleKey
+                        content      = (Get-Content -Path $localPeopleFile -Raw -Encoding utf8)
+                        content_type = "text/plain; charset=utf-8"
+                    }
+                    Write-Host "  [PEOPLE] People file stored in R2: $r2PeopleKey"
+
+                    # [CF] Register participants in D1
+                    $cfParticipants = @($resolvedPeople | ForEach-Object {
+                        $personId = if ($_.PSObject.Properties['PersonId']) { $_.PersonId } elseif ($_.PSObject.Properties['Id']) { $_.Id } else { $null }
+                        @{
+                            person_id    = $personId
+                            display_name = if ($_.PSObject.Properties['DisplayName']) { $_.DisplayName } elseif ($_.PSObject.Properties['Name']) { $_.Name } else { $null }
+                            role         = if ($_.PSObject.Properties['Role']) { $_.Role } else { $null }
+                            was_organiser = ($personId -and $Organiser -and ($personId -eq $Organiser -or $_.DisplayName -like "*$($Organiser.Split('@')[0])*"))
+                        }
+                    })
+                    Invoke-CloudflareSync -Method "Post" -Endpoint "participants" -Body @{
+                        meeting_ref  = $MeetingId
+                        meeting_date = $EventDate.ToString("yyyy-MM-dd")
+                        participants = $cfParticipants
+                        source       = "PeopleFile"
+                    }
+
+                    # Update master people log (works in both script-scope and local-scope contexts)
+                    if (Get-Variable -Name "masterPeopleLogData" -Scope Script -ErrorAction SilentlyContinue) {
+                        $script:masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $script:masterPeopleLogData -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate -PeopleFileUrl $uploadedPeopleFile.webUrl -ResolvedPeople $resolvedPeople
+                    } elseif (Get-Variable -Name "masterPeopleLogData" -ErrorAction SilentlyContinue) {
+                        $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate -PeopleFileUrl $uploadedPeopleFile.webUrl -ResolvedPeople $resolvedPeople
+                    }
+                }
+            } else {
+                Write-Warning "  [PEOPLE] No resolved people found — skipping people file"
+            }
+        } catch {
+            Write-Warning "  [PEOPLE] People intelligence failed: $_"
+        }
+    }
+
+    # ── 13. UPDATE SHAREPOINT COLUMNS ────────────────────────────
+    $authHeaderRef = $null
+    if (Get-Variable -Name "authHeader" -ErrorAction SilentlyContinue) { $authHeaderRef = $authHeader }
+    if ($authHeaderRef) {
+        foreach ($fileItem in @($uploadedTranscript, $uploadedSummary) | Where-Object { $_ }) {
+            try {
+                $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$DriveId/items/$($fileItem.id)/listitem/fields"
+                Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeaderRef -Body (@{
+                    "MeetingID" = $MeetingId; "Category" = $MeetingType; "Priority" = "normal"; "Mode" = $modeResult.mode
+                } | ConvertTo-Json) -ContentType "application/json" | Out-Null
+            } catch { Write-Warning "  [$PathLabel] SharePoint column update failed for $($fileItem.name): $_" }
+        }
+    }
+
+    # ── 14. BUILD & RETURN LOG ENTRY ──────────────────────────────
+    $now                 = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
+    $effectiveStatus     = if ($uploadedTranscript -and -not $uploadedSummary -and $cls.summary) { "repair_needed" } else { "success" }
+    $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { $AgentState }
+    $effectiveRetryCount = if ($repairAttempted) { 1 } else { 0 }
+
+    $logEntry = [pscustomobject]@{
+        RunId                    = $RunId
+        MeetingId                = $MeetingId
+        Subject                  = $Subject
+        Organiser                = $Organiser
+        EventDate                = $EventDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        Type                     = $MeetingType
+        Priority                 = "normal"
+        Mode                     = $modeResult.mode
+        ModeConfidence           = $modeResult.confidence
+        ModeSource               = $modeResult.source
+        Classification           = $modeResult.mode
+        ClassificationConfidence = $modeResult.confidence
+        ClassificationSource     = $modeResult.source
+        PipelineVersion          = $PIPELINE_VERSION
+        TopicRecords             = $topicRecords3D
+        HasTranscript            = ($null -ne $uploadedTranscript)
+        TranscriptFile           = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile }
+        SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $localSummaryFile }
+        ConfluenceMirror         = $confluenceUrl
+        PeopleFile               = if ($uploadedPeopleFile) { $uploadedPeopleFile.webUrl } else { $null }
+        Status                   = $effectiveStatus
+        AgentState               = $effectiveAgentState
+        LastProcessed            = $now
+        RetryCount               = $effectiveRetryCount
+        RepairReason             = $repairReason
+        LastRunId                = $RunId
+        LastUpdated              = $now
+    }
+
+    $teamsMsg = "MEETING ID: $MeetingId`n" +
+                "SUBJECT: $Subject`n" +
+                "ORGANISER: $Organiser`n" +
+                "EVENT DATE: $($EventDate.ToString('yyyy-MM-ddTHH:mm:ssZ'))`n" +
+                "TYPE: $MeetingType`n" +
+                "MODE: $($modeResult.mode)`n" +
+                "STATUS: $effectiveStatus`n" +
+                "AGENT STATE: $effectiveAgentState`n" +
+                "TRANSCRIPT FILE: $(if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile })`n" +
+                "SUMMARY FILE: $(if ($uploadedSummary) { $uploadedSummary.webUrl } else { '' })`n" +
+                "$(if ($confluenceUrl) { "CONFLUENCE MIRROR: $confluenceUrl`n" } else { '' })" +
+                "LAST UPDATED: $now"
+
+    return @{
+        LogEntry           = $logEntry
+        TeamsMessage       = $teamsMsg
+        UploadedTranscript = $uploadedTranscript
+        UploadedSummary    = $uploadedSummary
+        UploadedPeopleFile = $uploadedPeopleFile
+        ConfluenceUrl      = $confluenceUrl
+        TopicRecords       = $topicRecords3D
+        EnrichedSummary    = $enrichedSummary
+        LocalFile          = $localFile
+        LocalSummaryFile   = $localSummaryFile
+    }
+}
+
 function Invoke-LLM {
     param(
         [string]$SystemPrompt,
@@ -1458,7 +1971,8 @@ function Format-TopicRecord {
         $MeetingMetadata, 
         [string]$SummaryLink,
         $ResolvedPeople,
-        $Taxonomy
+        $Taxonomy,
+        [string]$MeetingMode = ""
     )
     
     $tagsString = if ($TopicData.Tags) { $TopicData.Tags -join ", " } else { "None" }
@@ -1709,12 +2223,16 @@ function Get-MeetingClassification {
     param($type, $organiser, $transcriptContent)
 
     # --- Case 1: Transcript exists - Use LLM with map-reduce chunking ---
-    if ($transcriptContent -and $rules.LLMConfig.Endpoint) {
+    # Resolve LLM config: env vars take priority over classification_rules.json
+    $llmEndpointResolved = if ($env:AZURE_OPENAI_ENDPOINT) { $env:AZURE_OPENAI_ENDPOINT } `
+                           elseif ($rules -and $rules.LLMConfig) { $rules.LLMConfig.Endpoint } `
+                           else { $null }
+    if ($transcriptContent -and $llmEndpointResolved) {
         try {
             # --- Build shared LLM connection config ---
             $keySource     = if ($env:FOUNDRY_API_KEY) { "FOUNDRY_API_KEY" } elseif ($env:AZURE_OPENAI_API_KEY) { "AZURE_OPENAI_API_KEY" } else { "classification_rules.json" }
             $llmKey        = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-            $authMode      = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
+            $authMode      = if ($llmEndpointResolved -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
             $llmHeaders    = if ($authMode -eq "api-key") {
                 @{ "api-key" = $llmKey; "Content-Type" = "application/json" }
             } else {
@@ -1722,24 +2240,27 @@ function Get-MeetingClassification {
             }
             # Azure OpenAI specific: ensure the api-key is also in the URI if headers are tricky in some environments
             # but usually the header is sufficient. 
-            $deploymentName = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-            $fullUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                $base = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
+            $llmModel       = if ($env:AZURE_OPENAI_MODEL) { $env:AZURE_OPENAI_MODEL } `
+                             elseif ($rules -and $rules.LLMConfig) { if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model } } `
+                             else { "gpt-4o" }
+            $deploymentName = $llmModel
+            $fullUri        = if ($llmEndpointResolved -match "openai\.azure\.com") {
+                $base = $llmEndpointResolved -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
                 "$base/openai/deployments/$deploymentName/chat/completions?api-version=2024-02-15-preview"
-            } elseif ($rules.LLMConfig.Endpoint -match "/v1/?$") {
-                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
+            } elseif ($llmEndpointResolved -match "/v1/?$") {
+                "$($llmEndpointResolved -replace '/$', '')/chat/completions"
             } else {
-                "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions"
+                "$($llmEndpointResolved -replace '/$', '')/chat/completions"
             }
 
             Write-Host "  [LLM DIAG] Endpoint: $fullUri"
-            Write-Host "  [LLM DIAG] Model: $($rules.LLMConfig.Model)"
+            Write-Host "  [LLM DIAG] Model: $llmModel"
             Write-Host "  [LLM DIAG] Key source: $keySource"
             Write-Host "  [LLM DIAG] Auth mode: $authMode"
 
             # --- Chunk config (configurable via LLMConfig, with safe defaults) ---
-            $chunkSize = if ($rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
-            $overlap   = if ($rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
+            $chunkSize = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
+            $overlap   = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
 
             # --- Split transcript into chunks ---
             $chunks = Split-TranscriptIntoChunks -Text $transcriptContent -ChunkSize $chunkSize -Overlap $overlap
@@ -1769,7 +2290,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $raw = Invoke-LLM -SystemPrompt $chunkSummaryPrompt `
                                   -UserContent "Transcript section $chunkNum/$($chunks.Count):`n`n$chunk" `
                                   -FullUri $fullUri -Headers $llmHeaders `
-                                  -Model $rules.LLMConfig.Model -MaxTokens $chunkSummaryMaxTok `
+                                  -Model $llmModel -MaxTokens $chunkSummaryMaxTok `
                                   -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                 if ($raw) { $chunkSummaries += "### Section $chunkNum`n$raw" }
             }
@@ -1787,7 +2308,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                         if ($i+1 -lt $currentSummaries.Count) { $pair += "`n`n" + $currentSummaries[$i+1] }
                         
                         $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail."
-                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $rules.LLMConfig.Model -MaxTokens $synthesisMaxTok `
+                        $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $llmModel -MaxTokens $synthesisMaxTok `
                                           -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                         if ($syn) { $nextTier += $syn }
                     }
@@ -1814,7 +2335,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
                                          -FullUri $fullUri -Headers $llmHeaders `
-                                         -Model $rules.LLMConfig.Model -MaxTokens $summaryMaxTok `
+                                         -Model $llmModel -MaxTokens $summaryMaxTok `
                                          -ResponseFormat "json_object" `
                                          -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
 
@@ -1825,12 +2346,71 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                     Write-Warning "  [LLM DIAG] Summary call failed after $llmMaxRetries retries — skipping records call. Will fall through to heuristic fallback."
                 } else {
                     Write-Host "  [LLM DIAG] Extracting Topic Records (max tokens: $recordsMaxTok)..." -ForegroundColor Gray
-                    $recordsPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'records' array. Leave 'summary' as an empty string. Be thorough — include ALL topics identified in the summaries. Do not truncate."
-                    
+
+                    # Count how many ### Topic: sections the summary produced — used as minimum record count guard (Fix 3)
+                    $summaryTopicCount = 0
+                    if ($summaryRaw) {
+                        $sParsed = ConvertFrom-LLMJson -RawContent $summaryRaw
+                        if ($sParsed -and $sParsed.summary) {
+                            $summaryTopicCount = ([regex]::Matches($sParsed.summary, '### Topic:')).Count
+                        }
+                    }
+                    $minRecordsHint = if ($summaryTopicCount -gt 0) { "You identified $summaryTopicCount topic sections in the summary. You MUST produce at least $summaryTopicCount records — one per topic section." } else { "Produce one record per distinct topic discussed." }
+
+                    # Fix 1: Inject canonical topic T-code list so LLM maps directly instead of inventing IDs
+                    # Fix 2: Strengthen FOCUS instruction to enforce schema completeness and one-record-per-theme
+                    $canonicalTopics = @"
+
+==================================================
+CANONICAL TOPIC TAXONOMY (MANDATORY MAPPING)
+==================================================
+You MUST map each topic record to one of these canonical T-codes in the TopicId field.
+Do NOT invent topic IDs. Pick the closest match:
+
+  T01: Product Performance
+  T02: Product Quality & Compliance
+  T03: Product Value & Perception
+  T04: Product Scope & Prioritisation
+  T05: Delivery Progress & Readiness
+  T06: Delivery Risk & Constraints
+  T07: Development Execution
+  T08: Cash Flow & Liquidity
+  T09: Cost Structure & Margins
+  T10: Revenue & Commercial Performance
+  T11: Financial Risk & Exposure
+  T12: Organisation & Capability
+  T13: Resource Allocation
+  T14: Operational Effectiveness
+  T15: Strategic Direction & Alignment
+  T16: Product-Market Fit
+  T17: Growth & Opportunities
+  T18: Delivery Confidence
+
+Also populate TopicName with the canonical name from the list above (e.g. "Product Quality & Compliance").
+"@
+
+                    $recordsFocus = @"
+
+==================================================
+FOCUS FOR THIS CALL
+==================================================
+- Generate ONLY the 'records' array. Set 'summary' to an empty string "".
+- $minRecordsHint
+- Each record MUST include ALL schema fields: TopicId, TopicName, Label, Title, Domain, TopicFamily, Topic, Category, ContextType, Tags, Status, Trajectory, Signal, Capability, CapabilityPhase, ProcessGovernor, Summary, KeyFacts, Decisions, Actions, Risks, NextSteps, RetrievalAnchors.
+- Label = a short human-readable name for this specific discussion (e.g. "Scanner Firmware Stability").
+- TopicName = the canonical name from the taxonomy above (e.g. "Product Quality & Compliance").
+- TopicId = the T-code from the taxonomy above (e.g. "T02").
+- Do NOT collapse multiple distinct topics into one record.
+- Do NOT omit fields — use empty arrays [] or "Unknown" if the value is not present.
+- Do NOT truncate. Return all records.
+"@
+
+                    $recordsPrompt = $rules.LLMConfig.Prompt + $canonicalTopics + $recordsFocus
+
                     $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
                                              -UserContent $combinedSummaries `
                                              -FullUri $fullUri -Headers $llmHeaders `
-                                             -Model $rules.LLMConfig.Model -MaxTokens $recordsMaxTok `
+                                             -Model $llmModel -MaxTokens $recordsMaxTok `
                                              -ResponseFormat "json_object" `
                                              -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                 }
@@ -1858,6 +2438,14 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                     if ($rJson -and $rJson.records) {
                         $finalResult.records = $rJson.records
                         if ($finalResult.source -eq "llm") { $finalResult.source = "llm" } else { $finalResult.source = "llm_partial_records" }
+
+                        # Fix 3: Minimum record count guard — warn if LLM returned fewer records than topics in summary
+                        $returnedCount = @($rJson.records).Count
+                        if ($summaryTopicCount -gt 0 -and $returnedCount -lt $summaryTopicCount) {
+                            Write-Warning "  [LLM DIAG] Record count shortfall: summary had $summaryTopicCount topics but records call returned only $returnedCount. Consider re-running with -ForceRerun."
+                        } else {
+                            Write-Host "  [LLM DIAG] Record count OK: $returnedCount record(s) returned (expected >=$summaryTopicCount)" -ForegroundColor Gray
+                        }
                     }
                 }
 
@@ -2406,265 +2994,40 @@ function Process-VttFile {
         Write-Host "  [VTT/TXT] Date overridden from content: $($eventDate.ToString('yyyy-MM-dd HH:mm'))"
     }
 
-    # LLM & Classification setup
-    $llmKey  = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $script:rules.LLMConfig.ApiKey }
-    $auth    = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-    $hdrs    = if ($auth -eq "api-key") { @{ "api-key" = $llmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $llmKey"; "Content-Type" = "application/json" } }
-    $deploy  = if ($script:rules.LLMConfig.DeploymentName) { $script:rules.LLMConfig.DeploymentName } else { $script:rules.LLMConfig.Model }
-    $base    = $script:rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-    $llmUri  = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-        "$base/openai/deployments/$deploy/chat/completions?api-version=2024-02-15-preview"
-    } else { "$($script:rules.LLMConfig.Endpoint)/chat/completions" }
-    
     $organiser = $script:calendarUserUpn
-    $classResult = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
 
-    # --- CLASSIFICATION & SUMMARY LOGIC ---
-    $cls = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
-    if (-not $cls.summary) {
-        Write-Warning "  [VTT] Summary generation failed. Retrying once..."
-        $cls = Get-MeetingClassification -type "vtt_sync" -organiser $organiser -transcriptContent $plainText
-    }
+    # --- SHARED PROCESSING CORE ---
+    $result = Invoke-MeetingProcessing `
+        -PlainText    $plainText `
+        -Subject      $subject `
+        -Organiser    $organiser `
+        -EventDate    $eventDate `
+        -MeetingId    $mId `
+        -MeetingType  "vtt_sync" `
+        -PathLabel    "VTT" `
+        -DriveId      $script:driveId `
+        -OutDir       $script:outDir `
+        -SegmentCount 1 `
+        -AgentState   "processed_vtt" `
+        -RunId        "vtt_inbox"
 
-    $summaryText = if ($cls.summary) { $cls.summary } else { "No summary generated." }
-    
-    # --- EIP ENHANCEMENT LAYER ---
-    # Pre-extract history for Enrichment function
-    $historyTopicRecords = @()
-    if ($script:masterLogData.Meetings) {
-        foreach ($mE in $script:masterLogData.Meetings) {
-            if ($mE.TopicRecords) {
-                foreach ($tr in $mE.TopicRecords) {
-                    $historyTopicRecords += [pscustomobject]@{
-                        TopicId   = $tr.TopicId
-                        TopicName = $tr.TopicName
-                        Content   = $tr.Content
-                        Signal    = $tr.Signal
-                        EventDate = $mE.EventDate
-                    }
-                }
-            }
-        }
-    }
-
-    # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
-    $initialRecords = if ($cls.records) { $cls.records } else { @() }
-    # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
-    $vttExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
-    Write-Host "  [CTX] Execution context detected: $(if ($vttExecutionContext) { $vttExecutionContext } else { 'Unknown (no bias applied)' })"
-
-    $enrichResult = Enrich-Summary -summaryText $summaryText -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $vttExecutionContext
-    $enrichedSummaryText = $enrichResult.Summary
-    
-    # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
-    $topicRecords3D = @()
-    if ($enrichResult.Records) {
-        foreach ($er in $enrichResult.Records) {
-            $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
-            if ($ir) {
-                # Prepare values
-                $finalSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
-                $finalTags = if ($ir.Tags) { $ir.Tags } else { $er.Tags }
-
-                # Add new properties to the enriched record object
-                $er | Add-Member -MemberType NoteProperty -Name "Summary" -Value $finalSummary -Force
-                $er | Add-Member -MemberType NoteProperty -Name "KeyFacts" -Value $ir.KeyFacts -Force
-                $er | Add-Member -MemberType NoteProperty -Name "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
-                $er | Add-Member -MemberType NoteProperty -Name "Decisions" -Value $ir.Decisions -Force
-                $er | Add-Member -MemberType NoteProperty -Name "Actions" -Value $ir.Actions -Force
-                $er | Add-Member -MemberType NoteProperty -Name "NextSteps" -Value $ir.NextSteps -Force
-                $er | Add-Member -MemberType NoteProperty -Name "Risks" -Value $ir.Risks -Force
-                $er | Add-Member -MemberType NoteProperty -Name "TopicName" -Value $ir.TopicName -Force
-                $er | Add-Member -MemberType NoteProperty -Name "Tags" -Value $finalTags -Force
-            }
-            $topicRecords3D += $er
-        }
-    } else {
-        $topicRecords3D = $initialRecords
-    }
-
-    # Smart Mode Switch
-    $modeInfo = Assign-Mode -type "vtt_sync" -organiser $organiser -topicRecords $topicRecords3D
-
-    # --- TOPIC RECORD GENERATION ---
-    $summaryWithLinks = $enrichedSummaryText
-    if ($cls.summary) {
-        $topicMonthFolder = $eventDate.ToString("yyyy-MM")
-        $topicRecordsDir = "Exec Intel Insights/Topic Records/$topicMonthFolder/$mId"
-        $topicFolderId = Ensure-DriveFolder -DriveId $script:driveId -FolderPath $topicRecordsDir
-        
-        foreach ($tr in $topicRecords3D) {
-            $safeTopicName = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.Label }
-            $sanitizedTopic = $safeTopicName -replace '[^\w\s-]', '' -replace '\s+', '-'
-            if (-not $sanitizedTopic) { $sanitizedTopic = "Details" }
-            
-            $trFileName = "$mId-$($tr.TopicId)-$sanitizedTopic.md"
-            $trLocalPath = Join-Path $script:outDir $trFileName
-            
-            $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
-                Subject = $subject; MeetingId = $mId; EventDate = $eventDate
-            } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $script:taxonomy -MeetingMode $mode
-            
-            $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
-            Write-Host "  [VTT] Uploading Topic Record: $trFileName"
-            Upload-FileToSharePoint -DriveId $script:driveId -FolderId $topicFolderId -FilePath $trLocalPath | Out-Null
-            
-            $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-            # [CF] Upsert topic to D1
-            $cfMeetingDate = if ($null -ne $start -and $start -is [datetime]) { $start.ToString("yyyy-MM-dd") } elseif ($null -ne $eventDate -and $eventDate -is [datetime]) { $eventDate.ToString("yyyy-MM-dd") } else { (Get-Date -Format "yyyy-MM-dd") }
-            Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
-                topic_id     = $tr.TopicId
-                topic_name   = $safeTopicNameForConf
-                domain       = $tr.Domain
-                category     = $tr.Category
-                priority     = if ($tr.EXECUTIVE_PRIORITY -and $tr.EXECUTIVE_PRIORITY -ne "Unknown") { $tr.EXECUTIVE_PRIORITY } else { "Medium" }
-                owner        = if ($tr.Ownership -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
-                summary      = $tr.Summary
-                meeting_ref  = $mId
-                meeting_date = $cfMeetingDate
-                context      = if ($script:meetingContext) { $script:meetingContext } else { "Unknown" }
-                source       = "Transcript"
-            }
-
-            # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
-            if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
-                $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
-                $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-                $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
-            }
-        }
-    }
-
-    # Local Files
-    $timestamp    = $eventDate.ToString("yyyy-MM-dd_HHmm")
-    $cleanSubject = ($subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_').Trim('_')
-    $localTxt     = Join-Path $script:outDir "$timestamp-$cleanSubject.txt"
-    $localSum     = Join-Path $script:outDir "$timestamp-$cleanSubject-Summary.txt"
-    
-    $header = @"
----
-MEETING ID: $mId
-SUBJECT: $subject
-ORGANISER: $organiser
-EVENT DATE: $($eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ"))
-TYPE: vtt_sync
-PRIORITY: Normal
-MODE: $($modeInfo.mode)
-MODE_SOURCE: $($modeInfo.source)
-MODE_CONFIDENCE: $($modeInfo.confidence)
-PIPELINE_VERSION: $script:PIPELINE_VERSION
-PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
-STATUS: success
----
-
-"@
-
-    ($header + $plainText) | Out-File -FilePath $localTxt -Encoding utf8
-    ($header + $summaryWithLinks) | Out-File -FilePath $localSum -Encoding utf8
-
-    # 4. Upload to Primary SharePoint (Petersplace)
-    $monthFolder   = $eventDate.ToString("yyyy-MM")
-    $evtFolderPath = "$script:spTranscriptRootFolder/$monthFolder"
-    $evtFolderId   = Ensure-DriveFolder -DriveId $script:driveId -FolderPath $evtFolderPath
-    $uploadedTxt   = Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localTxt
-    $uploadedSum   = if (Test-Path $localSum) { Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localSum } else { $null }
-
-    # 5. Confluence mirror
-    $confluenceUrl = $null
-    if ($script:pipelineConfig.enable_confluence_mirror) {
-        try {
-            $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $script:pipelineConfig.confluence_space_key }
-            $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $script:pipelineConfig.confluence_parent_id }
-            $confHtml   = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $organiser
-            $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
-        } catch { Write-Warning "  [VTT] Confluence mirror failed: $_" }
-    }
-
-    # 6. People Intelligence
-    $peopleUrl = $null
-    if ($script:peopleConfig -and $cls.summary -and $plainText) {
-        try {
-            $speakerNames = Get-TranscriptSpeakers -TranscriptText $plainText
-            $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $script:peopleConfig
-
-            if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
-                # Build LLM connection for people pass (same config as classification)
-                $pLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $script:rules.LLMConfig.ApiKey }
-                $pAuthMode   = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-                $pHeaders    = if ($pAuthMode -eq "api-key") { @{ "api-key" = $pLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $pLlmKey"; "Content-Type" = "application/json" } }
-                $pDeployment = if ($script:rules.LLMConfig.DeploymentName) { $script:rules.LLMConfig.DeploymentName } else { $script:rules.LLMConfig.Model }
-                $pUri        = if ($script:rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                    $pBase = $script:rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-                    "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
-                } else { "$($script:rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
-
-                $peopleRaw = Get-PeopleIntelligence `
-                    -TranscriptText $plainText `
-                    -ChunkSummaries $enrichedSummaryText `
-                    -ResolvedPeople $resolvedPeople `
-                    -TopicRecords   $topicRecords3D `
-                    -MeetingId      $mId `
-                    -Subject        $subject `
-                    -FullUri        $pUri `
-                    -Headers        $pHeaders `
-                    -Model          $script:rules.LLMConfig.Model
-
-                if ($peopleRaw) {
-                    $peopleFileContent = Format-PeopleFile `
-                        -LLMOutput $peopleRaw `
-                        -MeetingId $mId `
-                        -Subject $subject `
-                        -EventDate $eventDate `
-                        -PipelineVersion $script:PIPELINE_VERSION
-                    $localPeopleFile = Join-Path $script:outDir "$timestamp-$cleanSubject-People.txt"
-                    $peopleFileContent | Out-File -FilePath $localPeopleFile -Encoding utf8
-
-                    $upPeople = Upload-FileToSharePoint -DriveId $script:driveId -FolderId $evtFolderId -FilePath $localPeopleFile
-                    $peopleUrl = $upPeople.webUrl
-                    $script:masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $script:masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $peopleUrl -ResolvedPeople $resolvedPeople
-                }
-            }
-        } catch {
-            Write-Warning "  [VTT] People intelligence failed: $_"
-        }
-    }
-
-    # 7. Update Master Log Entry
-    $logEntry = @{
-        MeetingId      = $mId
-        Subject        = $subject
-        Organiser      = $organiser
-        EventDate      = $eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
-        Type           = "vtt_sync"
-        Status         = "success"
-        AgentState     = "processed_vtt"
-        TopicRecords   = $topicRecords3D
-        TranscriptFile = $uploadedTxt.webUrl
-        SummaryFile    = if ($uploadedSum) { $uploadedSum.webUrl } else { $null }
-        ConfluenceMirror = $confluenceUrl
-        PeopleFile     = $peopleUrl
-        LastProcessed  = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
-        PipelineVersion = $script:PIPELINE_VERSION
-    }
-
+    # Update master log
     $existing = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
     if ($existing) {
         $idx = [array]::IndexOf($script:masterLogData.Meetings, $existing)
-        $script:masterLogData.Meetings[$idx] = $logEntry
+        $script:masterLogData.Meetings[$idx] = $result.LogEntry
     } else {
-        $script:masterLogData.Meetings += $logEntry
+        $script:masterLogData.Meetings += $result.LogEntry
     }
 
-    # 8. Persistence (Update Master Logs in SharePoint)
+    # Persist master logs to SharePoint
     try {
         $masterLogLocalPath = Join-Path $script:outDir $script:masterLogFileName
         $script:masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
         Upload-FileToSharePoint -DriveId $script:driveId -FolderId $script:rootFolderId -FilePath $masterLogLocalPath | Out-Null
-        
         $masterPeopleLogLocalPath = Join-Path $script:outDir $script:masterPeopleLogFileName
         $script:masterPeopleLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterPeopleLogLocalPath -Encoding utf8
         Upload-FileToSharePoint -DriveId $script:driveId -FolderId $script:rootFolderId -FilePath $masterPeopleLogLocalPath | Out-Null
-        
         Write-Host "  [VTT] Master logs updated in SharePoint ✅"
     } catch {
         Write-Warning "  [VTT] Failed to update master logs: $_"
@@ -2833,241 +3196,44 @@ if ($VttFile) {
     $plainText = ConvertFrom-Vtt -VttContent $vttRaw
     Write-Host "  [VTT] Transcript length: $($plainText.Length) chars"
 
-    # --- Classify and summarise ---
-    $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $plainText
-    if (-not $cls.summary) {
-        Write-Warning "  [VTT] Summary generation failed. Retrying once..."
-        $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $plainText
-    }
+    # --- SHARED PROCESSING CORE ---
+    $result = Invoke-MeetingProcessing `
+        -PlainText    $plainText `
+        -Subject      $subject `
+        -Organiser    $organiser `
+        -EventDate    $eventDate `
+        -MeetingId    $mId `
+        -MeetingType  $meetingType `
+        -PathLabel    "VTT" `
+        -DriveId      $driveId `
+        -OutDir       $outDir `
+        -SegmentCount 1 `
+        -AgentState   "processed_vtt_direct" `
+        -RunId        "vtt_direct"
 
-    # --- EIP Enrichment ---
-    $historyTopicRecords = @()
-    if ($masterLogData -and $masterLogData.Meetings) {
-        $historyTopicRecords = $masterLogData.Meetings | Where-Object { $_.TopicRecords } | ForEach-Object { $_.TopicRecords } | Where-Object { $_ }
-    }
-    
-    # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
-    $initialRecords = if ($cls.records) { $cls.records } else { @() }
-    # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
-    $vttDirectExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
-    Write-Host "  [CTX] Execution context detected: $(if ($vttDirectExecutionContext) { $vttDirectExecutionContext } else { 'Unknown (no bias applied)' })"
-
-    $enrichResult        = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $vttDirectExecutionContext
-    $enrichedSummaryText = if ($enrichResult.Summary) { $enrichResult.Summary } else { $cls.summary }
-    $topicRecords3D      = if ($enrichResult.Records) { $enrichResult.Records } else { $initialRecords }
-    $modeResult          = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
-
-    foreach ($rec in $topicRecords3D) {
-        Write-Host "  [3D DIAG] Topic=$($rec.TopicId) / $($rec.TopicName) | Section=$($rec.Section) |Category=$($rec.Category) | ContextType=$($rec.ContextType)"
-    }
-    Write-Host "  [VALIDATION] Topics detected: $(($topicRecords3D | Select-Object -Property TopicId -Unique).Count)"
-    Write-Host "  [VALIDATION] Mode Assigned: $($modeResult.mode) ($($modeResult.source))"
-
-    # --- Build header ---
-    $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
-
-    # Resolve People for Entity Extraction
-    $resolvedPeople = Resolve-People -TranscriptText $plainText
-
-    # --- STEP 4: GENERATE TOPIC RECORDS ---
-    # Path aligned with Meeting Transcripts: Topic Records/YYYY-MM/[meeting-id]/
-    $topicMonthFolder = $eventDate.ToString("yyyy-MM")
-    $topicRecordsDir = "Exec Intel Insights/Topic Records/$topicMonthFolder/$mId"
-    $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
-    
-    $summaryWithLinks = [string]$enrichedSummaryText
-    foreach ($tr in $topicRecords3D) {
-        $cleanLabel = if ($tr.Label) { $tr.Label } else { $tr.TopicName }
-        $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
-        if (-not $sanitizedLabel) { $sanitizedLabel = "Details" }
-        $trFileName = "$($tr.TopicId)-$sanitizedLabel.md"
-        $trLocalPath = Join-Path $outDir $trFileName
-        
-        # Mutual Linking: Topic Record -> Summary
-        $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
-            Subject = $subject; MeetingId = $mId; EventDate = $eventDate
-        } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy -MeetingMode $mode
-        
-        $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
-        Write-Host "  [VTT] Uploading Topic Record: $trFileName"
-        Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
-        
-        $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-
-        # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
-        if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
-            $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
-            $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-            $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
-        }
-    }
-
-    $header = @"
-MEETING ID: $mId
-SUBJECT: $subject
-ORGANISER: $organiser
-EVENT DATE: $($eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ"))
-TYPE: $meetingType
-PRIORITY: normal
-MODE: $($modeResult.mode)
-MODE_SOURCE: $($modeResult.source)
-MODE_CONFIDENCE: $($modeResult.confidence)
-PIPELINE_VERSION: $PIPELINE_VERSION
-PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
-STATUS: success
-BACK-LINK (MASTER LOG): $masterLogUrl
----
-
-"@
-
-    # --- Save transcript .txt ---
-    if (-not (Test-Path $outDir)) { $null = New-Item -ItemType Directory -Path $outDir -Force }
-    $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
-    ($header + $plainText) | Out-File -FilePath $localFile -Encoding utf8
-    Write-Host "  [VTT] Transcript saved: $localFile"
-
-    # --- Save summary .txt ---
-    $localSummaryFile = $null
-    if ($cls.summary) {
-        $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-        ($header + $summaryWithLinks) | Out-File -FilePath $localSummaryFile -Encoding utf8
-        Write-Host "  [VTT] Summary saved   : $localSummaryFile"
-    }
-
-    # --- SharePoint upload ---
-    $uploadedTranscript = $null
-    $uploadedSummary    = $null
-    try {
-        $eventFolderPath    = "$spTranscriptRootFolder/$($eventDate.ToString('yyyy-MM'))"
-        $eventFolderId      = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
-        $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
-        Write-Host "  [VTT] Transcript uploaded to SharePoint"
-        # [CF] Register transcript in D1
-        Invoke-CloudflareSync -Method "Post" -Endpoint "transcripts" -Body @{
-            meeting_ref   = $mId
-            meeting_date  = $eventDate.ToString("yyyy-MM-dd")
-            source_system = "M365"
-            segment_count = if ($contentSegments -and $contentSegments.Count) { $contentSegments.Count } else { 1 }
-        }
-        if ($localSummaryFile) {
-            $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
-            Write-Host "  [VTT] Summary uploaded to SharePoint"
-        }
-    } catch {
-        Write-Warning "  [VTT] SharePoint upload failed: $_"
-    }
-
-    # --- Confluence mirroring ---
-    $confluenceUrl = $null
-    if ($cls.summary) {
-        $vttConfig       = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { $null }
-        $isMirrorEnabled = ($vttConfig -and $vttConfig.enable_confluence_mirror) -or ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
-        if ($isMirrorEnabled) {
-            $confSpace  = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $vttConfig.confluence_space_key }
-            $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $vttConfig.confluence_parent_id }
-            if ($confSpace -and $confParent) {
-                $confHtml      = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $eventDate -Organiser $organiser
-                $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
-            }
-        }
-    }
-
-    # --- VTT People Intelligence ---
-    $vttUploadedPeopleFile = $null
-    if ($peopleConfig -and $cls.summary -and $plainText) {
-        try {
-            $vttSpeakerNames   = Get-TranscriptSpeakers -TranscriptText $plainText
-            $vttResolvedPeople = Resolve-People -Names $vttSpeakerNames -PeopleConfig $peopleConfig
-            if ($vttResolvedPeople -and $vttResolvedPeople.Count -gt 0) {
-                $vttLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-                $vttAuthMode   = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-                $vttLlmHeaders = if ($vttAuthMode -eq "api-key") { @{ "api-key" = $vttLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $vttLlmKey"; "Content-Type" = "application/json" } }
-                $vttDeployment = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-                $vttLlmUri     = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                    $vttBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-                    "$vttBase/openai/deployments/$vttDeployment/chat/completions?api-version=2024-02-15-preview"
-                } else { "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
-
-                $vttPeopleRaw = Get-PeopleIntelligence `
-                    -TranscriptText $plainText `
-                    -ChunkSummaries $enrichedSummaryText `
-                    -ResolvedPeople $vttResolvedPeople `
-                    -TopicRecords $topicRecords3D `
-                    -MeetingId $mId `
-                    -Subject $subject `
-                    -FullUri $vttLlmUri `
-                    -Headers $vttLlmHeaders `
-                    -Model $rules.LLMConfig.Model
-
-                if ($vttPeopleRaw) {
-                    $vttPeopleContent = Format-PeopleFile -LLMOutput $vttPeopleRaw -MeetingId $mId -Subject $subject -EventDate $eventDate -PipelineVersion $PIPELINE_VERSION
-                    $vttLocalPeopleFile = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
-                    $vttPeopleContent | Out-File -FilePath $vttLocalPeopleFile -Encoding utf8
-                    $vttUploadedPeopleFile = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $vttLocalPeopleFile
-                    Write-Host "  [VTT] People file uploaded: $($vttUploadedPeopleFile.webUrl)"
-                    $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $eventDate -PeopleFileUrl $vttUploadedPeopleFile.webUrl -ResolvedPeople $vttResolvedPeople
-                }
-            } else {
-                Write-Warning "  [VTT] No resolved people found — skipping people file"
-            }
-        } catch {
-            Write-Warning "  [VTT] People intelligence failed: $_"
-        }
-    }
-
-    # --- Master Log entry ---
-    $now         = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
-    $vttLogEntry = @{
-        MeetingId                = $mId
-        Subject                  = $subject
-        Organiser                = $organiser
-        EventDate                = $eventDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
-        Type                     = $meetingType
-        Priority                 = "normal"
-        Mode                     = $modeResult.mode
-        ModeConfidence           = $modeResult.confidence
-        ModeSource               = $modeResult.source
-        Classification           = $modeResult.mode
-        ClassificationConfidence = $modeResult.confidence
-        ClassificationSource     = $modeResult.source
-        PipelineVersion          = $PIPELINE_VERSION
-        TopicRecords             = $topicRecords3D
-        HasTranscript            = $true
-        TranscriptFile           = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile }
-        SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $localSummaryFile }
-        ConfluenceMirror         = $confluenceUrl
-        PeopleFile               = if ($vttUploadedPeopleFile) { $vttUploadedPeopleFile.webUrl } else { $null }
-        Status                   = "success"
-        AgentState               = "processed_vtt"
-        LastProcessed            = $now
-        RetryCount               = 0
-        LastRunId                = "vtt_direct"
-        LastUpdated              = $now
-    }
-
+    # Update master log
     $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
     if ($existingMatch) {
         $idx = [array]::IndexOf($masterLogData.Meetings, $existingMatch)
-        $masterLogData.Meetings[$idx] = $vttLogEntry
+        $masterLogData.Meetings[$idx] = $result.LogEntry
     } else {
-        $masterLogData.Meetings += $vttLogEntry
+        $masterLogData.Meetings += $result.LogEntry
     }
 
+    # Persist master logs
     $masterLogLocalPath = Join-Path $outDir $masterLogFileName
     $masterLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterLogLocalPath -Encoding utf8
     try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterLogLocalPath | Out-Null } catch { Write-Warning "  [VTT] Master log upload failed: $_" }
-
-    Write-Host ""
-    Write-Host "VTT Mode complete ✅"
-    Write-Host "  Transcript : $localFile"
-    if ($localSummaryFile)        { Write-Host "  Summary    : $localSummaryFile" }
-    if ($confluenceUrl)           { Write-Host "  Confluence : $confluenceUrl" }
-    if ($vttUploadedPeopleFile)   { Write-Host "  People     : $($vttUploadedPeopleFile.webUrl)" }
-
-    # Save master_people_log in VTT mode
     $masterPeopleLogLocalPath = Join-Path $outDir $masterPeopleLogFileName
     $masterPeopleLogData | ConvertTo-Json -Depth 10 | Set-Content -Path $masterPeopleLogLocalPath -Encoding utf8
     try { Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $masterPeopleLogLocalPath | Out-Null } catch {}
+
+    Write-Host ""
+    Write-Host "VTT Mode complete ✅"
+    Write-Host "  Transcript : $($result.LocalFile)"
+    if ($result.LocalSummaryFile)   { Write-Host "  Summary    : $($result.LocalSummaryFile)" }
+    if ($result.ConfluenceUrl)      { Write-Host "  Confluence : $($result.ConfluenceUrl)" }
+    if ($result.UploadedPeopleFile) { Write-Host "  People     : $($result.UploadedPeopleFile.webUrl)" }
     exit 0
 }
 
@@ -3440,361 +3606,24 @@ foreach ($calendarEvent in $events) {
         $timestamp = (Get-Date $start -Format "yyyy-MM-dd_HHmm")
         $localFile = Join-Path $outDir "$timestamp-$cleanSubject.txt"
 
-        if ($true) { # scope block to preserve indentation parity with original foreach
+        # --- SHARED PROCESSING CORE ---
+        $mId    = Get-MeetingLogId -EventDate $start -Subject $subject
+        $segCnt = if ($contentSegments -and $contentSegments.Count) { $contentSegments.Count } else { 1 }
+        $result = Invoke-MeetingProcessing `
+            -PlainText    $content `
+            -Subject      $subject `
+            -Organiser    $organiser `
+            -EventDate    $start `
+            -MeetingId    $mId `
+            -MeetingType  $meetingType `
+            -PathLabel    "CALENDAR" `
+            -DriveId      $driveId `
+            -OutDir       $outDir `
+            -SegmentCount $segCnt `
+            -AgentState   "pending" `
+            -RunId        $runId
 
-            # --- METADATA ENHANCEMENT ---
-            $mId = Get-MeetingLogId -EventDate $start -Subject $subject
-            $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
-
-            # --- CLASSIFICATION & SUMMARY LOGIC ---
-            $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
-            $repairReason = $null
-            $repairAttempted = $false
-
-            # Reliable repair: if summary is missing or unusable, retry once in the same run
-            if (-not $cls.summary) {
-                Write-Warning "  [REPAIR] Summary generation failed. Retrying once in same run..."
-                $repairAttempted = $true
-                $cls = Get-MeetingClassification -type $meetingType -organiser $organiser -transcriptContent $content
-                if (-not $cls.summary) {
-                    $repairReason = "llm_summary_missing_after_retry"
-                }
-            }
-
-            # --- EIP ENHANCEMENT LAYER ---
-            # Pre-extract history for Enrichment function
-            $historyTopicRecords = @()
-            if ($masterLogData.Meetings) {
-                foreach ($mE in $masterLogData.Meetings) {
-                    if ($mE.TopicRecords) {
-                        foreach ($tr in $mE.TopicRecords) {
-                            $historyTopicRecords += [pscustomobject]@{
-                                TopicId   = $tr.TopicId
-                                TopicName = $tr.TopicName
-                                Content   = $tr.Content
-                                Signal    = $tr.Signal
-                                EventDate = $mE.EventDate
-                            }
-                        }
-                    }
-                }
-            }
-
-            # Phase 1-4: Stable Topic Classification & Consolidation
-            # If LLM already provided records, use them; otherwise let Enrich-Summary try to derive them
-            $initialRecords = if ($cls.records) { $cls.records } else { @() }
-            # Detect execution context from config-driven rules (execution_contexts.json > ContextDetectionRules)
-            $calExecutionContext = Resolve-ExecutionContext -Subject $subject -Organiser $organiser
-            Write-Host "  [CTX] Execution context detected: $(if ($calExecutionContext) { $calExecutionContext } else { 'Unknown (no bias applied)' })"
-            $enrichResult = Enrich-Summary -summaryText $cls.summary -meetingId $mId -historyRecords $historyTopicRecords -InitialRecords $initialRecords -MeetingContext $calExecutionContext
-            $enrichedSummaryText = $enrichResult.Summary
-            
-            # Ensure LLM-provided deep metadata (KeyFacts, Anchors, etc.) is preserved through enrichment
-            $topicRecords3D = @()
-            if ($enrichResult.Records) {
-                foreach ($er in $enrichResult.Records) {
-                    $ir = $initialRecords | Where-Object { $_.TopicId -eq $er.TopicId } | Select-Object -First 1
-                    if ($ir) {
-                        # Prepare values to avoid inline-if syntax errors
-                        $finalSummary = if ($ir.Summary) { $ir.Summary } else { $er.Content }
-                        $finalTags = if ($ir.Tags) { $ir.Tags } else { $er.Tags }
-
-                        # Add new properties to the enriched record object
-                        $er | Add-Member -MemberType NoteProperty -Name "Summary" -Value $finalSummary -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "KeyFacts" -Value $ir.KeyFacts -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "RetrievalAnchors" -Value $ir.RetrievalAnchors -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "Decisions" -Value $ir.Decisions -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "Actions" -Value $ir.Actions -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "NextSteps" -Value $ir.NextSteps -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "Risks" -Value $ir.Risks -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "TopicName" -Value $ir.TopicName -Force
-                        $er | Add-Member -MemberType NoteProperty -Name "Tags" -Value $finalTags -Force
-                    }
-                    $topicRecords3D += $er
-                }
-            } else {
-                $topicRecords3D = $initialRecords
-            }
-
-            # Task 5.1: Smart Mode Switch for "Work" meetings based on topic content
-            $modeInfo = Assign-Mode -type $meetingType -organiser $organiser -topicRecords $topicRecords3D
-
-            # --- PHASE 7: VALIDATION & LOGGING ---
-            if ($pipelineConfig.enable_stable_topic_classification) {
-                $topicCount = if ($topicRecords) { $topicRecords.Count } else { 0 }
-                $t00Count = ($topicRecords | Where-Object { $_.TopicId -eq "T00" }).Count
-                $t00Usage = if ($topicCount -gt 0) { ($t00Count / $topicCount) * 100 } else { 0 }
-                
-                Write-Output "  [VALIDATION] Topics detected: $topicCount"
-                Write-Output "  [VALIDATION] T00 Usage: $($t00Usage.ToString('F1'))%"
-                Write-Output "  [VALIDATION] Mode Assigned: $($modeInfo.mode) ($($modeInfo.source))"
-
-                # Safety Check: Ensure we have at least one topic for successful runs
-                if ($topicCount -eq 0 -and $cls.summary) {
-                    Write-Warning "  [VALIDATION] No topics extracted from summary. Check LLM prompt compliance."
-                }
-            }
-
-            $header = @"
----
-MEETING ID: $mId
-SUBJECT: $subject
-ORGANISER: $organiser
-EVENT DATE: $start
-TYPE: $meetingType
-PRIORITY: $priority
-MODE: $($modeInfo.mode)
-MODE_SOURCE: $($modeInfo.source)
-MODE_CONFIDENCE: $($modeInfo.confidence)
-PIPELINE_VERSION: $PIPELINE_VERSION
-TAXONOMY_VERSION: $TAXONOMY_VERSION
-MAPPING_RULES_VERSION: $MAPPING_RULES_VERSION
-ROLES_CONFIG_VERSION: $ROLES_CONFIG_VERSION
-SENTIMENT_RULES_VERSION: $SENTIMENT_RULES_VERSION
-PROCESSING_TIMESTAMP: $([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ"))
-STATUS: success
-BACK-LINK (MASTER LOG): $masterLogUrl
----
-
-"@
-            # 1. Save and Upload RAW TRANSCRIPT
-            $contentWithHeader = $header + $content
-            $contentWithHeader | Out-File -FilePath $localFile -Encoding utf8
-            $uploadedTranscript = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localFile
-            # [CF] Register transcript in D1 (CALENDAR path)
-            Invoke-CloudflareSync -Method "Post" -Endpoint "transcripts" -Body @{
-                meeting_ref   = $mId
-                meeting_date  = $start.ToString("yyyy-MM-dd")
-                source_system = "M365"
-                segment_count = if ($contentSegments -and $contentSegments.Count) { $contentSegments.Count } else { 1 }
-            }
-
-            # 2. Save and Upload SUMMARY (if available)
-            $uploadedSummary = $null
-            if ($cls.summary) {
-                # --- STEP 4: GENERATE TOPIC RECORDS ---
-                # Path aligned with Meeting Transcripts: Topic Records/YYYY-MM/[meeting-id]/
-                $eventMonthFolder = (Get-Date $start -Format "yyyy-MM")
-                $topicRecordsDir = "Exec Intel Insights/Topic Records/$eventMonthFolder/$mId"
-                $topicFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $topicRecordsDir
-                
-                $summaryWithLinks = [string]$enrichedSummaryText
-                foreach ($tr in $topicRecords3D) {
-                    # Use canonical topic name for filename grouping
-                    $safeTopicName = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.Label }
-                    $sanitizedTopic = $safeTopicName -replace '[^\w\s-]', '' -replace '\s+', '-'
-                    if (-not $sanitizedTopic) { $sanitizedTopic = "Details" }
-                    
-                    $trFileName = "$mId-$($tr.TopicId)-$sanitizedTopic.md"
-                    $trLocalPath = Join-Path $outDir $trFileName
-                    
-                    # Mutual Linking: Topic Record -> Summary
-                    $trContent = Format-TopicRecord -TopicData $tr -MeetingMetadata @{
-                        Subject = $subject; MeetingId = $mId; EventDate = $start
-                    } -SummaryLink $masterLogUrl -ResolvedPeople $resolvedPeople -Taxonomy $taxonomy -MeetingMode $mode
-                    
-                    $trContent | Out-File -FilePath $trLocalPath -Encoding utf8
-                    Write-Host "  [CALENDAR] Uploading Topic Record: $trFileName"
-                    Upload-FileToSharePoint -DriveId $driveId -FolderId $topicFolderId -FilePath $trLocalPath
-                    
-                    $safeTopicNameForConf = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
-                    # [CF] Upsert topic to D1 (CALENDAR path)
-                    Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
-                        topic_id     = $tr.TopicId
-                        topic_name   = $safeTopicNameForConf
-                        domain       = $tr.Domain
-                        category     = $tr.Category
-                        priority     = if ($tr.EXECUTIVE_PRIORITY -and $tr.EXECUTIVE_PRIORITY -ne "Unknown") { $tr.EXECUTIVE_PRIORITY } else { "Medium" }
-                        owner        = if ($tr.Ownership -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
-                        summary      = $tr.Summary
-                        meeting_ref  = $mId
-                        meeting_date = $start.ToString("yyyy-MM-dd")
-                        context      = if ($script:meetingContext) { $script:meetingContext } else { "Unknown" }
-                        source       = "Transcript"
-                    }
-
-                    # Mutual Linking: Summary -> Topic Record (Robust match for ## or ### Topic)
-                    if ($null -ne $summaryWithLinks -and $null -ne $tr.Label) {
-                        $pattern = "(?m)^#{2,3}\s*Topic:\s*" + [regex]::Escape($tr.Label) + "\s*$"
-                        $replacement = "### Topic: $($tr.Label)`n> [View Dedicated Topic Record]($trFileName)"
-                        $summaryWithLinks = [regex]::Replace($summaryWithLinks, $pattern, $replacement)
-                    }
-                }
-
-                $localSummaryFile = Join-Path $outDir "$timestamp-$cleanSubject-Summary.txt"
-                $summaryWithHeader = $header + $summaryWithLinks
-                $summaryWithHeader | Out-File -FilePath $localSummaryFile -Encoding utf8
-                $uploadedSummary = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localSummaryFile
-
-                # --- CONFLUENCE MIRRORING ---
-                $config = $null; if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { $config = Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json }
-                
-                $confluenceUrl = $null
-                $hasConfluenceCreds = ($env:CONFLUENCE_TOKEN -and $env:CONFLUENCE_USER)
-                $isMirrorEnabled = ($config -and $config.enable_confluence_mirror) -or $hasConfluenceCreds
-                
-                if ($isMirrorEnabled -and $organiser -ne "carolynn@empoweringtech.com") {
-                    $confSpace = if ($env:CONFLUENCE_SPACE_KEY) { $env:CONFLUENCE_SPACE_KEY } else { $config.confluence_space_key }
-                    $confParent = if ($env:CONFLUENCE_PARENT_ID) { $env:CONFLUENCE_PARENT_ID } else { $config.confluence_parent_id }
-                    
-                    if ($confSpace -and $confParent) {
-                        $confHtml = Convert-SummaryToConfluenceHtml -SummaryText $enrichedSummaryText -Subject $subject -MeetingId $mId -EventDate $start -Organiser $organiser
-                        $confluenceUrl = Publish-SummaryToConfluence -HtmlContent $confHtml -Title $mId -SpaceKey $confSpace -ParentPageId $confParent
-                    } else {
-                        Write-Output "  [CONFLUENCE] Skip: Missing Space Key ($confSpace) or Parent ID ($confParent)."
-                    }
-                }
-            }
-            
-            # --- PEOPLE INTELLIGENCE ---
-            $uploadedPeopleFile = $null
-            if ($peopleConfig -and $cls.summary -and $content) {
-                try {
-                    # 1. Extract speaker names from transcript and resolve against people_config
-                    $speakerNames = Get-TranscriptSpeakers -TranscriptText $content
-                    $resolvedPeople = Resolve-People -Names $speakerNames -PeopleConfig $peopleConfig
-
-                    if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
-                        # 2. Run LLM people intelligence extraction (Pass 3)
-                        # Build LLM connection for people pass (same config as classification)
-                        $pLlmKey     = if ($env:FOUNDRY_API_KEY) { $env:FOUNDRY_API_KEY } elseif ($env:AZURE_OPENAI_API_KEY) { $env:AZURE_OPENAI_API_KEY } else { $rules.LLMConfig.ApiKey }
-                        $pAuthMode   = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") { "api-key" } else { "Bearer" }
-                        $pHeaders    = if ($pAuthMode -eq "api-key") { @{ "api-key" = $pLlmKey; "Content-Type" = "application/json" } } else { @{ "Authorization" = "Bearer $pLlmKey"; "Content-Type" = "application/json" } }
-                        $pDeployment = if ($rules.LLMConfig.DeploymentName) { $rules.LLMConfig.DeploymentName } else { $rules.LLMConfig.Model }
-                        $pUri        = if ($rules.LLMConfig.Endpoint -match "openai\.azure\.com") {
-                            $pBase = $rules.LLMConfig.Endpoint -replace "/(openai/)?v\d[^/]*/?$", "" -replace "/$", ""
-                            "$pBase/openai/deployments/$pDeployment/chat/completions?api-version=2024-02-15-preview"
-                        } else { "$($rules.LLMConfig.Endpoint -replace '/$', '')/chat/completions" }
-
-                        $peopleRaw = Get-PeopleIntelligence `
-                            -TranscriptText $content `
-                            -ChunkSummaries $enrichedSummaryText `
-                            -ResolvedPeople $resolvedPeople `
-                            -TopicRecords $topicRecords3D `
-                            -MeetingId $mId `
-                            -Subject $subject `
-                            -FullUri $pUri `
-                            -Headers $pHeaders `
-                            -Model $rules.LLMConfig.Model
-
-                        if ($peopleRaw) {
-                            # 3. Format and save *-People.txt
-                            $peopleFileContent = Format-PeopleFile `
-                                -LLMOutput $peopleRaw `
-                                -MeetingId $mId `
-                                -Subject $subject `
-                                -EventDate $start `
-                                -PipelineVersion $PIPELINE_VERSION
-                            $localPeopleFile = Join-Path $outDir "$timestamp-$cleanSubject-People.txt"
-                            $peopleFileContent | Out-File -FilePath $localPeopleFile -Encoding utf8
-
-                            # 4. Upload to SharePoint (same folder as transcript and summary)
-                            $uploadedPeopleFile = Upload-FileToSharePoint -DriveId $driveId -FolderId $eventFolderId -FilePath $localPeopleFile
-                            Write-Host "  [PEOPLE] People file uploaded: $($uploadedPeopleFile.webUrl)"
-                            # [CF] Register participants in D1
-                            if ($resolvedPeople -and $resolvedPeople.Count -gt 0) {
-                                $cfParticipants = @($resolvedPeople | ForEach-Object {
-                                    $personId = if ($_.PSObject.Properties['PersonId']) { $_.PersonId } elseif ($_.PSObject.Properties['Id']) { $_.Id } else { $null }
-                                    @{
-                                        person_id    = $personId
-                                        display_name = if ($_.PSObject.Properties['DisplayName']) { $_.DisplayName } elseif ($_.PSObject.Properties['Name']) { $_.Name } else { $null }
-                                        role         = if ($_.PSObject.Properties['Role']) { $_.Role } else { $null }
-                                        was_organiser = ($personId -and $personId -eq $organiserId)
-                                    }
-                                })
-                                Invoke-CloudflareSync -Method "Post" -Endpoint "participants" -Body @{
-                                    meeting_ref  = $mId
-                                    meeting_date = $start.ToString("yyyy-MM-dd")
-                                    participants = $cfParticipants
-                                    source       = "PeopleFile"
-                                }
-                            }
-                            $masterPeopleLogData = Update-MasterPeopleLog -MasterPeopleLogData $masterPeopleLogData -MeetingId $mId -Subject $subject -EventDate $start -PeopleFileUrl $uploadedPeopleFile.webUrl -ResolvedPeople $resolvedPeople
-                        }
-                    } else {
-                        Write-Warning "  [PEOPLE] No resolved people found in transcript — skipping people file"
-                    }
-                } catch {
-                    Write-Warning "  [PEOPLE] People intelligence failed: $_"
-                }
-            }
-
-            # --- CAPTURE SUCCESS DATA IMMEDIATELY ---
-            $effectiveStatus = if ($uploadedTranscript -and -not $uploadedSummary) { "repair_needed" } else { "success" }
-            $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { "pending" }
-            $effectiveRetryCount = if ($repairAttempted) { 1 } else { 0 }
-
-            $logEntry = [pscustomobject]@{
-                RunId                    = $runId
-                Subject                  = $subject
-                Organiser                = $organiser
-                EventDate                = $start
-                Status                   = $effectiveStatus
-                Type                     = $meetingType
-                Priority                 = $priority
-                Classification           = $cls.classification
-                ClassificationConfidence = $cls.confidence
-                ClassificationSource     = $cls.source
-                AgentState               = $effectiveAgentState
-                LastProcessed            = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
-                RetryCount               = $effectiveRetryCount
-                RepairReason             = $repairReason
-                File                     = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $null }
-                SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $null }
-                ConfluenceMirror         = $confluenceUrl
-                TopicRecords             = $topicRecords
-                MeetingId                = $mId
-                PeopleFile               = if ($uploadedPeopleFile) { $uploadedPeopleFile.webUrl } else { $null }
-            }
-            $log += $logEntry
-
-            # --- TEAMS NOTIFICATION ---
-            $hasTranscript = if ($logEntry.File) { "True" } else { "False" }
-            $mirrorLine = if ($logEntry.ConfluenceMirror) { "CONFLUENCE MIRROR: $($logEntry.ConfluenceMirror)`n" } else { "" }
-            
-            $teamsMsg = "MEETING ID: $($logEntry.MeetingId)`n" +
-                        "SUBJECT: $($logEntry.Subject)`n" +
-                        "ORGANISER: $($logEntry.Organiser)`n" +
-                        "EVENT DATE: $($logEntry.EventDate)`n" +
-                        "TYPE: $($logEntry.Type)`n" +
-                        "PRIORITY: $($logEntry.Priority)`n" +
-                        "MODE: $($logEntry.Classification)`n" +
-                        "MODE_CONFIDENCE: $($logEntry.ClassificationConfidence)`n" +
-                        "MODE_SOURCE: $($logEntry.ClassificationSource)`n" +
-                        "STATUS: $($logEntry.Status)`n" +
-                        "AGENT STATE: $($logEntry.AgentState)`n" +
-                        "HAS TRANSCRIPT: $hasTranscript`n" +
-                        "TRANSCRIPT FILE: $($logEntry.File)`n" +
-                        "SUMMARY FILE: $($logEntry.SummaryFile)`n" +
-                        $mirrorLine +
-                        "LAST UPDATED: $($logEntry.LastProcessed)"
-            
-            # Teams notification is now batched at the end of the run
-
-            # Update SharePoint Columns for both files (Transcript and Summary)
-            $filesToUpdate = New-Object System.Collections.Generic.List[Object]
-            if ($uploadedTranscript) { $filesToUpdate.Add($uploadedTranscript) }
-            if ($uploadedSummary) { $filesToUpdate.Add($uploadedSummary) }
-
-            foreach ($fileItem in $filesToUpdate) {
-                try {
-                    Write-Output "  Updating SharePoint columns for: $($fileItem.name)"
-                    $fieldsUri = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$($fileItem.id)/listitem/fields"
-                    
-                    $fieldData = @{
-                        "MeetingID" = $mId
-                        "Category"  = $meetingType
-                        "Priority"  = $priority
-                        "Mode"      = $modeInfo.mode
-                    }
-                    
-                    Invoke-RestMethod -Method Patch -Uri $fieldsUri -Headers $authHeader -Body ($fieldData | ConvertTo-Json) -ContentType "application/json" | Out-Null
-                } catch {
-                    $err = $_.Exception.Message
-                    Write-Warning "SharePoint Update Failed for $($fileItem.name): $err"
-                }
-            }
-        } # end if ($true) scope block
+        $log += $result.LogEntry
     }
     catch {
         $errMessage = $_.Exception.Message
@@ -3980,9 +3809,9 @@ if ($log -and $log.Count -gt 0) {
 
     # Build run summary counts
     $totalMeetings  = $log.Count
-    $newMeetings    = ($log | Where-Object { $_.Status -eq "processed" } | Measure-Object).Count
-    $skippedMeetings= ($log | Where-Object { $_.Status -eq "skipped" }   | Measure-Object).Count
-    $errorMeetings  = ($log | Where-Object { $_.Status -eq "error" }     | Measure-Object).Count
+    $newMeetings    = ($log | Where-Object { $_.AgentState -notin @("skipped", "error") } | Measure-Object).Count
+    $skippedMeetings= ($log | Where-Object { $_.AgentState -eq "skipped" }                | Measure-Object).Count
+    $errorMeetings  = ($log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" } | Measure-Object).Count
     $dateRangeStr   = "$($FromDate.ToString('yyyy-MM-dd')) – $($ToDate.ToString('yyyy-MM-dd'))"
 
     # Collect pipeline errors from log
