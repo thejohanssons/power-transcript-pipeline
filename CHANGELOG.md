@@ -7,6 +7,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.9.1] — 2026-07-28
+
+### Fixed
+- **Blank topic record filenames** (`T07-T07.md` etc.): When `Enrich-Summary` returns a single enriched record with no `Label` field, the merge loop now carries `Label` and `TopicName` from the matching LLM initial record. Falls back to `$ir.TopicName` if `Label` is also missing.
+
+### Refactored
+- **Single config source of truth**: Removed `packages/pipeline/config/` from the repo. Root `config/` is now the only copy. Azure deploy workflow copies `config/` into the pipeline package at deploy time (`cp -r ./config ./packages/pipeline/config`).
+
+### Deployed
+- Staging Worker updated to match production (R2 file API, `PATCH /topics/:id`).
+
+---
+
 ## [1.9.0] — 2026-07-28
 
 ### Added
