@@ -16,6 +16,10 @@ packages/pipeline/pipeline_config.json
 config/people_config.json
 config/people_recommendations.json
 
+# packages/pipeline/config/ is generated at deploy time by copying from root config/
+# Single source of truth: config/ (root). Do not commit the pipeline copy.
+packages/pipeline/config/
+
 # Azurite artifacts
 __blobstorage__
 __queuestorage__
