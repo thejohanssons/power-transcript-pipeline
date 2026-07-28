@@ -26,6 +26,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: 'Copy config into pipeline package'
+        run: cp -r ./config ./packages/pipeline/config
+
       - name: 'Deploy to Azure Functions'
         uses: Azure/functions-action@v1
         with:
