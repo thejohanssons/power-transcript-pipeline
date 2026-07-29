@@ -3268,7 +3268,7 @@ Write-Host "  [DIAG] Found $eventCount online meetings where you are the organis
 
 # Fallback: include events where user is listed as an attendee
 $filterEnd = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
-$attendeeUri = "https://graph.microsoft.com/v1.0/users/$calendarUserUpn/events?`$top=999&`$filter=isOnlineMeeting eq true and end/dateTime lt '$filterEnd' and attendees/any(a:a/emailAddress/address eq '$calendarUserUpn')"
+$attendeeUri = "https://graph.microsoft.com/v1.0/users/$calendarUserUpn/calendarView?startDateTime=$startStr&endDateTime=$endStr&`$top=999&`$filter=isOnlineMeeting eq true"
 
 try {
     $attendeeResp = Invoke-RestMethod -Method Get -Uri $attendeeUri -Headers $authHeader
