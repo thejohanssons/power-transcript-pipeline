@@ -29,6 +29,20 @@ jobs:
       - name: 'Copy config into pipeline package'
         run: cp -r ./config ./packages/pipeline/config
 
+      - name: 'Reset pipeline config to production values'
+        run: |
+          python3 -c "
+          import json
+          path = 'packages/pipeline/pipeline_config.json'
+          with open(path) as f:
+              cfg = json.load(f)
+          cfg['eip_cloudflare_sync'] = 'production'
+          cfg['skip_sharepoint'] = False
+          with open(path, 'w') as f:
+              json.dump(cfg, f, indent=2)
+          print('pipeline_config.json reset to production values ✅')
+          "
+
       - name: 'Deploy to Azure Functions'
         uses: Azure/functions-action@v1
         with:
