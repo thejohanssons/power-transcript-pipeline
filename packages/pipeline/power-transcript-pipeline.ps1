@@ -1292,25 +1292,115 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     $topicRecordsDir  = "Exec Intel Insights/Topic Records/$topicMonthFolder/$MeetingId"
     $topicFolderId    = Ensure-DriveFolder -DriveId $DriveId -FolderPath $topicRecordsDir
 
-    # Deduplicate topic records by specific topic label — same named topic discussed
-    # multiple times in a meeting should be collapsed into one record (longest wins).
-    # Note: dedup is on Label/TopicName (the specific topic), NOT TopicId (the taxonomy code).
-    # Multiple distinct topics can legitimately share the same TopicId (taxonomy category).
-    $deduped = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    # ── TOPIC DEDUP + CONSOLIDATION ─────────────────────────────────────────────
+    # Same named topic discussed multiple times in a meeting → collapse to one record.
+    # Dedup is on Label/TopicName (the specific topic), NOT TopicId (taxonomy code).
+    # Multiple distinct topics can legitimately share the same TopicId.
+    #
+    # Strategy (replaces naive "longest wins"):
+    #   1. Collect all variants per label into a cluster.
+    #   2. If only one variant → pass through unchanged (no cost).
+    #   3. Compute Jaccard similarity on word tokens between all variant pairs.
+    #   4. If max pairwise similarity >= 0.75 → fast path: keep longest (same as before).
+    #   5. If similarity < 0.75 → complementary content detected:
+    #      a. Call LLM to produce one merged summary preserving all distinct points.
+    #      b. Store raw variants in SummaryVariants for provenance.
+
+    function Get-JaccardSimilarity {
+        param([string]$TextA, [string]$TextB)
+        if (-not $TextA -or -not $TextB) { return 0.0 }
+        $tokA = [System.Collections.Generic.HashSet[string]]($TextA.ToLower() -split '\W+' | Where-Object { $_ })
+        $tokB = [System.Collections.Generic.HashSet[string]]($TextB.ToLower() -split '\W+' | Where-Object { $_ })
+        $intersection = [System.Collections.Generic.HashSet[string]]($tokA)
+        $intersection.IntersectWith($tokB)
+        $union = [System.Collections.Generic.HashSet[string]]($tokA)
+        $union.UnionWith($tokB)
+        if ($union.Count -eq 0) { return 1.0 }
+        return [double]$intersection.Count / [double]$union.Count
+    }
+
+    function Merge-TopicVariants {
+        param([string]$Label, [string[]]$Variants)
+        $i = 0
+        $numbered = ($Variants | ForEach-Object { $i++; "Variant ${i}:`n$_" }) -join "`n`n"
+        $instructions = "You are consolidating multiple summaries of the same topic (`"$Label`") from different segments of the same meeting. " +
+                        "Each variant captured a different part of the discussion. Your task: " +
+                        "Write ONE merged summary that preserves ALL distinct points from all variants. " +
+                        "Remove repetition: if the same point appears in multiple variants, include it once. " +
+                        "Do NOT omit information. Use concise bullet points. Output only the merged summary text, nothing else."
+        $prompt = $instructions + "`n`n" + $numbered
+        $result = Invoke-LLM -Prompt $prompt -MaxTokens 600
+        if ($result -and $result.Trim()) { return $result.Trim() }
+        return $Variants -join "`n`n---`n`n"
+    }
+
+    # Phase 1: cluster variants by label
+    $clusters = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($tr in $topicRecords3D) {
         $label = if ($tr.Label -and $tr.Label -ne $tr.TopicId) { $tr.Label } `
                  elseif ($tr.TopicName) { $tr.TopicName } `
-                 else { $tr.TopicId }   # last resort: only dedup within same T-code when no name
-        if (-not $deduped.ContainsKey($label)) {
-            $deduped[$label] = $tr
+                 else { $tr.TopicId }
+        if (-not $clusters.ContainsKey($label)) {
+            $clusters[$label] = [System.Collections.Generic.List[object]]::new()
+        }
+        $clusters[$label].Add($tr)
+    }
+
+    # Phase 2: consolidate each cluster
+    $consolidated = [System.Collections.Generic.List[object]]::new()
+    $SIMILARITY_THRESHOLD = 0.75
+
+    foreach ($kvp in $clusters.GetEnumerator()) {
+        $variants = @($kvp.Value)
+
+        if ($variants.Count -eq 1) {
+            $consolidated.Add($variants[0])
+            continue
+        }
+
+        # Pick the record with the most metadata as the base (longest summary)
+        $base = $variants | Sort-Object { if ($_.Summary) { $_.Summary.Length } else { 0 } } -Descending | Select-Object -First 1
+        $summaries = @($variants | ForEach-Object { if ($_.Summary) { $_.Summary } else { "" } } | Where-Object { $_ })
+
+        if ($summaries.Count -le 1) {
+            $consolidated.Add($base)
+            continue
+        }
+
+        # Compute max pairwise Jaccard similarity
+        $maxSimilarity = 0.0
+        for ($si = 0; $si -lt $summaries.Count; $si++) {
+            for ($sj = $si + 1; $sj -lt $summaries.Count; $sj++) {
+                $sim = Get-JaccardSimilarity -TextA $summaries[$si] -TextB $summaries[$sj]
+                if ($sim -gt $maxSimilarity) { $maxSimilarity = $sim }
+            }
+        }
+
+        if ($maxSimilarity -ge $SIMILARITY_THRESHOLD) {
+            # Fast path: variants are highly similar — keep longest (original behaviour)
+            Write-Host "  [DEDUP] '$($kvp.Key)': $($variants.Count) variants, sim=$([math]::Round($maxSimilarity,2)) → longest wins (fast path)"
+            $consolidated.Add($base)
         } else {
-            $existingLen = if ($deduped[$label].Summary) { $deduped[$label].Summary.Length } else { 0 }
-            $newLen      = if ($tr.Summary)              { $tr.Summary.Length }              else { 0 }
-            if ($newLen -gt $existingLen) { $deduped[$label] = $tr }
+            # Slow path: complementary content — LLM consolidation
+            Write-Host "  [DEDUP] '$($kvp.Key)': $($variants.Count) variants, sim=$([math]::Round($maxSimilarity,2)) → LLM consolidation" -ForegroundColor Cyan
+            $mergedSummary = Merge-TopicVariants -Label $kvp.Key -Variants $summaries
+            if ($base.PSObject.Properties['Summary']) {
+                $base.Summary = $mergedSummary
+            } else {
+                $base.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("Summary", $mergedSummary))
+            }
+            $variantsJson = $summaries | ConvertTo-Json -Compress
+            if ($base.PSObject.Properties['SummaryVariants']) {
+                $base.SummaryVariants = $variantsJson
+            } else {
+                $base.PSObject.Properties.Add([System.Management.Automation.PSNoteProperty]::new("SummaryVariants", $variantsJson))
+            }
+            $consolidated.Add($base)
         }
     }
+
     $beforeCount    = $topicRecords3D.Count
-    $topicRecords3D = @($deduped.Values)
+    $topicRecords3D = @($consolidated)
     if ($topicRecords3D.Count -lt $beforeCount) {
         Write-Host "  [NID] Topic record dedup: $beforeCount → $($topicRecords3D.Count) records (collapsed duplicate labels)"
     }
@@ -1344,17 +1434,18 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         $safeOwner      = if ($tr.Ownership -and $tr.Ownership.PSObject.Properties['PRIMARY_OWNER'] -and $tr.Ownership.PRIMARY_OWNER) { $tr.Ownership.PRIMARY_OWNER } else { $null }
         $safeContext    = if ($meetingCtx) { $meetingCtx } else { "Unknown" }
         Invoke-CloudflareSync -Method "Post" -Endpoint "topics" -Body @{
-            topic_id     = $tr.TopicId
-            topic_name   = $safeTopicName
-            domain       = $tr.Domain
-            category     = $tr.Category
-            priority     = $safePriority
-            owner        = $safeOwner
-            summary      = $tr.Summary
-            meeting_ref  = $MeetingId
-            meeting_date = $EventDate.ToString("yyyy-MM-dd")
-            context      = $safeContext
-            source       = "Transcript"
+            topic_id         = $tr.TopicId
+            topic_name       = $safeTopicName
+            domain           = $tr.Domain
+            category         = $tr.Category
+            priority         = $safePriority
+            owner            = $safeOwner
+            summary          = $tr.Summary
+            summary_variants = if ($tr.PSObject.Properties['SummaryVariants']) { $tr.SummaryVariants } else { $null }
+            meeting_ref      = $MeetingId
+            meeting_date     = $EventDate.ToString("yyyy-MM-dd")
+            context          = $safeContext
+            source           = "Transcript"
         }
 
         # Mutual Linking: Summary -> Topic Record

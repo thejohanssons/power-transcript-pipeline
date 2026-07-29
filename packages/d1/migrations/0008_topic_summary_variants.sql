@@ -1,0 +1,11 @@
+-- ============================================================
+-- Copyright (c) 2026 Virrata AB. All rights reserved.
+-- EIP Platform — D1 Canonical Schema
+-- Migration 0008: Add summary_variants provenance field to topic_occurrences
+-- ============================================================
+-- Stores raw per-segment summaries captured before consolidation.
+-- Populated only when a topic label appears >1 time in the same meeting
+-- AND the variants are sufficiently distinct (similarity < 0.75).
+-- When variants are highly similar, summary_variants is left NULL and
+-- the standard "longest wins" fast path is used instead.
+ALTER TABLE topic_occurrences ADD COLUMN summary_variants TEXT; -- JSON array of raw summary strings
