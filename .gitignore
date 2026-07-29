@@ -12,8 +12,6 @@ pipeline_config.json
 packages/pipeline/classification_rules.json
 packages/pipeline/pipeline_config.json
 
-# Root config/ is gitignored — use packages/pipeline/config/ as the source of truth
-/config/
 
 # Azurite artifacts
 __blobstorage__
