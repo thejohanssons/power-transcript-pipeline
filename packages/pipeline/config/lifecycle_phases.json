@@ -1,0 +1,12 @@
+{
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+    "lifecycle_phases": [
+    "Capability Establishment",
+    "Capability Validation",
+    "Capability Transfer",
+    "Capability Operation",
+    "Capability Improvement",
+    "Capability Retirement",
+    "Unknown"
+  ]
+}

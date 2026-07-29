@@ -12,13 +12,8 @@ pipeline_config.json
 packages/pipeline/classification_rules.json
 packages/pipeline/pipeline_config.json
 
-# People config contains PII (names, emails) - do not commit
-config/people_config.json
-config/people_recommendations.json
-
-# packages/pipeline/config/ is generated at deploy time by copying from root config/
-# Single source of truth: config/ (root). Do not commit the pipeline copy.
-packages/pipeline/config/
+# Root config/ is gitignored — use packages/pipeline/config/ as the source of truth
+/config/
 
 # Azurite artifacts
 __blobstorage__

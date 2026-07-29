@@ -26,9 +26,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: 'Copy config into pipeline package'
-        run: cp -r ./config ./packages/pipeline/config
-
       - name: 'Reset pipeline config to production values'
         run: |
           python3 -c "
