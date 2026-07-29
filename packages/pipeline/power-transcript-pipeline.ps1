@@ -3264,7 +3264,7 @@ $events = $events | Where-Object {
 }
 
 $eventCount = ($events | Measure-Object).Count
-Write-Host "  [DIAG] Found $eventCount online meetings where you are the organiser." -ForegroundColor Gray
+Write-Host "  [DIAG] Found $eventCount online meetings in calendar (organised + attended)." -ForegroundColor Gray
 
 # Fallback: include events where user is listed as an attendee
 $filterEnd = $ToDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -3291,7 +3291,8 @@ Write-Host "✅ Total unique online meetings to evaluate: $($events.Count)" -For
 # Prevents processing the same meeting multiple times if it exists on multiple calendars
 $uniqueMeetings = @{}
 foreach ($e in $events) {
-    $key = $e.onlineMeeting.joinUrl
+    # Use joinUrl as dedup key; fall back to event ID to avoid silent drops when joinUrl is null
+    $key = if ($e.onlineMeeting.joinUrl) { $e.onlineMeeting.joinUrl } else { $e.id }
     if (-not $uniqueMeetings.ContainsKey($key)) {
         $uniqueMeetings[$key] = $e
     }
