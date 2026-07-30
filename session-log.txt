@@ -1,19 +1,19 @@
 # EIP Platform — Session State Log
-# Last updated: 2026-07-29 11:12 UTC
+# Last updated: 2026-07-30 09:25 UTC
 # Branch: main
 
 ## Current Git State
-- Branch: main (local + remote) — v1.9.2 deployed to production
+- Branch: main (local + remote) — v1.9.3 deployed to production
 - main: production (Azure Function + CF Worker auto-deploy on push)
 - develop: in sync with main ✅ (fast-forwarded 2026-07-29)
-- fix/blank-labels-staging-deploy: DELETED ✅
+- feature/topic-dedup-consolidation: MERGED & DELETED ✅ (2026-07-30)
 
 ## Last 5 commits on main
+83bed86 feat: topic dedup consolidation with similarity gate + LLM merge (squash merge of PR #1)
 422401e refactor: always use packages/pipeline/config/ — remove path fallback logic
 8e51b0a refactor: move config back to packages/pipeline/config/ (Option B — committed, private repo)
 6996037 ci: reset pipeline_config.json to production values on every Azure deploy
 f538831 config: set production mode as default in pipeline_config.json
-fd4b093 fix: prevent silent meeting drops when onlineMeeting.joinUrl is null
 
 NOTE: CI GREEN ✅. Config permanently solved — packages/pipeline/config/ is single source of truth.
 
@@ -73,12 +73,15 @@ Staging:
   logs/          — master_log.json + master_people_log.json (2.2MB verified)
   topic-records/ — ~1,124 MD files (all 7 months)
 
-## D1 Schema (9 tables, 7 migrations)
+## D1 Schema (9 tables, 8 migrations)
   topics, topic_occurrences, topic_merge_candidates,
   transcripts, meeting_participants, sessions,
   actions (schema ready, no data yet),
   decisions (schema ready, no data yet),
   risks (schema ready, no data yet)
+  
+  New column (migration 0008, applied 2026-07-30):
+  topic_occurrences.summary_variants TEXT  — JSON array of raw summaries before LLM consolidation (null if fast path taken)
 
 ## Staging pipeline_config.json settings
   eip_cloudflare_sync: "staging"
@@ -96,6 +99,27 @@ Staging:
   - POST /transcripts → staging D1
   - POST /participants → staging D1
   - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
+
+## Session Summary — 2026-07-30 (Topic Dedup Consolidation — v1.9.3)
+
+### Shipped in v1.9.3 (PR #1 merged to main 2026-07-30)
+1. FEATURE: Topic dedup consolidation with Jaccard similarity gate + LLM merge
+   - Replaced naive "longest wins" dedup with two-phase cluster → consolidate loop
+   - Get-JaccardSimilarity: cheap token-overlap check (no LLM cost) on word tokens
+   - Merge-TopicVariants: LLM consolidation prompt fires only when similarity < 0.75
+   - Fast path (sim >= 0.75): keep longest — zero extra cost, same as before
+   - Slow path (sim < 0.75): LLM merges all distinct points; raw variants stored in SummaryVariants
+   - SIMILARITY_THRESHOLD = 0.75 as named constant (easy to tune)
+2. SCHEMA: Migration 0008 — topic_occurrences.summary_variants TEXT (provenance field)
+   - Applied to both eip-platform-staging and eip-platform production ✅
+3. CF UPSERT: summary_variants field wired into POST /topics body
+4. NOTE: Consolidation only fires on long meetings (60+ min) where transcript splits across multiple LLM chunks.
+   Short meetings are processed as a single chunk — LLM naturally merges recurring topics during extraction.
+
+### Known trigger condition
+- Slow path fires when: same topic label appears in 2+ pipeline chunks AND Jaccard sim < 0.75
+- Jaccard sim is computed on word tokens (lowercase, non-alphanumeric stripped)
+- Watch for [DEDUP] log lines in pipeline output to confirm path taken and similarity score
 
 ## Session Summary — 2026-07-27/28 (Spike 3 + v1.9.1)
 
@@ -127,9 +151,12 @@ Staging:
 3. CONSIDER: Filter out declined meetings to reduce noise (low priority)
 4. Sync Worker (D1 → SharePoint + Confluence views)
 5. People file re-parse → populate actions/decisions/risks tables
-6. Scheduled dedup Worker (semantic similarity via Workers AI)
+6. DONE (v1.9.3): In-meeting topic dedup consolidation — similarity gate + LLM merge ✅
+   (replaces the previously planned "Scheduled dedup Worker" for in-meeting duplicates)
 7. Fix ExCo daily T09 blank label edge case (Enrich-Summary TopicId mismatch)
 8. Fix Node.js 20 deprecation warning in GitHub Actions
+9. CONSIDER: Tune SIMILARITY_THRESHOLD (currently 0.75) based on real slow-path observations
+10. CONSIDER: Taxonomy-to-policy mapping — trajectory-style summaries for risk/decision topics
 
 ## To Be Considered (Future Work)
 Source: change-suggestions-by-zoo.txt — architectural review by Zoo (2026-07-28)
