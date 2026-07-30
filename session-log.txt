@@ -100,6 +100,22 @@ Staging:
   - POST /participants → staging D1
   - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
 
+## Session Summary — 2026-07-30 (LLM Model Upgrade + Chunk Config Refactor)
+
+### Shipped (2026-07-30, commits fe0cba2 → d92b241)
+1. LLM model upgraded from gpt-4o → gpt-5.6-terra (both environments)
+2. Removed temperature=0 — not supported by GPT-5.6 (fix: a92df2c)
+3. LLM tuning config extracted to committed packages/pipeline/config/llm_config.json:
+   - ChunkSize: 32,000 → 400,000 chars (single-chunk for all normal meetings)
+   - ChunkOverlap: 500 → 0
+   - ChunkSummaryMaxTokens: 4,000 → 8,000
+   - SynthesisMaxTokens: 6,000 → 12,000
+   - SummaryMaxTokens: 8,000 → 16,000
+   - RecordsMaxTokens: 32,000 → 64,000
+   - MaxCombinedSummaryChars: 80,000 → 300,000
+4. Pipeline reads llm_config.json first, falls back to classification_rules.json, then hardcoded defaults
+5. Verified: [LLM DIAG] Chunks: 1 (chunk size: 400000 chars) ✅ — whole meeting in one pass
+
 ## Session Summary — 2026-07-30 (LLM Model Upgrade — gpt-4o → gpt-5.6-terra)
 
 ### Shipped (2026-07-30, commit fe0cba2)
