@@ -1,5 +1,5 @@
 # EIP Platform — Session State Log
-# Last updated: 2026-07-30 09:25 UTC
+# Last updated: 2026-07-30 12:14 UTC
 # Branch: main
 
 ## Current Git State
@@ -99,6 +99,22 @@ Staging:
   - POST /transcripts → staging D1
   - POST /participants → staging D1
   - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
+
+## Session Summary — 2026-07-30 (LLM Model Upgrade — gpt-4o → gpt-5.6-terra)
+
+### Shipped (2026-07-30, commit fe0cba2)
+1. LLM model upgraded from gpt-4o to gpt-5.6-terra in both environments:
+   - Local: profile.ps1 sets $env:AZURE_OPENAI_MODEL = "gpt-5.6-terra" (cold-start env)
+   - Production: Azure Function App "peter-consolidate-meeting-transcripts" (rg: Atlassian-Rovo-Connector)
+     updated via az cli: AZURE_OPENAI_MODEL=gpt-5.6-terra
+2. Key gains vs gpt-4o:
+   - Intelligence Index: ~20 → 46 (+130%)
+   - Context window: 128k → 1M tokens (removes 32k output ceiling on records pass)
+   - TTFT: significantly faster (1.46s vs multi-second cold reasoning)
+   - Price: $2.50/$15 per 1M tokens (comparable to gpt-4o at scale)
+3. CONSIDER (future): two-tier routing — GPT-5.6 Sol for records extraction pass,
+   Terra for chunk summaries/synthesis/dedup merge — for maximum quality on the
+   highest-stakes structured output task.
 
 ## Session Summary — 2026-07-30 (Topic Dedup Consolidation — v1.9.3)
 
