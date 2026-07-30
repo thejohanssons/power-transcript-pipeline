@@ -1,0 +1,208 @@
+# EIP Platform — Session State Log
+# Last updated: 2026-07-29 11:12 UTC
+# Branch: main
+
+## Current Git State
+- Branch: main (local + remote) — v1.9.2 deployed to production
+- main: production (Azure Function + CF Worker auto-deploy on push)
+- develop: in sync with main ✅ (fast-forwarded 2026-07-29)
+- fix/blank-labels-staging-deploy: DELETED ✅
+
+## Last 5 commits on main
+422401e refactor: always use packages/pipeline/config/ — remove path fallback logic
+8e51b0a refactor: move config back to packages/pipeline/config/ (Option B — committed, private repo)
+6996037 ci: reset pipeline_config.json to production values on every Azure deploy
+f538831 config: set production mode as default in pipeline_config.json
+fd4b093 fix: prevent silent meeting drops when onlineMeeting.joinUrl is null
+
+NOTE: CI GREEN ✅. Config permanently solved — packages/pipeline/config/ is single source of truth.
+
+## Local Working State
+- pipeline_config.json: production mode (gitignored — set locally)
+  eip_cloudflare_sync: "production"
+  skip_sharepoint: false
+  CONFLUENCE_TOKEN: set via $env:CONFLUENCE_TOKEN in pwsh session
+- Config: packages/pipeline/config/ — all 13 files committed ✅ NO MORE CONFIG LOSS ON BRANCH SWITCH
+- Untracked files (gitignored, local only):
+  /config/                             ← old root config copy — safe to delete
+  session-log.txt                      ← this file
+  local-pipeline-output.txt           ← latest pipeline run output
+  D1-wireing.txt                       ← D1 wiring notes
+  change-suggestions-by-zoo.txt       ← architectural review notes
+  packages/pipeline/normalize-topic-ids-d1.ps1  ← utility script
+  packages/pipeline/2026-07-22_1100-ExCo_daily_lunch_time.txt  ← test transcript
+  PRS/Matching engine+all/            ← PRS documents
+
+## Backfill Status (as of 2026-07-29 09:21)
+- Local backfill runs completed: 2026-07-01 through 2026-07-28 ✅
+- July 21st re-run: ✅ All 6 meetings processed (NPI Stage 1 biweekly, ExCo Finance Call, General on compliance, Payment Strategy, Image scanning, Webkorps Custom Dashboard)
+- July 27th re-run: ✅ All 4 meetings with transcripts processed (ExCo daily NOW INCLUDED)
+- Azure production mode: CONFIRMED ✅ (pipeline_config.json corrected + deploy workflow enforces it)
+- Azure deploy workflow: now resets pipeline_config.json to production values on every deploy ✅
+- NOTE: Azure was previously running in STAGING mode (skip_sharepoint=true) — historical Azure runs may have skipped SharePoint writes. Local backfill has compensated for most gaps.
+
+## Calendar Query Fixes (2026-07-29)
+- FIX: calendarView with proper date range for attendee query (fd4b093) — backfill dates now fully covered
+- FIX: null joinUrl dedup drop (fd4b093) — 14 meetings now visible (was 11)
+- KNOWN ISSUE: "Declined" meetings are now evaluated — no transcript found (expected). 
+  Consider filtering out declined meetings to reduce noise (low priority)
+- KNOWN ISSUE: ExCo daily shows as "Declined" — if Peter declined but transcript exists, it WILL be processed
+
+## Cloudflare Resources
+Production:
+  Worker: https://eip-api-worker.homeassistant-8d3.workers.dev
+  D1:     eip-platform (9a989055-0e00-4c0d-a046-bd87af8001b0)
+  R2:     eip-platform (WEUR)
+
+Staging:
+  Worker: https://eip-api-worker-staging.homeassistant-8d3.workers.dev
+  D1:     eip-platform-staging (6222238e-9e78-43f2-a1a2-90baddda8080)
+  R2:     eip-platform-staging (WEUR)
+
+## D1 Production Content (as of 2026-07-23)
+  topics:               500+ specific named topic entities
+  topic_occurrences:    ~1,000+ per-meeting events
+  meeting_participants: 670 people records
+  transcripts:          ~435 meeting refs
+  topic_merge_candidates: 1 pending
+
+## R2 Production Content
+  transcripts/   — raw VTT/TXT files (all months 2026-01 to 2026-07)
+  summaries/     — meeting summary files
+  people/        — people awareness files
+  logs/          — master_log.json + master_people_log.json (2.2MB verified)
+  topic-records/ — ~1,124 MD files (all 7 months)
+
+## D1 Schema (9 tables, 7 migrations)
+  topics, topic_occurrences, topic_merge_candidates,
+  transcripts, meeting_participants, sessions,
+  actions (schema ready, no data yet),
+  decisions (schema ready, no data yet),
+  risks (schema ready, no data yet)
+
+## Staging pipeline_config.json settings
+  eip_cloudflare_sync: "staging"
+  skip_sharepoint: true
+  eip_api_worker_url_staging: https://eip-api-worker-staging.homeassistant-8d3.workers.dev
+  eip_api_worker_url: https://eip-api-worker.homeassistant-8d3.workers.dev
+
+## What Staging Mode Skips
+  - Upload-FileToSharePoint (all file uploads)
+  - Publish-SummaryToConfluence (summary mirror)
+  - Publish-TopicRecordToConfluence (REMOVED — topic records never go to Confluence)
+
+## What Staging Mode Writes
+  - POST /topics    → staging D1 (all 3 paths: VTT inbox, VTT direct, CALENDAR)
+  - POST /transcripts → staging D1
+  - POST /participants → staging D1
+  - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
+
+## Session Summary — 2026-07-27/28 (Spike 3 + v1.9.1)
+
+### Shipped in v1.9.0 (merged to main 2026-07-28)
+1. REFACTOR: Invoke-MeetingProcessing shared processing core (eliminates ~820 lines duplication)
+2. REFACTOR: Normalize-TopicIds function — maps LLM slugs → canonical T-codes
+3. FEATURE: R2 file wiring — POST/GET/DELETE /files on Worker; pipeline uploads transcript/summary/topic-records/people
+4. BUG FIX: PATCH /topics/:id rename/merge logic in api-worker
+5. BUG FIX: Teams notification counter using AgentState (not Status)
+6. PROMPT FIX: Inject canonical T01-T18 taxonomy into records prompt; strengthen FOCUS instruction; min-count guard
+7. BUG FIX: "Parameter set cannot be resolved" crash on multi-record meetings
+   Root cause: PSObject.Properties.Add on bare PSCustomObject from Enrich-Summary merge loop
+8. CI: Added .github/workflows/ci.yml — tsc typecheck + PSScriptAnalyzer Error-only lint
+
+### Shipped in v1.9.1 (merged to main 2026-07-28)
+9. BUG FIX: Blank topic record filenames (T07-T07.md) — carry Label/TopicName from LLM records through merge loop
+10. REFACTOR: Single config source of truth — removed packages/pipeline/config/ from repo; deploy workflow copies root config/ at build time
+11. DEPLOYED: Staging Worker updated to match production
+
+### Known remaining issues
+1. ExCo daily T09 still blank — Enrich-Summary T09 record has no $ir match in initial records (TopicId mismatch). Rare edge case.
+2. RECORD SHORTFALL: Occasional LLM non-determinism — min-count guard fires correctly, re-run with -ForceRerun resolves.
+3. NODE.JS DEPRECATION: actions/checkout@v4 warns about Node.js 20 in CI. Cosmetic only.
+
+## Next Steps (Prioritised)
+1. BACKFILL: Full re-run of historical dates with -ForceRerun to pick up missed attendee meetings
+   (calendarView + null joinUrl fixes now in place — earlier runs missed ExCo daily + attendee-only meetings)
+2. CLEANUP: Delete /config/ root folder (no longer needed — safe to remove)
+3. CONSIDER: Filter out declined meetings to reduce noise (low priority)
+4. Sync Worker (D1 → SharePoint + Confluence views)
+5. People file re-parse → populate actions/decisions/risks tables
+6. Scheduled dedup Worker (semantic similarity via Workers AI)
+7. Fix ExCo daily T09 blank label edge case (Enrich-Summary TopicId mismatch)
+8. Fix Node.js 20 deprecation warning in GitHub Actions
+
+## To Be Considered (Future Work)
+Source: change-suggestions-by-zoo.txt — architectural review by Zoo (2026-07-28)
+Reviewed and triaged. High-ROI items only:
+
+### High ROI — implement when ready
+A. JSON Schema validation at Worker/pipeline startup
+   - Define JSON Schema or TypeScript interfaces per config type (CapabilitiesConfig, FunctionsConfig, ExecutionContextsConfig, TopicMappingConfig)
+   - Validate all configs at startup; fail fast with descriptive errors
+   - Add orphaned TopicId check (T-code in mapping_rules but missing from taxonomy)
+
+B. Unit tests using artifacts/verification/ fixtures
+   - artifacts/verification/RUN_*/expected_output.json as test fixtures
+   - Test context detection, topic matching (T01–T18), SemanticIntegrityRules, StrategicSignals
+   - Add packages/api-worker/test/ directory
+
+C. Split mapping_rules.json into top-level concern keys
+   - Keep as single file but restructure: { rules: [...], semantic_integrity: [...], strategic_signals: [...] }
+   - No structural change to loading logic, cleaner editing and git diffs
+
+D. Expand types.ts with full domain interfaces
+   - ExecutionContext, TopicRule, SemanticIntegrityRule, StrategicSignal, TranscriptSegment, TopicMatch
+
+### Lower priority / deferred
+- Archetype defaults for context_bias (over-engineered at this stage)
+- Separate semantic scoring engine module (LLM IS the engine — don't duplicate)
+- model_mappings.json (D1 schema is already the source of truth)
+- PowerShell Modules/ directory (worth doing when reuse across scripts justifies it)
+- Config version manifest (git hash already serves this purpose)
+- Taxonomy as authoritative index (keep taxonomy.json as display layer, mapping_rules.json as operational layer)
+
+## Worker API Endpoints (current — staging + production)
+GET  /health
+GET  /topics?domain=&status=&priority=&since=&limit=
+GET  /topics/:id
+POST /topics                    — upsert with fuzzy dedup
+GET  /topics/:id/occurrences
+POST /transcripts               — now accepts r2_key field
+GET  /queue
+PATCH /queue/:id                — approve/reject/amend
+POST /sessions
+GET  /merge-candidates
+POST /participants              — batch upsert
+GET  /meetings/:ref/participants
+PATCH /transcripts/:id
+POST /files                     — NEW: upload to R2
+GET  /files/{key}               — NEW: retrieve from R2
+DELETE /files/{key}             — NEW: delete from R2
+
+## Architecture Notes
+- Monorepo: packages/pipeline (Azure), packages/api-worker (CF Worker), packages/d1 (schema), packages/sync-worker (future)
+- Config path resolution: $PSScriptRoot/../../config (local dev) → ./config (Azure deploy)
+- classification_rules.json: gitignored secret, in repo root (not packages/pipeline/)
+- pipeline_config.json: gitignored secret, in packages/pipeline/
+- All PS1 scripts use $PSScriptRoot for self-relative paths
+- R2 uploads now go via POST /files Worker endpoint (not wrangler CLI)
+- AVOID: $executionContext as variable name — clashes with PowerShell reserved $ExecutionContext
+- Invoke-MeetingProcessing is the single shared processing core for all 3 pipeline paths
+
+## R2 Key Convention
+  transcripts/{yyyy-MM}/{meeting_id}.txt
+  summaries/{yyyy-MM}/{meeting_id}-summary.txt
+  topic-records/{yyyy-MM}/{meeting_id}/{topic_id}-{label}.md
+  people/{yyyy-MM}/{meeting_id}-people.txt
+  logs/{filename}
+
+## GitHub Secrets
+  CLOUDFLARE_API_TOKEN: set and verified (rotated 2026-07-22)
+  AZURE_FUNCTIONAPP_PUBLISH_PROFILE: set
+
+## Azure Function
+  App: peter-consolidate-meeting-transcripts
+  Deploys from: packages/pipeline/ (path-filtered CI/CD on main)
+  Runtime: PowerShell 7.x
+  Trigger: Timer (daily)
+AI assistant session started

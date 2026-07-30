@@ -1,0 +1,397 @@
+Architectural and config-structure change suggestions by Zoo
+
+Scope
+- Project: /Users/peter/git-stuff/power-transcript-pipeline
+- Focus: overall architecture, config structure and runtime alignment
+
+1. Overall architecture observations
+
+You have a multi-component system:
+- Azure Functions / PowerShell pipeline in packages/pipeline
+  - e.g. packages/pipeline/power-transcript-pipeline.ps1
+  - packages/pipeline/TranscriptJob/run.ps1 and function.json
+- Cloudflare Workers/API in packages/api-worker
+  - packages/api-worker/src/index.ts
+  - packages/api-worker/src/fuzzy.ts
+  - packages/api-worker/src/types.ts
+- D1 schema migrations in packages/d1/migrations
+  - 0001_initial_schema.sql through 0007_risks_table.sql
+- A rich domain/taxonomy/config layer in config/
+  - capabilities.json
+  - functions.json
+  - execution_contexts.json
+  - mapping_rules.json
+  - plus other taxonomy-related configs
+
+The core “intelligence” of the system lives in JSON configs (taxonomy, mapping rules, execution contexts). This is a strong pattern: it lets you iterate semantic rules without redeploying code. The main improvement area is formalising schemas, centralising config loading, and tightening alignment between configs, runtime code, and D1 schema.
+
+2. Config structure – strengths
+
+Domain separation:
+- config/capabilities.json
+  - Defines high-level enterprise capabilities (Corporate Strategy, Product Strategy, Marketing, Finance, etc.).
+- config/functions.json
+  - Defines organisational functions (Executive, Product, R&D, Engineering, Finance, etc.).
+- config/execution_contexts.json
+  - Defines meeting / execution contexts and ContextDetectionRules (NPI-managed, Product Development, R&D Project, Executive Governance, Finance BAU, Commercial BAU, etc.).
+  - Encodes subject_patterns and organiser_patterns per context.
+- config/mapping_rules.json
+  - Defines TopicId-based rules (T01–T18) for semantic mapping.
+  - Contains SemanticIntegrityRules and StrategicSignals.
+
+Rich metadata:
+- mapping_rules.json includes:
+  - Version, Description, Changelog (2.0, 2.1, 2.2) with detailed change descriptions.
+  - ContextBias blocks per topic with boost_in and suppress_in execution context lists.
+  - SemanticIntegrityRules such as ProductBrandResolution, SupplierBrandConflict, PersonBrandConflict, BrandCastConflict, NpiContextGuard.
+  - StrategicSignals with impact_hint and alignment_hint.
+
+Clear domain naming:
+- TopicIds T01–T18:
+  - T01 Product Performance
+  - T02 Product Quality & Compliance
+  - T03 Product Value & Perception
+  - T04 Product Scope & Prioritisation
+  - T05 Delivery Progress & Readiness
+  - T06 Delivery Risk & Constraints
+  - T07 Development Execution
+  - T08 Cash Flow & Liquidity
+  - T09 Cost Structure & Margins
+  - T10 Revenue & Commercial Performance
+  - T11 Financial Risk & Exposure
+  - T12 Organisation & Capability
+  - T13 Resource Allocation
+  - T14 Operational Effectiveness
+  - T15 Strategic Direction & Alignment
+  - T16 Product-Market Fit
+  - T17 Growth & Opportunities
+  - T18 Delivery Confidence
+
+This gives a solid foundation for consistent downstream processing.
+
+3. Config structure – improvement suggestions
+
+3.1. Introduce a formal schema per config type
+
+Currently the JSON files are free-form but clearly follow implicit schemas. Introduce explicit schemas:
+
+- Define JSON Schema (or TypeScript interfaces) for each config type:
+  - CapabilitiesConfig for config/capabilities.json
+    - fields: _copyright, capabilities: string[]
+  - FunctionsConfig for config/functions.json
+    - fields: _copyright, functions: string[]
+  - ExecutionContextsConfig for config/execution_contexts.json
+    - fields: _copyright, execution_contexts: string[], ContextDetectionRules: array of structured rules.
+  - TopicMappingConfig for config/mapping_rules.json
+    - fields: Version, Description, Changelog[], Rules[], SemanticIntegrityRules[], StrategicSignals[].
+
+- Validate configs at startup:
+  - In packages/api-worker/src/index.ts:
+    - On Worker init, load all config files and validate against schemas.
+    - Fail fast with a clear error (including which file and which field) if validation fails.
+  - In packages/pipeline/TranscriptJob/run.ps1 and other pipeline scripts:
+    - Use a shared PowerShell module to read and validate configs.
+
+Benefits:
+- Early detection of typos and structural errors (e.g. context_bias misspelled, missing boost_in array).
+- Safer evolution of config: adding a new field requires schema updates and ensures consistency across the pipeline and Workers.
+- Better tooling: you can use JSON schema-aware editors for authoring mapping rules.
+
+3.2. Split mapping_rules.json by concern
+
+mapping_rules.json currently mixes multiple concerns:
+- Versioning metadata:
+  - Version, Description, Changelog.
+- Topic rules:
+  - ContextBias, Keywords, suppress_keywords, critical_keywords, CategoryHints per TopicId.
+- SemanticIntegrityRules:
+  - ProductBrandResolution, SupplierBrandConflict, PersonBrandConflict, BrandCastConflict, NpiContextGuard.
+- StrategicSignals:
+  - Urgency, HighStrategicWeight, AlignmentConsensus, AlignmentConflict.
+
+This is powerful but will become heavy to maintain as you add more rules. Recommended split:
+
+- config/mapping/metadata.json
+  - Contains Version, Description, Changelog.
+- config/mapping/topics.json
+  - Contains the Rules array (T01–T18 topic mappings).
+- config/mapping/semantic_integrity.json
+  - Contains SemanticIntegrityRules.
+- config/mapping/strategic_signals.json
+  - Contains StrategicSignals.
+
+Runtime pattern:
+- At startup, the Worker or pipeline loads all four files and composes them into a single in-memory TopicMappingConfig object.
+- Editing and diffing becomes clearer because each concern has its own file and git history.
+
+3.3. Create a single taxonomy entry point with references
+
+You already have taxonomy-related configs plus capabilities/functions/topics. To avoid drift:
+
+- Make config/taxonomy.json the authoritative index (if not already):
+  - Declare TopicIds and their structural info (name, domain, capability, function alignment).
+  - Declare relationships between topics, capabilities, functions, and execution contexts.
+
+- Topic rules in mapping_rules (or mapping/topics.json after split) should reference the taxonomy instead of re-declaring domain information:
+  - For each TopicId in Rules, refer to taxonomy.topics[T01] etc.
+
+Pattern:
+- taxonomy.topics[T01]:
+  - { id: "T01", name: "Product Performance", capability: "Product Development", function: "Product", domain: "CPO" ... }
+- mapping/topics.json:
+  - Only keywords, suppress_keywords, context_bias, CategoryHints – no structural domain duplication.
+
+Benefits:
+- Single source of truth for domain relationships.
+- Lower risk of semantic drift between taxonomy and keyword rules.
+
+3.4. Normalize repeated structures
+
+In mapping_rules.json, several structures repeat across topics:
+- context_bias with boost_in and suppress_in arrays.
+- CategoryHints arrays.
+- critical_keywords and suppress_keywords arrays.
+
+Introduce shared type definitions/archetypes:
+
+- Define archetype definitions (conceptually, or in a shared config):
+  - product_execution_topic archetype:
+    - Default context_bias: boost_in ["NPI-managed", "Product Development", "R&D Project"], suppress_in ["Executive Governance", "Commercial BAU", "Finance BAU"].
+  - finance_topic archetype:
+    - Default context_bias: boost_in ["Finance BAU", "Executive Governance"], suppress_in ["NPI-managed", "Product Development"].
+  - executive_topic archetype:
+    - Default context_bias: boost_in ["Executive Governance", "Programme"], suppress_in ["NPI-managed", "R&D Project"]
+
+- Implementation pattern:
+  - A config preprocessor or code layer applies archetype defaults by TopicId or domain.
+  - Topic definitions only override what differs from archetype.
+
+Benefits:
+- Less duplication in config files.
+- Easier large-scale changes (e.g. adding a new execution context and adjusting bias for many topics).
+
+4. Runtime architecture – improvement suggestions
+
+4.1. Central config loading and caching service
+
+Currently, each component may be loading configs ad hoc. Introduce central config services per runtime:
+
+- In packages/api-worker:
+  - Implement a ConfigService in TypeScript:
+    - Responsibilities:
+      - Load all config files from config/ on Worker init.
+      - Validate using JSON schema or TypeScript runtime validation.
+      - Provide typed accessors:
+        - getCapabilities(): CapabilitiesConfig
+        - getFunctions(): FunctionsConfig
+        - getExecutionContexts(): ExecutionContextsConfig
+        - getTopicMappings(): TopicMappingConfig
+    - Internally cache these structures per Worker instance.
+
+- In Azure Functions / PowerShell pipeline:
+  - Create a shared PowerShell module, e.g. packages/pipeline/Modules/Config.psm1:
+    - Functions:
+      - Get-CapabilitiesConfig
+      - Get-FunctionsConfig
+      - Get-ExecutionContextsConfig
+      - Get-TopicMappingsConfig
+    - Validation logic to mirror the TypeScript ConfigService, ensuring cross-runtime consistency.
+
+Benefits:
+- Single loading and validation logic per runtime.
+- Reduced duplication and fewer subtle differences in how configs are interpreted.
+- Easy to add caching and reload strategies if configs change over time.
+
+4.2. Separate semantic scoring engine from I/O
+
+Given the richness of mapping_rules, your pipeline logic warrants a clear engine boundary:
+
+- Semantic scoring engine responsibilities:
+  - Apply Rules (T01–T18) to transcript segments.
+  - Apply SemanticIntegrityRules and ContextDetectionRules.
+  - Compute per-segment topic scores, flags, and strategic signals.
+
+- I/O responsibilities (pipeline and Workers):
+  - Fetch transcripts from storage (e.g. source_snapshot.vtt files in artifacts/verification/RUN_... directories or Azure blob/R2).
+  - Persist extracted topics/actions/decisions/risks into D1 tables (per migrations 0005_actions_table.sql, 0006_decisions_table.sql, 0007_risks_table.sql).
+  - Expose APIs and functions for external consumers (e.g. via packages/api-worker/src/index.ts endpoints).
+
+Architectural suggestion:
+- Create a shared library/module representing the semantic engine:
+  - For TypeScript runtime (Cloudflare Worker):
+    - A module like packages/api-worker/src/engine.ts that encapsulates:
+      - context detection from execution_contexts.json
+      - topic scoring using mapping_rules and taxonomy
+      - integrity rule enforcement
+      - strategic signal detection.
+  - For PowerShell runtime (Azure pipeline):
+    - A PowerShell module packages/pipeline/Modules/SemanticEngine.psm1 mirroring the above behaviour.
+
+- Both runtimes call these engine modules instead of re-implementing logic.
+
+Benefits:
+- Reduced divergence between pipeline and API outputs.
+- Easier testing: you can unit test the semantic engine independent of any I/O.
+
+4.3. Strong alignment between D1 schema and config
+
+In packages/d1/migrations, you have topic- and intelligence-related tables:
+- 0004_topic_intelligence_fields.sql
+- 0005_actions_table.sql
+- 0006_decisions_table.sql
+- 0007_risks_table.sql
+
+To tighten alignment:
+- Ensure each TopicId (T01–T18) has a clear mapping to D1:
+  - For example, for each topic rule, define:
+    - The target table(s) and fields used to persist matches.
+    - Whether the topic drives entries in actions/decisions/risks.
+
+- Introduce a configuration file specifically for model mappings, e.g.:
+  - config/model_mappings.json:
+    - For each TopicId:
+      - { TopicId: "T01", table: "topics", fields: ["performance_score", "context"], derived_from: ["Keywords", "context_bias"] }
+    - For each SemanticIntegrityRule:
+      - Define how conflicts are stored or flagged (e.g. BrandCastConflict -> a specific field in a conflicts table).
+    - For StrategicSignals:
+      - Define derived metrics/fields for high-level dashboards.
+
+Benefits:
+- Explicit, documented link between semantic rules and database schema.
+- Easier to introduce new tables or new fields without hidden dependencies.
+
+5. Code quality recommendations
+
+5.1. Shared domain types in packages/api-worker
+
+Use packages/api-worker/src/types.ts to define domain-level interfaces:
+- ExecutionContext
+- ContextDetectionRule
+- TopicRule
+- SemanticIntegrityRule
+- StrategicSignal
+- TranscriptSegment
+- TopicMatch (including score, context, integrity flags, signals).
+
+Ensure that:
+- index.ts and fuzzy.ts rely on these types instead of untyped objects.
+- ConfigService returns typed structures.
+
+Benefits:
+- Fewer runtime mistakes from mis-typed structures.
+- Clear contracts for how config is consumed in code.
+
+5.2. Unit tests focused on config-driven behaviour
+
+Currently there is no visible test directory under packages/api-worker. Add one:
+- packages/api-worker/test/
+
+Test focus:
+- Context detection:
+  - Given sample calendar subjects and organisers matching execution_contexts.json, confirm correct context classification.
+- Topic matching:
+  - Use sample transcript segments that exercise T01–T18 rules and verify expected topic matches and scores.
+- SemanticIntegrityRules:
+  - Confirm that brand conflicts and NpiContextGuard behave as intended.
+- StrategicSignals:
+  - Confirm detection of Urgency, HighStrategicWeight, AlignmentConsensus, AlignmentConflict.
+
+Use verification artifacts as fixtures:
+- artifacts/verification/RUN_* directories contain source_snapshot.vtt and expected_output.json.
+- Build tests that compare engine output to expected_output.json.
+
+Benefits:
+- Regression protection when configs change.
+- Confidence that mapping rule tweaks don’t unintentionally break behaviour.
+
+5.3. PowerShell pipeline modularisation
+
+Scripts in packages/pipeline:
+- power-transcript-pipeline.ps1
+- migrate-people-to-d1.ps1
+- migrate-topics-to-d1.ps1
+- migrate-topic-records-to-d1.ps1
+- normalize-topic-ids-d1.ps1
+- query-topics.ps1
+- rename-vtt-to-txt.ps1
+- TranscriptJob/run.ps1
+
+Likely share concerns:
+- Config loading
+- Logging and diagnostics
+- Error handling
+- D1/Azure bindings
+
+Suggested structure:
+- Create Modules directory under packages/pipeline:
+  - packages/pipeline/Modules/Config.psm1
+  - packages/pipeline/Modules/Logging.psm1
+  - packages/pipeline/Modules/D1Client.psm1
+
+Patterns:
+- Each script focuses on orchestration:
+  - A pipeline script uses:
+    - Get-TranscriptFiles
+    - Invoke-SemanticEngine
+    - Write-ResultsToD1
+  - The shared modules handle lower-level details.
+
+Benefits:
+- Less duplication across scripts.
+- Easier to reason about and change cross-cutting behaviour (logging, error handling, config loading).
+
+6. Governance and evolution of config
+
+6.1. Versioning strategy
+
+You already version mapping_rules.json (2.0, 2.1, 2.2). Extend this pattern to other configs:
+- Add Version and Changelog arrays to:
+  - execution_contexts.json
+  - capabilities.json
+  - functions.json
+
+- Introduce a central manifest, e.g. config/version_manifest.json:
+  - Summarises the current set of versions:
+    - mapping_rules: 2.2
+    - execution_contexts: 1.0
+    - capabilities: 1.0
+    - functions: 1.0
+
+Benefits:
+- Clear view of the semantic configuration state at any point in time.
+- Easier rollback or compatibility checks (e.g. mapping_rules 2.2 requires execution_contexts >= 1.0).
+
+6.2. Config change workflow and validation tooling
+
+Make your semantic pipeline governed but agile:
+
+- Process for config changes:
+  - Every change to a config file:
+    - Updates the relevant Changelog entry with date and description.
+    - Optionally references a design/spec artefact (e.g. PRS/Matching engine+all/EIP_Product_Topic_Memory_Matching_Engine_PRS.md).
+
+- Add validation tooling:
+  - A Node or PowerShell script (e.g. tools/validate-configs.ps1 or scripts/validate-configs.ts) that:
+    - Validates all JSON configs against schemas.
+    - Checks for orphaned TopicIds or execution contexts (e.g. TopicId referenced in mapping_rules but missing from taxonomy).
+    - Generates a summary validation report into artifacts/verification/config_validation_report.json.
+
+Benefits:
+- Reduced risk of untracked changes to critical semantic rules.
+- Clear audit trail of how the semantic pipeline evolves over time.
+
+7. Summary
+
+- Current strengths:
+  - Clear separation between config-driven semantics and runtime code.
+  - Rich domain representation in mapping_rules.json and execution_contexts.json.
+  - D1 schema aligned with topics/actions/decisions/risks.
+
+- Highest-leverage improvements:
+  1) Formal schemas and central config loading/validation across both Cloudflare Worker and Azure pipeline.
+  2) Splitting mapping_rules.json by concern (metadata, topics, semantic integrity, strategic signals) and normalising repeated structures via archetypes.
+  3) Establishing a dedicated semantic scoring engine module shared by both runtimes.
+  4) Tight, explicit mapping between config concepts (TopicIds, rules, signals) and D1 schema via a model_mappings config.
+  5) Strengthening domain typing and adding focused tests in packages/api-worker, plus modularising PowerShell scripts in packages/pipeline.
+
+Implementing these changes will make the system easier to evolve, reduce semantic drift between components, and improve reliability and testability as you continue to enrich the taxonomy and mapping rules.
