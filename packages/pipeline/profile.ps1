@@ -30,3 +30,6 @@ if ($env:MSI_SECRET) {
 # LLM API Key for transcript classification (Azure OpenAI endpoint)
 # Set this to your Azure OpenAI key - do NOT commit the actual key to source control
 # $env:FOUNDRY_API_KEY = "your-azure-openai-key-here"
+
+# LLM model selection — override the pipeline default (gpt-4o)
+$env:AZURE_OPENAI_MODEL = "gpt-5.6-terra"
