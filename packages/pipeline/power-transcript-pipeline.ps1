@@ -1697,9 +1697,10 @@ function Invoke-LLM {
             @{ role = "system"; content = $SystemPrompt },
             @{ role = "user";   content = $UserContent  }
         )
-        temperature           = 0
         max_completion_tokens = $MaxTokens
     }
+    # temperature = 0 removed: GPT-5.6+ models only support the default (1).
+    # Determinism is achieved via temperature omission (model default) rather than explicit 0.
     
     if ($ResponseFormat -eq "json_object") {
         $bodyObj.response_format = @{ type = "json_object" }
