@@ -1,0 +1,11 @@
+{
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+  "_note": "Non-sensitive LLM tuning parameters. Endpoint, API key and deployment name are set via Azure App Settings (AZURE_OPENAI_ENDPOINT, FOUNDRY_API_KEY, AZURE_OPENAI_MODEL) or classification_rules.json (gitignored).",
+  "ChunkSize": 400000,
+  "ChunkOverlap": 0,
+  "ChunkSummaryMaxTokens": 8000,
+  "SynthesisMaxTokens": 12000,
+  "SummaryMaxTokens": 16000,
+  "RecordsMaxTokens": 64000,
+  "MaxCombinedSummaryChars": 300000
+}

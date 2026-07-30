@@ -2348,20 +2348,22 @@ function Get-MeetingClassification {
             Write-Host "  [LLM DIAG] Key source: $keySource"
             Write-Host "  [LLM DIAG] Auth mode: $authMode"
 
-            # --- Chunk config (configurable via LLMConfig, with safe defaults) ---
-            $chunkSize = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkSize) { [int]$rules.LLMConfig.ChunkSize } else { 32000 }
-            $overlap   = if ($rules -and $rules.LLMConfig -and $rules.LLMConfig.ChunkOverlap) { [int]$rules.LLMConfig.ChunkOverlap } else { 500 }
+            # --- Chunk config — read from committed llm_config.json, fallback to classification_rules.json ---
+            $llmConfigPath = Join-Path $configDir "llm_config.json"
+            $llmConfig     = if (Test-Path $llmConfigPath) { Get-Content $llmConfigPath | ConvertFrom-Json } else { $null }
+            $chunkSize = if ($llmConfig -and $llmConfig.ChunkSize)        { [int]$llmConfig.ChunkSize }        elseif ($rules.LLMConfig.ChunkSize)        { [int]$rules.LLMConfig.ChunkSize }        else { 400000 }
+            $overlap   = if ($llmConfig -and $llmConfig.ChunkOverlap -ne $null) { [int]$llmConfig.ChunkOverlap } elseif ($rules.LLMConfig.ChunkOverlap)  { [int]$rules.LLMConfig.ChunkOverlap } else { 0 }
 
             # --- Split transcript into chunks ---
             $chunks = Split-TranscriptIntoChunks -Text $transcriptContent -ChunkSize $chunkSize -Overlap $overlap
             Write-Host "  [LLM DIAG] Chunks: $($chunks.Count) (chunk size: $chunkSize chars)"
 
             # --- Read configurable token limits and retry/timeout settings (with safe defaults) ---
-            $chunkSummaryMaxTok = if ($rules.LLMConfig.ChunkSummaryMaxTokens)   { [int]$rules.LLMConfig.ChunkSummaryMaxTokens }   else { 4000 }
-            $synthesisMaxTok    = if ($rules.LLMConfig.SynthesisMaxTokens)      { [int]$rules.LLMConfig.SynthesisMaxTokens }      else { 6000 }
-            $summaryMaxTok      = if ($rules.LLMConfig.SummaryMaxTokens)        { [int]$rules.LLMConfig.SummaryMaxTokens }        else { 8000 }
-            $recordsMaxTok      = if ($rules.LLMConfig.RecordsMaxTokens)        { [int]$rules.LLMConfig.RecordsMaxTokens }        else { 32000 }
-            $maxCombinedChars   = if ($rules.LLMConfig.MaxCombinedSummaryChars) { [int]$rules.LLMConfig.MaxCombinedSummaryChars } else { 80000 }
+            $chunkSummaryMaxTok = if ($llmConfig -and $llmConfig.ChunkSummaryMaxTokens)   { [int]$llmConfig.ChunkSummaryMaxTokens }   elseif ($rules.LLMConfig.ChunkSummaryMaxTokens)   { [int]$rules.LLMConfig.ChunkSummaryMaxTokens }   else { 8000 }
+            $synthesisMaxTok    = if ($llmConfig -and $llmConfig.SynthesisMaxTokens)      { [int]$llmConfig.SynthesisMaxTokens }      elseif ($rules.LLMConfig.SynthesisMaxTokens)      { [int]$rules.LLMConfig.SynthesisMaxTokens }      else { 12000 }
+            $summaryMaxTok      = if ($llmConfig -and $llmConfig.SummaryMaxTokens)        { [int]$llmConfig.SummaryMaxTokens }        elseif ($rules.LLMConfig.SummaryMaxTokens)        { [int]$rules.LLMConfig.SummaryMaxTokens }        else { 16000 }
+            $recordsMaxTok      = if ($llmConfig -and $llmConfig.RecordsMaxTokens)        { [int]$llmConfig.RecordsMaxTokens }        elseif ($rules.LLMConfig.RecordsMaxTokens)        { [int]$rules.LLMConfig.RecordsMaxTokens }        else { 64000 }
+            $maxCombinedChars   = if ($llmConfig -and $llmConfig.MaxCombinedSummaryChars) { [int]$llmConfig.MaxCombinedSummaryChars } elseif ($rules.LLMConfig.MaxCombinedSummaryChars) { [int]$rules.LLMConfig.MaxCombinedSummaryChars } else { 300000 }
             $llmTimeoutSec      = if ($rules.LLMConfig.RequestTimeoutSec)       { [int]$rules.LLMConfig.RequestTimeoutSec }       else { 300 }
             $llmMaxRetries      = if ($rules.LLMConfig.MaxRetries)              { [int]$rules.LLMConfig.MaxRetries }              else { 3 }
             $llmRetryBackoff    = if ($rules.LLMConfig.RetryBackoffSec)         { [int]$rules.LLMConfig.RetryBackoffSec }         else { 5 }
