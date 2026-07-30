@@ -1,0 +1,51 @@
+{
+  "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
+  "domain_mappings": {
+    "Product": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Technology": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Operations": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "SupplyChain": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Governance": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Finance": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "People": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Sales": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Marketing": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "IT": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    },
+    "Strategy": {
+      "space_key": "PWMN",
+      "parent_id": "2178875426"
+    }
+  },
+  "default_space": "PWMN",
+  "default_parent_id": "2178875426"
+}

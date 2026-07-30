@@ -1,0 +1,213 @@
+The EIP (Executive Intelligence Pipeline) architecture is a single PowerShell-based pipeline, hosted as an Azure Function, that orchestrates three main layers: input acquisition, AI + rules processing, and output publishing/logging. Below is a concise architecture + data-flow description.
+
+---
+
+## 1. High-level architecture
+
+**Core runtime**
+- Azure Function App (timer trigger) hosts the pipeline.
+- Entry script: [`power-transcript-pipeline.ps1`](packages/pipeline/power-transcript-pipeline.ps1:1), dot-sourced from [`TranscriptJob/run.ps1`](packages/pipeline/TranscriptJob/run.ps1:1).
+- No external PowerShell modules; only `Invoke-RestMethod` and local JSON files.
+
+**Key external systems**
+- **Microsoft Graph**
+  - Calendar (meeting discovery)
+  - Online meeting transcripts (VTT)
+  - SharePoint/OneDrive (file storage)
+- **Azure OpenAI / Azure AI Foundry**
+  - LLM for classification, topic extraction, and people intelligence.
+- **Confluence**
+  - Mirror of summaries + topic records.
+- **Microsoft Teams Webhook**
+  - End-of-run notification.
+
+**Persistent data stores**
+- SharePoint document library `Exec Intel Insights` as the main content store:
+  - Raw transcripts
+  - Leadership summaries
+  - People intelligence files
+  - Topic records
+  - Master logs
+  - Run logs
+- Local JSON config under [`/config`](config/):
+  - `taxonomy.json`, `mapping_rules.json`, `sentiment_rules.json`, `roles_config.json`, `process_governors.json`, `ownership_rules.json`, etc.
+- Secrets/PII in gitignored files:
+  - `classification_rules.json` (LLM config + keys)
+  - `pipeline_config.json` (Confluence + Teams settings)
+  - `config/people_config.json`, `config/people_recommendations.json`.
+
+The whole system is essentially one orchestrator script plus a set of helper functions and config files, with SharePoint acting as the "database".
+
+---
+
+## 2. Entry points and modes
+
+The main script [`power-transcript-pipeline.ps1`](packages/pipeline/power-transcript-pipeline.ps1:1) can run in three modes:
+
+1. **Calendar Mode (default)**
+   - Trigger: Timer (Azure Function) or manual run without `-VttFile`.
+   - Input: Meetings between `FromDate` and `ToDate` for the configured user (via Graph Calendar).
+   - Use case: Daily production run.
+
+2. **VTT Inbox Mode**
+   - Trigger: Always runs at the end of a pipeline execution.
+   - Input: `.vtt` files from OneDrive folder `/Documents/Transcripts`.
+   - Use case: Ad-hoc uploads, backfill via dropping VTTs.
+
+3. **VTT Direct Mode**
+   - Trigger: Manual run with `-VttFile` parameter.
+   - Input: Single local `.vtt` file.
+   - Use case: Local testing, backfill from a local archive.
+
+All three modes converge into the same **per-meeting processing pipeline** once the raw transcript text is available.
+
+---
+
+## 3. End-to-end data flow (per meeting)
+
+### Step 0 — Deduplication
+- Uses `master_log.json` in SharePoint root.
+- If an entry exists for the meeting with `Status: success`, that meeting is skipped.
+- Purpose: Idempotence across reruns and to avoid double-processing.
+
+### Step 1 — Transcript acquisition
+
+**Calendar Mode path**
+1. Query Graph: `GET /users/{upn}/calendarView` between `FromDate` and `ToDate`.
+2. Filter down to Teams online meetings (join URL present).
+3. Ongoing-meeting guard:
+   - If `now < scheduledEnd + 2h` → skip silently, no log written.
+4. For eligible meetings, call transcript APIs, e.g. `GET /users/{id}/onlineMeetings/{id}/transcripts`.
+5. Download transcript as `.vtt`.
+6. Convert `.vtt` → plain text using `ConvertFrom-Vtt`.
+
+**VTT Inbox / Direct path**
+1. Inbox mode: list VTT files via `Get-VttInboxFiles` (Graph on OneDrive `/Documents/Transcripts`).
+2. Direct mode: use passed-in file path.
+3. Parse meeting metadata from filename via `ConvertFrom-VttFilename`.
+4. Strip WebVTT structure via `ConvertFrom-Vtt` to get plain transcript text.
+
+At the end of this step, EIP has:
+- Meeting metadata (Subject, EventDate, Organizer, Mode candidate).
+- Plain-text transcript (full conversation).
+
+### Step 2 — Mode assignment
+- Function: `Assign-Mode`.
+- Inputs: meeting type, organiser, early topic hints.
+- Outputs: `MeetingMode` (CEO/CPO/COO/CMO/CSO/CFO/CTO).
+- Uses mappings from `roles_config.json` and type mappings to categorize which executive lens to apply.
+
+### Step 3 — LLM classification & topic extraction
+- Function: `Get-MeetingClassification` → orchestrates `Split-TranscriptIntoChunks`, `Invoke-LLM`, `ConvertFrom-LLMJson`, `Recover-LLMResult`.
+- Process:
+  1. **Chunking:** `Split-TranscriptIntoChunks` splits transcript into ~32k-char chunks with overlap.
+  2. **Pass 1 (map):** Each chunk sent to LLM with a structured prompt; each returns intermediate summary + candidate topic records.
+  3. **Pass 2 (reduce):** Second LLM call merges chunk-level results into one unified JSON document.
+- Output JSON (core fields):
+  - `classification` (executive mode label, but pipeline has its own fallback logic).
+  - `summary` — a full 9-section leadership narrative as a single string.
+  - `records[]` — raw topic records (TopicId, Domain, Topic, Status, Trajectory, actions, risks, etc.).
+
+This is the main **AI engine step** that transforms raw text into structured semantic content.
+
+### Step 4 — Enrichment
+- Function: `Enrich-Summary`.
+- Inputs: raw LLM output (summary + topic records) plus historical topic records from master log.
+- Responsibilities:
+  - Parse the 9-section summary into a canonical internal representation.
+  - Cross-reference against history to detect **stalled work** / long-running topics via `Get-StalledWork`.
+  - Apply validation over topic records (`Validate-TopicRecord`).
+  - Regenerate the final summary text with additional sections:
+    - `## TOPIC TRENDS & PERSISTENCE`
+    - `## STALLED WORK DETECTED`
+
+At this point, the system has:
+- Final enriched meeting summary.
+- A cleaned and validated topic record list.
+
+### Step 5 — People intelligence
+- Functions: `Get-TranscriptSpeakers`, `Resolve-People`, `Get-PeopleIntelligence`, `Format-PeopleFile`, `Update-MasterPeopleLog`.
+- Flow:
+  1. Extract speaker names from transcript.
+  2. Resolve them against `people_config.json` (aliases, roles, org structure).
+  3. If unknown people are found, propose additions in `people_recommendations.json`.
+  4. Third LLM pass (`Get-PeopleIntelligence`) produces a structured per-person JSON:
+     - Attendance, contributions, actions, decisions, risks, topics referenced, stance, summary.
+  5. Format into a `*-People.txt` file for human consumption.
+  6. Update `master_people_log.json` with meeting-level people intelligence metadata.
+
+### Step 6 — Topic record generation
+- Functions: `Get-TopicSentiment`, `Classify-Topic`, `Get-TopicEntities`, `Resolve-Ownership`, `Format-TopicRecord`, `Validate-TopicRecord`.
+- Config sources: `taxonomy.json`, `mapping_rules.json`, `process_governors.json`, `ownership_rules.json`, `sentiment_rules.json`.
+- Flow:
+  1. Normalize each topic record (fuzzy matching against taxonomy topics).
+  2. Reconstruct missing metadata (Domain, TopicFamily, Capability, Phase, Governor) from taxonomy defaults.
+  3. Derive sentiment, severity, tags, context types, etc.
+  4. Ownership deep recovery chain:
+     - MeetingMode → `taxonomy.json` → `process_governors.json` → `ownership_rules.json`.
+  5. For COO meetings, apply `ContextOverride.COO`.
+  6. Generate final markdown for each topic record: header metadata, summary, key facts, decisions, actions, risks, next steps, retrieval anchors, ownership block, validation status.
+
+### Step 7 — Mutual linking
+- The pipeline cross-links artifacts:
+  - In the meeting summary: each `## Topic:` section gets a link to its dedicated topic record.
+  - In each topic record: include a backlink to the meeting summary or master log entry.
+- This turns SharePoint + Confluence into a **navigable knowledge graph** rather than isolated documents.
+
+### Step 8 — Upload to SharePoint
+- Functions: `Ensure-DriveFolder`, `Upload-FileToSharePoint`, `Get-MeetingLogId`, plus use of `Get-StickyMasterLogValue` when updating master logs.
+- Target structure (within `Exec Intel Insights`):
+  - `/Meeting transcripts/YYYY-MM/[meeting-id].txt` — raw transcript.
+  - `/Meeting transcripts/YYYY-MM/[meeting-id]-Summary.txt`.
+  - `/Meeting transcripts/YYYY-MM/[meeting-id]-People.txt`.
+  - `/Topic Records/YYYY-MM/[meeting-id]/[meeting-id]-[TopicId]-[slug].md` — one per topic.
+  - Root files: `master_log.json`, `master_log.txt`, `master_people_log.json`, `master_people_log.txt`.
+  - Run log CSV under `_DO_NOT_PRIORITISE_Run logs/`.
+
+### Step 9 — Confluence mirror (optional)
+- Controlled via `pipeline_config.json.enable_confluence_mirror`.
+- Functions: `Convert-SummaryToConfluenceHtml`, `Publish-SummaryToConfluence`, `Publish-TopicRecordToConfluence`.
+- Flow:
+  1. Convert summary markdown to Confluence HTML.
+  2. Create/update Confluence pages for the meeting summary and each topic record.
+  3. Resolve space and parent pages using `confluence_mappings.json` and the topic/domain metadata.
+  4. Handle versioning: if a page exists, update instead of creating a duplicate.
+
+### Step 10 — Master log update
+- Fields maintained in `master_log.json` per meeting:
+  - MeetingId, Subject, EventDate, Status, TranscriptUrl, SummaryUrl, TopicRecords[], ConfluenceUrl, PeopleFileUrl, Mode, ProcessingTimestamp, PipelineVersion.
+- Sticky logic: `Get-StickyMasterLogValue` ensures that once a URL is set, reruns do not overwrite it with worse data.
+
+### Step 11 — Teams notification
+- Function: `Send-TeamsNotification`.
+- Single webhook per run:
+  - If any warnings/errors occurred: send a diagnostic summary.
+  - If clean: send a “pipeline OK” message plus basic stats.
+
+---
+
+## 4. Conceptual layers
+
+You can also view the architecture as four logical layers:
+
+1. **Acquisition layer**
+   - Graph calendar + transcript APIs
+   - VTT filename parsing
+   - Deduplication and ongoing-meeting protection
+
+2. **Intelligence layer**
+   - LLM map-reduce + enrichment
+   - Topic classification + sentiment + history analysis
+   - People intelligence extraction
+
+3. **Knowledge representation layer**
+   - Taxonomy + mapping rules
+   - Topic records as durable knowledge units
+   - Ownership and governance resolution
+
+4. **Distribution layer**
+   - SharePoint document library as canonical store
+   - Confluence mirroring for wider consumption
+   - Teams notifications as an operational interface
+
+This is the EIP architecture and data flow: a single Azure Function–hosted PowerShell pipeline that converts raw Teams transcripts into a network of structured, interlinked executive-intelligence artifacts, stored primarily in SharePoint and mirrored to Confluence.

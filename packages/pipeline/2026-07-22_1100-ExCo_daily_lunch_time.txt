@@ -1,0 +1,670 @@
+---
+MEETING ID: 2026-07-22_0900_exco_daily____lunch_time_
+SUBJECT: ExCo daily (+ lunch time)
+ORGANISER: carolynn@empoweringtech.com
+EVENT DATE: 07/22/2026 11:00:00
+TYPE: ExCo
+PRIORITY: high
+MODE: CEO
+MODE_SOURCE: config_rule
+MODE_CONFIDENCE: High
+PIPELINE_VERSION: 1.7.9
+TAXONOMY_VERSION: 1.1
+MAPPING_RULES_VERSION: 2.1
+ROLES_CONFIG_VERSION: 1.1
+SENTIMENT_RULES_VERSION: 1.1
+PROCESSING_TIMESTAMP: 2026-07-22 12:42:40Z
+STATUS: success
+BACK-LINK (MASTER LOG): https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt
+---
+WEBVTT
+
+00:00:04.126 --> 00:00:06.086
+<v Toby Sutton OBE (Empowering Tech)>I just forwarded, I just forwarded the e-mail.</v>
+
+00:00:04.206 --> 00:00:05.126
+<v Peter Johansson>A link from it.</v>
+
+00:00:07.606 --> 00:00:15.846
+<v Peter Johansson>Okay, yeah, then it's sharing, but I don't think, yeah.</v>
+
+00:00:08.086 --> 00:00:08.406
+<v Toby Sutton OBE (Empowering Tech)>But.</v>
+
+00:00:12.726 --> 00:00:15.606
+<v Toby Sutton OBE (Empowering Tech)>I'll ask him, I'll ask him to share it with you guys as well.</v>
+
+00:00:17.526 --> 00:00:18.086
+<v Toby Sutton OBE (Empowering Tech)>Well done.</v>
+
+00:00:19.606 --> 00:00:21.526
+<v Toby Sutton OBE (Empowering Tech)>Still sending me messages.</v>
+
+00:00:37.166 --> 00:00:48.566
+<v Jack Churchill>I think it'd be worth, if you haven't already discovered, finding out how much of A risk Ed is of legal action, given that there was a letter written at some point saying he would get something or other.</v>
+
+00:00:43.526 --> 00:00:43.926
+<v Peter Johansson>Okay.</v>
+
+00:00:51.126 --> 00:00:53.286
+<v Jack Churchill>Yeah, I know you've said that you think it's low, but...</v>
+
+00:00:55.526 --> 00:00:56.326
+<v Jack Churchill>I just wonder if...</v>
+
+00:00:55.526 --> 00:01:07.126
+<v Toby Sutton OBE (Empowering Tech)>I think there's a, you can make your own decision, Jack. I'm just informing you of what's going on and you decide. I'm not deciding what the risk is, but I'm telling you.</v>
+
+00:00:55.606 --> 00:00:58.966
+<v Peter Johansson>I missed that. Is there a promise to him about something?</v>
+
+00:01:06.526 --> 00:01:10.566
+<v Jack Churchill>No, I just said, is it worth hearing from Keval is what I said. I didn't say from you.</v>
+
+00:01:12.646 --> 00:01:20.086
+<v Toby Sutton OBE (Empowering Tech)>Okay, I thought you said, if it's from Keval or whoever, but I'm telling you, you can decide. So he has made it.</v>
+
+00:01:23.206 --> 00:01:41.046
+<v Toby Sutton OBE (Empowering Tech)>On the last call, he thanked us and said that he was well, you know, all the rest of it and enjoyed working with us and, you know, enjoyed all the opportunities and isn't going to sue us and he doesn't want it to become legal. But then again, his sort of</v>
+
+00:01:41.206 --> 00:02:01.046
+<v Toby Sutton OBE (Empowering Tech)>conversation again, sort of on this call is similar. The, yeah, I don't want it to become a sort of an issue, but you know, this, this, this and this. I'm getting all these things into the conversation. Hopefully Keval understands the words I've used about being a good employee and about this and about this and all that.</v>
+
+00:01:45.046 --> 00:01:45.206
+<v Carolynn Helps>Yeah.</v>
+
+00:02:01.366 --> 00:02:23.526
+<v Toby Sutton OBE (Empowering Tech)>He's definitely lining it up. But he's obviously, I think basically if he was to find another job, he probably wouldn't. And if he doesn't, then I think he probably will. His wife is obviously an HR manager and a professional. So he's obviously giving him advice as to what to include and what to ask for and what to say.</v>
+
+00:02:24.006 --> 00:02:26.806
+<v Toby Sutton OBE (Empowering Tech)>So, there is a point, and you know he...</v>
+
+00:02:24.326 --> 00:02:34.166
+<v Peter Johansson>Do we only get rid of people which have spouses in HR, like Dave and Ed? We just need to stop doing that.</v>
+
+00:02:29.846 --> 00:02:33.206
+<v Toby Sutton OBE (Empowering Tech)>Yeah, exactly. Yeah, and...</v>
+
+00:02:33.126 --> 00:02:33.606
+<v Jack Churchill>Street.</v>
+
+00:02:34.166 --> 00:02:38.606
+<v Toby Sutton OBE (Empowering Tech)>And Dave did, Dave did come up in conversation talking about...</v>
+
+00:02:35.126 --> 00:02:35.526
+<v Jack Churchill>Yeah.</v>
+
+00:02:42.046 --> 00:03:01.726
+<v Toby Sutton OBE (Empowering Tech)>He made some comments about, you know, staff members, whatever it was, I can't remember what it was. And I just basically said, yeah, well, Dave retired a few years ago, didn't he? And, you know, that was that and didn't really comment on stuff in much detail. But there is a risk. There's no doubt in my head about it whatsoever.</v>
+
+00:03:03.126 --> 00:03:07.166
+<v Jack Churchill>Yeah, all to do with this promise that was made to him, right? Nothing else.</v>
+
+00:03:06.326 --> 00:03:09.366
+<v Toby Sutton OBE (Empowering Tech)>Well, he's referenced it and dug it up quite a few times.</v>
+
+00:03:08.966 --> 00:03:16.206
+<v Jack Churchill>Okay, and do we have a copy of that letter? And is it worth us just seeing if I think it's got any legs to it?</v>
+
+00:03:17.646 --> 00:03:18.446
+<v Jack Churchill>That's why one day.</v>
+
+00:03:19.526 --> 00:03:37.926
+<v Toby Sutton OBE (Empowering Tech)>It would have been written, it was written by Keval at the time. It would have not promised anything, but it would have said if things are targets to hit and this does this and that does that. But you know, if someone chooses to behave like that and they choose to behave like that, you know, he's asked, he's made it clear he would like his shares options to continue.</v>
+
+00:03:38.406 --> 00:03:57.086
+<v Toby Sutton OBE (Empowering Tech)>But I think from my understanding that that's totally up to our discretion, whether we allow it to happen or not. I do think there is a time constraint. So I can't remember, but did we, you know, I don't think we've removed others yet, but I think we had something like, we've got a number of weeks to</v>
+
+00:03:57.206 --> 00:04:05.606
+<v Toby Sutton OBE (Empowering Tech)>make a decision. So I suppose we've made the decision of the previous people, but whether we've actually actioned that decision, I don't know.</v>
+
+00:04:06.966 --> 00:04:12.006
+<v Sharmella Kirby>No, we haven't yet. No. It's September. We have from September we can action it.</v>
+
+00:04:08.566 --> 00:04:08.886
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:04:12.806 --> 00:04:14.086
+<v Toby Sutton OBE (Empowering Tech)>Why from September?</v>
+
+00:04:15.086 --> 00:04:23.446
+<v Sharmella Kirby>Because that's a new date, I think, for it runs from September to July, the year for that.</v>
+
+00:04:24.726 --> 00:04:47.606
+<v Toby Sutton OBE (Empowering Tech)>And he also said that he wanted above legal redundancy. I already pushed back slightly on the call. I said, listen, everything to me is going to be about fairness. We've got to treat everybody the same. You know, and he said, yes, but you know, haven't I offered more than Jim? And I said, well, yeah, but you may have been employed for longer on a higher wage. You'll therefore get a</v>
+
+00:04:47.766 --> 00:05:06.726
+<v Toby Sutton OBE (Empowering Tech)>Why redundancy? Why do I need to sort of fundamentally change it? But yeah, as I say, I said, but again, we'll consider all these different things and come back to you with our final decision. But you have to consider, not you, everyone on the group has to</v>
+
+00:04:54.726 --> 00:04:55.286
+<v Peter Johansson>Yeah, yeah.</v>
+
+00:05:06.806 --> 00:05:23.366
+<v Toby Sutton OBE (Empowering Tech)>draw their own opinions as to what they think is going to happen. Have we run a fair redundancy process? This is the problem with this HR ********, isn't it? And the stage that we're in is the business. You know, you go back a couple of years, it wouldn't have made a difference. But with these, with people,</v>
+
+00:05:14.966 --> 00:05:15.166
+<v Peter Johansson>Pens.</v>
+
+00:05:23.286 --> 00:05:23.366
+<v Peter Johansson>Ann.</v>
+
+00:05:25.206 --> 00:05:26.166
+<v Toby Sutton OBE (Empowering Tech)>Especially.</v>
+
+00:05:25.566 --> 00:05:37.686
+<v Peter Johansson>As I run, run, run by the book, it's always already set up, as you say, he's been higher paid for a longer time, he he had a bit more, that's it. I wouldn't have bought it for the rest of it until...</v>
+
+00:05:27.806 --> 00:05:28.166
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:05:38.806 --> 00:05:43.606
+<v Peter Johansson>The **** really hits the fan. I would just listen and say, yeah, I hear you and that's it.</v>
+
+00:05:43.206 --> 00:05:47.686
+<v Toby Sutton OBE (Empowering Tech)>Yeah. The bottom line is I don't think we treat people badly, full stop.</v>
+
+00:05:48.366 --> 00:05:48.846
+<v Peter Johansson>Mhm.</v>
+
+00:05:48.966 --> 00:05:53.046
+<v Toby Sutton OBE (Empowering Tech)>and other people may think we do, but I honestly don't.</v>
+
+00:05:52.166 --> 00:05:56.806
+<v Jack Churchill>I don't think we do. We treat people very well. Generally, I think.</v>
+
+00:05:55.686 --> 00:06:01.606
+<v Toby Sutton OBE (Empowering Tech)>Yeah, but we are the we are the owners, maybe maybe the employees think we treat them badly, but</v>
+
+00:06:02.566 --> 00:06:03.126
+<v Peter Johansson>Good day.</v>
+
+00:06:03.806 --> 00:06:06.806
+<v Toby Sutton OBE (Empowering Tech)>I don't know, Dave Parks obviously thinks we've treated him badly, doesn't he?</v>
+
+00:06:04.326 --> 00:06:04.606
+<v Peter Johansson>Helps.</v>
+
+00:06:07.926 --> 00:06:11.686
+<v Jack Churchill>I think he just wants, um, I'd exclude him from you.</v>
+
+00:06:08.006 --> 00:06:09.406
+<v Toby Sutton OBE (Empowering Tech)>But I, I, I don't.</v>
+
+00:06:12.166 --> 00:06:12.326
+<v Peter Johansson>Mm.</v>
+
+00:06:13.046 --> 00:06:13.846
+<v Jack Churchill>It's not up.</v>
+
+00:06:13.526 --> 00:06:14.886
+<v Toby Sutton OBE (Empowering Tech)>All these people.</v>
+
+00:06:15.806 --> 00:06:17.286
+<v Toby Sutton OBE (Empowering Tech)>They obviously fell to grieve.</v>
+
+00:06:16.326 --> 00:06:19.686
+<v Jack Churchill>Dave's having a go. Dave's just having a go. That's what he's doing.</v>
+
+00:06:19.046 --> 00:06:23.286
+<v Toby Sutton OBE (Empowering Tech)>Amanda's having a go, go, so, so, and then...</v>
+
+00:06:22.486 --> 00:06:31.446
+<v Jack Churchill>Amanda did get, no, Amanda did get, it sounds like Dave was quite, David flatly was quite, he shouldn't have done what he did on that call with her.</v>
+
+00:06:32.246 --> 00:06:32.806
+<v Toby Sutton OBE (Empowering Tech)>Etic.</v>
+
+00:06:32.886 --> 00:06:38.486
+<v Jack Churchill>Let's all pray that no one else in Amanda's family dies soon or something. You know, that was not appropriate.</v>
+
+00:06:37.766 --> 00:06:44.806
+<v Toby Sutton OBE (Empowering Tech)>It could have been, it could have been taken as sarcastic, I agree, but knowing David Flaherty, it probably wasn't.</v>
+
+00:06:45.326 --> 00:06:45.446
+<v Jack Churchill>Ann.</v>
+
+00:06:45.806 --> 00:06:56.806
+<v Toby Sutton OBE (Empowering Tech)>Yeah, he was an overly religious person. But why blame the business on that? It's just, I don't get it. But there we go. That's from my side. Amanda obviously felt aggrieved.</v>
+
+00:06:58.686 --> 00:07:17.846
+<v Jack Churchill>I think whenever you hire, whenever you have two or 300 employees, you're going to have a few people who have got grievances against us one way or another, and that's just life. And if we're doing the right things like you're doing now with Ed and Keval and stuff, then, you know, we should be generally okay from that. And I think we want to get rid of Ed anyway, probably.</v>
+
+00:06:58.926 --> 00:06:59.366
+<v Toby Sutton OBE (Empowering Tech)>But...</v>
+
+00:07:14.806 --> 00:07:16.086
+<v Toby Sutton OBE (Empowering Tech)>I think it's not.</v>
+
+00:07:18.166 --> 00:07:30.326
+<v Jack Churchill>if he doesn't meet any of the consultation, etc. So, you know, whether there's a letter written which says something or other, you know, at some point we're going to have to cross that bridge with Ed anyway. I just can't remember what's in that letter.</v>
+
+00:07:31.206 --> 00:07:52.526
+<v Toby Sutton OBE (Empowering Tech)>Once again, Jack, I think you should follow the procedure. We don't want to get rid of Ed. We're getting rid of the position. The position is now no longer suitable. And unfortunately, that means that Ed has to go. It's not a decision about Ed. So as long as you read the documents that are sent, can demonstrate that we've had a conversation to discuss whether the role</v>
+
+00:07:48.486 --> 00:07:48.806
+<v Jack Churchill>Yeah.</v>
+
+00:07:52.646 --> 00:08:02.966
+<v Toby Sutton OBE (Empowering Tech)>is no longer required and we think it's no longer required, that there are no other roles that he is suitable to go into. That's the conversation that we're having.</v>
+
+00:07:53.046 --> 00:07:53.686
+<v Jack Churchill>Mmh.</v>
+
+00:07:58.006 --> 00:07:58.566
+<v Jack Churchill>That's right.</v>
+
+00:08:03.766 --> 00:08:04.326
+<v Jack Churchill>That's right.</v>
+
+00:08:06.566 --> 00:08:13.606
+<v Toby Sutton OBE (Empowering Tech)>Anyway, I've asked Ed to share it with you. I glanced at it. We'll talk about it on Thursday.</v>
+
+00:08:14.806 --> 00:08:22.886
+<v Toby Sutton OBE (Empowering Tech)>In ExCo, Friday in ExCo, whenever, and and we'll and we'll take a we'll take a decision, final decision.</v>
+
+00:08:18.326 --> 00:08:19.126
+<v Jack Churchill>He shared.</v>
+
+00:08:22.246 --> 00:08:27.846
+<v Sharmella Kirby>You've got another meeting with Ed. You've got another meeting with Ed, have you, Toby? Final meeting?</v>
+
+00:08:26.886 --> 00:08:35.366
+<v Toby Sutton OBE (Empowering Tech)>No, that's where I was at this. That's where I was today at the start of the start of the call. Yeah, my honest opinion is that.</v>
+
+00:08:29.926 --> 00:08:32.406
+<v Sharmella Kirby>That was the final one. OK.</v>
+
+00:08:36.326 --> 00:08:55.166
+<v Toby Sutton OBE (Empowering Tech)>If Ed behaved like he'd behaved in the last two meetings for the last three years of showing passion, drive, love for the company, wanting the US to get bigger and stronger and better and all the rest of it, he would have absolutely blasted this role. And this role would</v>
+
+00:08:55.246 --> 00:09:04.326
+<v Toby Sutton OBE (Empowering Tech)>Be not questionable as to whether we, whether we want it or whether we don't want it is because the reason the role is being made redundant, in my opinion.</v>
+
+00:09:05.406 --> 00:09:11.686
+<v Toby Sutton OBE (Empowering Tech)>One of the reasons, as long as, as well as having that sort of drive to the sales and marketing.</v>
+
+00:09:12.846 --> 00:09:31.606
+<v Toby Sutton OBE (Empowering Tech)>is because the role has sort of self-eliminated itself, if that makes sense. It is not a role that is necessary because it hasn't been developed or used in the way that we imagined it should be. And I honestly think that</v>
+
+00:09:32.086 --> 00:09:50.646
+<v Toby Sutton OBE (Empowering Tech)>because it hasn't been developed and made. And that's also partly because the team has shrunk and also because the focus is much less on the US now and more in the UK. So multiple reasons, but the role has certainly not been utilised to the way that we thought it would be. And therefore, there is no role.</v>
+
+00:09:52.166 --> 00:09:53.206
+<v Toby Sutton OBE (Empowering Tech)>Simple as that.</v>
+
+00:09:54.966 --> 00:10:16.966
+<v Toby Sutton OBE (Empowering Tech)>That's it. And that extends into my viewpoint exactly the same as the UK. The UK role, there is no UK role. The team has shrunk. It hasn't been utilised and the person in that role has not been driving it, doing the strategic thinking and analysis and doing them up.</v>
+
+00:10:17.446 --> 00:10:39.326
+<v Toby Sutton OBE (Empowering Tech)>And who has been? Well, the person above Quin. And so the logic for why it should be gone was that a couple of weeks ago. And to me, the logic is still exactly the same today. So that sort of goes against a lot of what Ed is saying about hold your horses, think whether the strategy is right, you want someone doing this role. Well,</v>
+
+00:10:39.606 --> 00:10:58.326
+<v Toby Sutton OBE (Empowering Tech)>my analysis would be actually, no, I don't. So that's sort of one part of it. The second part is I've said, well, just, and Keval was pushing back quite a bit on that as well about, okay, don't just talk about trying to convince them to change the strategy, look at your particular role. And so</v>
+
+00:10:58.646 --> 00:11:17.606
+<v Toby Sutton OBE (Empowering Tech)>This is where he then went, you know, as I say on the last call, I suggested a number of things to him. I said, push back to us, talk about WizCon, talk about data. These are things that, talk about company risk. These are things that you could quite happily develop an argument around to try to convince us that you need to move into a different role.</v>
+
+00:11:18.086 --> 00:11:37.766
+<v Toby Sutton OBE (Empowering Tech)>And one of the things that he's focused on is this data analysis. And he touched on it at the end of the last call as well, where he's basically, my words, basically saying we're in a bit of an echo chamber and nobody is really fighting for sales and sales numbers and how good the sales team are.</v>
+
+00:11:39.206 --> 00:12:02.606
+<v Toby Sutton OBE (Empowering Tech)>How he knows that, I don't know. Quin, you know, but he's basically assuming and probably correct that he's better at analysing the numbers than Quin is and nobody's doing it. So this is why he's proposing this main role that he's forwarded it to you, which is this sort of revenue manager role where he can do the analysis of all the numbers.</v>
+
+00:12:03.526 --> 00:12:22.646
+<v Toby Sutton OBE (Empowering Tech)>But he also recognises that he's probably not quite such a people person as Quin in terms of managing and leading the whole team. And again, this is my words, but because I basically said, well, you need to really describe how two people can do this role, because in my opinion, Quin does do an element of analysis of numbers.</v>
+
+00:12:23.046 --> 00:12:41.806
+<v Toby Sutton OBE (Empowering Tech)>and presenting stuff to us to make some strategic decisions. You may say that you can do it better than Quin does. I don't know, maybe you can, maybe you can't. I'll say that you can. And I'll also say that I agree with you that Quin is better at communication and you're less good at communication. So we're starting from the same point.</v>
+
+00:12:42.246 --> 00:13:03.126
+<v Toby Sutton OBE (Empowering Tech)>you know, Ed, you know, both of us are agreeing, now justify that it's really worth having this revenue analysis role, as well as a light touch analysis role that Quin's doing. And to me, I don't think I, my personal opinion is, although it sounds nice,</v>
+
+00:13:03.446 --> 00:13:22.166
+<v Toby Sutton OBE (Empowering Tech)>if we had a bigger business, if we were actually really driven by growth and driven by sales, and if we did have an extra 50, 60, 70, 100 people in this, in our company actually trying to grow the business,</v>
+
+00:13:22.646 --> 00:13:44.766
+<v Toby Sutton OBE (Empowering Tech)>If we were focused on trying to develop markets and analyse between different markets, then I think there would be more justification for that role. But actually, we don't want to grow the business. We're not focusing on sales revenue. We don't have more people or an aspiration to get more people. We're not developing markets. We're not developing territories and sectors.</v>
+
+00:13:45.126 --> 00:14:05.526
+<v Toby Sutton OBE (Empowering Tech)>We are deliberately shrinking the business, focusing on core areas, reducing our sales people, we're not worrying about sales revenue quite so much, focusing on profit. So the bigger strategy does not go with this growth model that we had 10 years ago.</v>
+
+00:14:05.566 --> 00:14:26.246
+<v Toby Sutton OBE (Empowering Tech)>He's far better suited, his arguments are far better suited to if we were trying to grow the business. We're not trying to grow the business. We're trying to get it, the areas that we're in, really, really stable and profitable. And we don't need this sort of more expansive sort of analysis, if that makes sense.</v>
+
+00:14:26.726 --> 00:14:29.286
+<v Toby Sutton OBE (Empowering Tech)>So I think that sort of eliminates that.</v>
+
+00:14:30.286 --> 00:14:49.126
+<v Toby Sutton OBE (Empowering Tech)>role, in my opinion, that it's just not necessary. The other things that he touched on were other positions. But, you know, again, he also basically said that it'd have to be on a pound more than Quin. So just that just sort of doesn't work, in my opinion. I think you look for a role.</v>
+
+00:14:49.526 --> 00:15:10.246
+<v Toby Sutton OBE (Empowering Tech)>you know, you get paid for what the suitable role is and how can you compare one person to another person? Because, you know, Kev could turn around and say, well, unless I'm paid one pound more than the most expensive person, nobody in the company is going to have their contracts. And then Penny could say, well, unless I'm not paid one pound more than the most expensive person, no one's going to</v>
+
+00:15:10.286 --> 00:15:29.686
+<v Toby Sutton OBE (Empowering Tech)>get paid. So the conversation is, I understand in some ways you have to balance these things, but you can't have that sort of direct correlation between one another. You have to, at some point, I said at some point, you're seeing a job description, you're offered a salary, you agree it's correct. Bob's your uncle, everybody's happy.</v>
+
+00:15:29.966 --> 00:15:45.686
+<v Toby Sutton OBE (Empowering Tech)>You can't then go back a few years later and say, well, I should have been earning X, Y, and Z because so-and-so is. It's just not right. The bit that he didn't address, and I would add into it, is</v>
+
+00:15:46.886 --> 00:15:50.486
+<v Toby Sutton OBE (Empowering Tech)>If Quin were to leave, we don't have anybody.</v>
+
+00:15:51.366 --> 00:15:58.566
+<v Toby Sutton OBE (Empowering Tech)>We've already highlighted that. We understand that that is a risk. We don't have anybody. And what would ultimately happen is that...</v>
+
+00:15:59.766 --> 00:16:14.406
+<v Toby Sutton OBE (Empowering Tech)>We would have to hire someone from scratch and then we as a team would have to work with them more closely for a period of time until they got up to speed. So</v>
+
+00:16:01.126 --> 00:16:01.926
+<v Jack Churchill>Someone else.</v>
+
+00:16:02.926 --> 00:16:03.206
+<v Jack Churchill>Yeah.</v>
+
+00:16:11.286 --> 00:16:11.566
+<v Jack Churchill>Yeah.</v>
+
+00:16:13.926 --> 00:16:20.086
+<v Jack Churchill>I don't think that's impossible. He's on a six-month notice period, I think, so it's not an impossible challenge.</v>
+
+00:16:20.046 --> 00:16:39.686
+<v Toby Sutton OBE (Empowering Tech)>Quin, yeah, something like that. So my analysis is still the same. If the company was slightly bigger, slightly larger, I would still consider Ed. But the thing that, and this is going off the roll thing, and I know this is not something we should be going on about,</v>
+
+00:16:21.366 --> 00:16:21.526
+<v Jack Churchill>It.</v>
+
+00:16:39.726 --> 00:16:40.006
+<v Toby Sutton OBE (Empowering Tech)>But...</v>
+
+00:16:41.286 --> 00:16:54.086
+<v Toby Sutton OBE (Empowering Tech)>I am frustrated that he still has an issue about the fact that he was made head of the US and Quin was made head of everything. And that to me goes to the core sort of problem of this role.</v>
+
+00:16:55.726 --> 00:17:14.846
+<v Toby Sutton OBE (Empowering Tech)>If he didn't have that problem, he would have really got behind the US and fully loved the US and that role would therefore not be being eliminated. So you can sort of see, you can sort of say, well, I'm eliminating Ed because he didn't do the role very well, but I'm sort of, I try to push it and say, no, I'm eliminating the role.</v>
+
+00:17:13.686 --> 00:17:14.846
+<v Peter Johansson>Okay.</v>
+
+00:17:15.206 --> 00:17:26.566
+<v Toby Sutton OBE (Empowering Tech)>because the role was not done particularly well. And does that make sort of sense? That's the justification that I have in my head. It's still eliminating the role rather than the person.</v>
+
+00:17:23.686 --> 00:17:23.806
+<v Peter Johansson>Okay.</v>
+
+00:17:28.726 --> 00:17:30.166
+<v Peter Johansson>That's the only way to do it, is it?</v>
+
+00:17:28.966 --> 00:17:36.486
+<v Toby Sutton OBE (Empowering Tech)>My view is, my view, I think, is still the same as it was before. It's a shame losing Ed, but...</v>
+
+00:17:32.246 --> 00:17:32.286
+<v Peter Johansson>Oh.</v>
+
+00:17:38.486 --> 00:17:42.966
+<v Toby Sutton OBE (Empowering Tech)>I don't see another option, quite frankly, at the moment. We want to make...</v>
+
+00:17:43.926 --> 00:18:04.006
+<v Toby Sutton OBE (Empowering Tech)>We want to make this sort of bigger strategic directional changes. I quite frankly think we could have eliminated the US role a year ago. And I think we've delayed for as we've delayed for a year. I think he should have gone or the role should have gone a year ago. I don't think it's been necessary for quite</v>
+
+00:18:04.046 --> 00:18:25.806
+<v Toby Sutton OBE (Empowering Tech)>for quite some time. And frankly, I think the same thing about the UK role. I think we could have eliminated that role a year ago. I think both these roles could have gone this time last year when we were eliminating lots of other things. I don't think they're necessary. I don't think it's needed. And I think we are in a slightly better position now than we were a year ago to get rid of them.</v>
+
+00:18:25.926 --> 00:18:43.526
+<v Toby Sutton OBE (Empowering Tech)>I think. So I'm still happy with the decision, frankly, is where I'm at. But I will read all these documents that he sent across and just do a thorough job and make some notes and comments and highlight some bits and pieces. And</v>
+
+00:18:45.606 --> 00:18:46.246
+<v Toby Sutton OBE (Empowering Tech)>So...</v>
+
+00:18:47.406 --> 00:19:00.246
+<v Sharmella Kirby>Did he at all comment on what an opportunity he lost here? For example, you know, in my head, he could have</v>
+
+00:19:01.286 --> 00:19:17.206
+<v Sharmella Kirby>with the US, he could have made more revenue than the rest of the world put together and therefore kind of essentially gone above Quin in that sense if he brought in more revenue than the rest of the world. I mean, did he even sort of think of that?</v>
+
+00:19:11.366 --> 00:19:12.606
+<v Toby Sutton OBE (Empowering Tech)>Ann, and that's the...</v>
+
+00:19:16.086 --> 00:19:16.486
+<v Toby Sutton OBE (Empowering Tech)>I.</v>
+
+00:19:17.606 --> 00:19:41.686
+<v Toby Sutton OBE (Empowering Tech)>I totally agree. And I made that point to him, you know, today, two days ago, and you know, multiple times over the last three years and at the starting point. But don't see this as a negative. See this as you are one of our first employees or the first employee, and you are trusted to run the US market. It is a massive market. It was</v>
+
+00:19:41.926 --> 00:20:01.966
+<v Toby Sutton OBE (Empowering Tech)>At the time, it was equal to, you know, half the world, basically, just about. It wasn't quite, was it? Because it, but it was still a big market. The potential is utterly huge, and you're being left alone to get on with it, you know. And I've made this point to him multiple times, but I think consistently he's felt</v>
+
+00:20:01.286 --> 00:20:02.886
+<v Jack Churchill>by over the years.</v>
+
+00:20:03.046 --> 00:20:06.086
+<v Toby Sutton OBE (Empowering Tech)>Yeah, and I think consistently he...</v>
+
+00:20:08.566 --> 00:20:11.526
+<v Toby Sutton OBE (Empowering Tech)>I think he's just been annoyed for three years.</v>
+
+00:20:14.086 --> 00:20:14.326
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:20:28.566 --> 00:20:29.446
+<v Toby Sutton OBE (Empowering Tech)>Exactly.</v>
+
+00:20:29.526 --> 00:20:42.406
+<v Carolynn Helps>to this approach, because we've seen none of this approach, or as far as I'm aware, we've not seen it, whether it stopped at Quin, I don't know, but we've seen none of his approach as he would take the CRO.</v>
+
+00:20:43.366 --> 00:20:47.846
+<v Carolynn Helps>job in the US as a stepping stone. We've seen no evidence of that.</v>
+
+00:20:46.646 --> 00:20:56.166
+<v Toby Sutton OBE (Empowering Tech)>Exactly. Exactly. That's the, that's my, that's the point. Sounds good. But if he really wanted to do it, why hasn't he done it for the last three years?</v>
+
+00:20:50.726 --> 00:20:51.206
+<v Carolynn Helps>Yeah.</v>
+
+00:20:55.206 --> 00:21:00.646
+<v Carolynn Helps>Done it, yeah, on a smaller scale with the US, or not such a smaller scale with the US, but...</v>
+
+00:21:01.726 --> 00:21:02.646
+<v Carolynn Helps>There's been no...</v>
+
+00:21:04.566 --> 00:21:06.966
+<v Carolynn Helps>Yeah, there's no evidence that he...</v>
+
+00:21:08.646 --> 00:21:08.966
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:21:08.806 --> 00:21:14.486
+<v Carolynn Helps>he would be capable, etc, and whether it would work, because we've not seen the, on a smaller scale for the US.</v>
+
+00:21:14.606 --> 00:21:14.966
+<v Jack Churchill>Nick.</v>
+
+00:21:15.926 --> 00:21:35.206
+<v Jack Churchill>I think also we've given him a lot of freedom as well. He's not had us breathing down his neck at all. I think he's been, we haven't been breathing down his neck at all. I think he's had total carte blanche to do whatever he wanted with 50 states of the United States. And he books his trips, he gets on with stuff and you know, he's had</v>
+
+00:21:36.406 --> 00:21:39.926
+<v Jack Churchill>Amazing opportunity, and he's had 10 years with us, so yeah.</v>
+
+00:21:40.886 --> 00:21:41.206
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:21:41.526 --> 00:21:50.726
+<v Jack Churchill>He's grown through being a first salesperson to climbing the ranks. He's had a nice growth story at our organisation.</v>
+
+00:21:51.286 --> 00:21:51.566
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:21:53.006 --> 00:22:12.446
+<v Toby Sutton OBE (Empowering Tech)>Hindsight is 2020. You know, if you went back in time, we would do the US differently, probably. The Jody time was great, moving into the six different territories, good concept, but we put Jody as in charge of one of those, one of those territories and we had five other people equal to Jody. That was a mistake.</v>
+
+00:21:55.126 --> 00:21:55.286
+<v Carolynn Helps>Mm.</v>
+
+00:22:13.926 --> 00:22:32.566
+<v Toby Sutton OBE (Empowering Tech)>So, you know, Jodie should have become the country manager and there should have been six people underneath her. You know, Jodie was upset. The other six people thought that there was going to be a position above. They were upset, didn't work. James going in, he never worked with anybody, you know, so that that that was.</v>
+
+00:22:15.166 --> 00:22:15.366
+<v Carolynn Helps>Mm.</v>
+
+00:22:32.726 --> 00:22:43.606
+<v Toby Sutton OBE (Empowering Tech)>Didn't help the situation, then then giving it to David sort of in 1/2 hour, then giving it to Ed later. Yeah, we, and this is the sort of...</v>
+
+00:22:45.606 --> 00:23:04.526
+<v Toby Sutton OBE (Empowering Tech)>about businesses evolving and changing. At each of these times, we did what we thought was the correct thing to do with some analysis and with some thought and a decision making process. So hindsight isn't particularly useful going back and thinking, well, what we could have done it this way, well, we could have done it that way. But this is a</v>
+
+00:23:04.646 --> 00:23:23.526
+<v Toby Sutton OBE (Empowering Tech)>again, another one of those times. You know, three years ago, we decided on Quin, we decided on Ed is this, and it was a decision. And we're now three years down the line and we're having another thing. But what we're doing still isn't working in the US. So we're making another strategic change. It's just all constant.</v>
+
+00:23:23.926 --> 00:23:24.486
+<v Toby Sutton OBE (Empowering Tech)>It's just...</v>
+
+00:23:25.606 --> 00:23:27.846
+<v Toby Sutton OBE (Empowering Tech)>Just one of those things, I just think it's...</v>
+
+00:23:29.766 --> 00:23:30.726
+<v Jack Churchill>Good evolution.</v>
+
+00:23:30.046 --> 00:23:30.566
+<v Toby Sutton OBE (Empowering Tech)>Helps.</v>
+
+00:23:32.886 --> 00:23:45.126
+<v Toby Sutton OBE (Empowering Tech)>Yeah, yeah, there are certainly things I would do differently if I could snap my fingers and go go back in time, but I think I'm in a relatively happy position with the where the business is at at the moment.</v>
+
+00:23:48.886 --> 00:24:09.646
+<v Toby Sutton OBE (Empowering Tech)>Yeah, and the US is not one of the things I'm worrying about, quite frankly. Yeah, because we've, a couple of years ago, we took the decision to basically sort of give up on the US, which I think was right. And the US is ticking over okay. We don't have an aspiration to grow it. The thing to worry about now is the launch of WizCom.</v>
+
+00:24:10.726 --> 00:24:12.326
+<v Toby Sutton OBE (Empowering Tech)>Ohh, but um...</v>
+
+00:24:11.766 --> 00:24:12.006
+<v Sharmella Kirby>Hmm.</v>
+
+00:24:18.406 --> 00:24:18.806
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:24:19.966 --> 00:24:20.166
+<v Carolynn Helps>Yeah.</v>
+
+00:24:19.986 --> 00:24:20.306
+<v Sharmella Kirby>Ann.</v>
+
+00:24:22.326 --> 00:24:22.646
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:24:24.486 --> 00:24:33.286
+<v Toby Sutton OBE (Empowering Tech)>Okay, another thing, and we can have a read of these documents. He sent even more. I know he's not, he's just forwarded them to you guys.</v>
+
+00:24:33.406 --> 00:24:36.406
+<v Carolynn Helps>Yeah, he's just shared with the ExCo, so we've got access.</v>
+
+00:24:35.606 --> 00:24:37.286
+<v Toby Sutton OBE (Empowering Tech)>Okay, fine.</v>
+
+00:24:38.726 --> 00:24:40.326
+<v Sharmella Kirby>Excellent. I'd rather not know.</v>
+
+00:24:42.166 --> 00:24:45.846
+<v Toby Sutton OBE (Empowering Tech)>The other thing, Penny is asking about VAT next week.</v>
+
+00:24:43.046 --> 00:24:43.206
+<v Sharmella Kirby>Play.</v>
+
+00:24:47.886 --> 00:24:48.246
+<v Toby Sutton OBE (Empowering Tech)>Um...</v>
+
+00:24:49.646 --> 00:24:50.486
+<v Jack Churchill>Yeah, good question.</v>
+
+00:24:51.326 --> 00:25:04.086
+<v Toby Sutton OBE (Empowering Tech)>whether it's going to be cancelled. But I thought on yesterday's conversation, we decided we had got through July. Do you think she's now basically saying that she's concerned about the 60,000 that she's meant to be collecting or something?</v>
+
+00:25:05.126 --> 00:25:10.726
+<v Sharmella Kirby>I don't know, because didn't we say that the VAT, we could pay the VAT? It was on the list to pay.</v>
+
+00:25:08.966 --> 00:25:09.366
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:25:10.966 --> 00:25:11.446
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:25:12.966 --> 00:25:16.006
+<v Sharmella Kirby>But no, I didn't understand her question. Well, question either.</v>
+
+00:25:15.286 --> 00:25:17.446
+<v Jack Churchill>Can you reply, Sharmella, saying something like that?</v>
+
+00:25:19.126 --> 00:25:20.086
+<v Sharmella Kirby>Yeah, can do.</v>
+
+00:25:21.286 --> 00:25:21.686
+<v Sharmella Kirby>Yeah.</v>
+
+00:25:22.686 --> 00:25:27.766
+<v Sharmella Kirby>I mean, we don't need to contact, if we're not going to pay it, we don't need to contact HMRC, we just don't pay it. We just...</v>
+
+00:25:22.886 --> 00:25:23.526
+<v Toby Sutton OBE (Empowering Tech)>I, I...</v>
+
+00:25:23.126 --> 00:25:23.766
+<v Jack Churchill>That'd be great.</v>
+
+00:25:28.566 --> 00:25:31.926
+<v Toby Sutton OBE (Empowering Tech)>I assume it's a direct debit that gets taken out is what she's saying.</v>
+
+00:25:28.926 --> 00:25:29.846
+<v Sharmella Kirby>Cancel the DB.</v>
+
+00:25:33.966 --> 00:25:35.206
+<v Sharmella Kirby>Maybe she can cancel it.</v>
+
+00:25:40.726 --> 00:25:45.206
+<v Carolynn Helps>Did we discuss yesterday about pushing the VAT out then? I don't think we did, did we?</v>
+
+00:25:41.446 --> 00:25:41.606
+<v Sharmella Kirby>Um...</v>
+
+00:25:44.166 --> 00:25:49.606
+<v Toby Sutton OBE (Empowering Tech)>No, it's just I assume it's I assume it's in her direct debit of forty-six 500.</v>
+
+00:25:44.246 --> 00:25:44.726
+<v Sharmella Kirby>No.</v>
+
+00:25:45.926 --> 00:25:46.166
+<v Sharmella Kirby>No.</v>
+
+00:25:50.486 --> 00:25:53.286
+<v Sharmella Kirby>Yeah, Toby had it on his sheet there to pay to pay.</v>
+
+00:25:54.246 --> 00:25:54.406
+<v Carolynn Helps>Mm.</v>
+
+00:25:55.286 --> 00:25:56.006
+<v Sharmella Kirby>That was one.</v>
+
+00:25:55.846 --> 00:26:05.766
+<v Toby Sutton OBE (Empowering Tech)>It is not a separate line, VAT. So unless it's on the 46, 500 line, let's, we could just give her a very quick call now and talk about it if you want.</v>
+
+00:26:06.886 --> 00:26:07.206
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+00:26:08.086 --> 00:26:08.406
+<v Sharmella Kirby>Yeah.</v>
+
+00:26:08.366 --> 00:26:16.246
+<v Toby Sutton OBE (Empowering Tech)>Let's do that. Okay, let's jump into a call with her and then is there anything else we want to talk about without her? Are we done for today?</v>
+
+00:26:18.006 --> 00:26:18.806
+<v Jack Churchill>Only for me.</v>
+
+00:26:19.166 --> 00:26:20.406
+<v Sharmella Kirby>Nothing for me.</v>
+
+00:26:19.286 --> 00:26:23.286
+<v Toby Sutton OBE (Empowering Tech)>Okay, let's see if we can get hold of her now on the other call. Okay, bye.</v>
+
+00:26:24.086 --> 00:26:24.406
+<v Carolynn Helps>Hey.</v>
+
+00:26:24.446 --> 00:26:24.806
+<v Sharmella Kirby>Thanks.</v>
+
+

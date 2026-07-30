@@ -1,0 +1,118 @@
+pwsh -NoProfile -File "./power-transcript-pipeline.ps1" `
+>>   -VttFile "./tmp_rovodev_test_dedup_transcript.txt" `
+>>   -ForceRerun
+FromDate resolved to: 07/25/2026 00:00:00
+ToDate resolved to: 07/30/2026 08:59:48
+Local working directory: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport
+  [CF] Cloudflare sync enabled → https://eip-api-worker-staging.homeassistant-8d3.workers.dev
+WARNING:   [STAGING] SharePoint writes DISABLED — staging mode active
+People config loaded (33 people) ✅
+Confluence domain mappings loaded ✅
+EIP 1.2 Ownership & Governance config loaded ✅
+Microsoft Graph Session Refreshed ✅
+Connected to Microsoft Graph (REST) ✅
+Resolved Primary SharePoint site ✅
+Resolved Primary SharePoint drive ✅
+Resolved MeetingIntelligence site ✅
+Resolved MeetingIntelligence drive ✅
+Run logs folder ready ✅
+Loading existing Master Log...
+Master Log loaded (524 meetings) ✅
+Master People Log loaded (164 entries) ✅
+Checking VTT inbox folder (Legacy)...
+VTT inbox (Legacy): no files found.
+Checking MeetingIntelligence Transcripts...
+MeetingIntelligence: 28 file(s) found ✅
+Processing VTT: HoD_20260709_153911.txt → [HoD_20260709_153911_2026-07-09]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260710_100507.txt → [HoD_20260710_100507_2026-07-10]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260710_132530.txt → [HoD_20260710_132530_2026-07-10]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260713_085757.txt → [HoD_20260713_085757_2026-07-13]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260713_124112.txt → [HoD_20260713_124112_2026-07-13]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260714_121540.txt → [HoD_20260714_121540_2026-07-14]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260714_141158.txt → [HoD_20260714_141158_2026-07-14]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260716_092531.txt → [HoD_20260716_092531_2026-07-16]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260716_111832.txt → [HoD_20260716_111832_2026-07-16]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260717_102705.txt → [HoD_20260717_102705_2026-07-17]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260720_124817.txt → [HoD_20260720_124817_2026-07-20]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260721_110145.txt → [HoD_20260721_110145_2026-07-21]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260721_153050.txt → [HoD_20260721_153050_2026-07-21]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260722_113919.txt → [HoD_20260722_113919_2026-07-22]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260722_120114.txt → [HoD_20260722_120114_2026-07-22]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260723_094922.txt → [HoD_20260723_094922_2026-07-23]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260723_124753.txt → [HoD_20260723_124753_2026-07-23]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260727_095425.txt → [HoD_20260727_095425_2026-07-27]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260727_112155.txt → [HoD_20260727_112155_2026-07-27]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260728_115451.txt → [HoD_20260728_115451_2026-07-28]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260728_134723.txt → [HoD_20260728_134723_2026-07-28]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260729_110934.txt → [HoD_20260729_110934_2026-07-29]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call + US Country Manager 25 Mar 26.txt → [Sales_Call_US_Country_Manager_25_Mar_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 11 Mar 26.txt → [Sales_Call_11_Mar_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 13 May 26.txt → [Sales_Call_13_May_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 15 Apr 26.txt → [Sales_Call_15_Apr_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 18 Feb 26.txt → [Sales_Call_18_Feb_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 28 Jan 26.txt → [Sales_Call_28_Jan_26_2026-07-08]
+  [VTT] Already in master log — skipping
+VTT Mode: Processing file './tmp_rovodev_test_dedup_transcript.txt'
+WARNING:   [VTT] Could not parse date from filename. Using today: 2026-07-30
+  [VTT] Subject    : tmp rovodev test dedup transcript
+  [VTT] Date       : 2026-07-30 08:59
+  [VTT] Participant: Unknown
+  [VTT] Transcript length: 5554 chars
+  [LLM DIAG] Endpoint: https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.1/chat/completions?api-version=2024-02-15-preview
+  [LLM DIAG] Model: gpt-5.1
+  [LLM DIAG] Key source: classification_rules.json
+  [LLM DIAG] Auth mode: api-key
+  [LLM DIAG] Chunks: 1 (chunk size: 32000 chars)
+  [LLM DIAG] Processing chunk 1/1...
+  [LLM DIAG] Combined summaries: 3297 chars feeding Pass 3
+  [LLM DIAG] Synthesising final Leadership Summary...
+  [LLM DIAG] Extracting Topic Records (max tokens: 32000)...
+  [LLM DIAG] Record count OK: 8 record(s) returned (expected >=8)
+  [CTX] Execution context detected: Unknown (no bias applied)
+WARNING:   [BRAND INTEGRITY] SupplierBrandConflict (warning) in topic 'Signals (Positive/Negative/Unknowns)': Contributions in this context should be attributed to Supply Chain / Operations, not to Wizcom engineering or C-Pen product team
+  [EIP 1.2 DIAG] Topic=T11 | LLM Owner=Unknown | Governor=Unknown [recovery may apply]
+  [VALIDATION] Topics detected: 1
+  [VALIDATION] T00 Usage: 0,0%
+  [VALIDATION] Mode Assigned: CEO (default_fallback)
+  [VTT] Uploading Topic Record: 2026-07-30_0659_tmp_rovodev_test_dedup_transcript-T11-Enterprise-Revenue-Concentration-and-Payment-Term-Risk.md
+  [VTT] Transcript uploaded to SharePoint
+  [VTT] Transcript stored in R2: transcripts/2026-07/2026-07-30_0659_tmp_rovodev_test_dedup_transcript.txt
+  [VTT] Summary uploaded to SharePoint
+  [VTT] Summary stored in R2: summaries/2026-07/2026-07-30_0659_tmp_rovodev_test_dedup_transcript-summary.txt
+  [PEOPLE] Running people intelligence extraction...
+WARNING:   [PEOPLE] Unresolved names: MEETING ID, SUBJECT, ORGANISER, EVENT DATE, TYPE, PRIORITY, MODE, STATUS — flagged to people_recommendations.json
+  [PEOPLE] Running people intelligence extraction (4 people)...
+  [PEOPLE] People file uploaded: 
+  [PEOPLE] People file stored in R2: people/2026-07/2026-07-30_0659_tmp_rovodev_test_dedup_transcript-people.txt
+
+VTT Mode complete ✅
+  Transcript : /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-07-30_0859-tmp_rovodev_test_dedup_transcript.txt
+  Summary    : /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-07-30_0859-tmp_rovodev_test_dedup_transcript-Summary.txt
+PS /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline> 
