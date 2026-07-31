@@ -2422,7 +2422,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 
                 # --- PASS 3: Decoupled Output Calls ---
                 Write-Host "  [LLM DIAG] Synthesising final Leadership Summary..." -ForegroundColor Gray
-                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []."
+                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []. Respond with a JSON object."
                 
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
@@ -2497,7 +2497,7 @@ FOCUS FOR THIS CALL
 - Do NOT truncate. Return all records.
 "@
 
-                    $recordsPrompt = $rules.LLMConfig.Prompt + $canonicalTopics + $recordsFocus
+                    $recordsPrompt = $rules.LLMConfig.Prompt + $canonicalTopics + $recordsFocus + "`n`nRespond with a JSON object."
 
                     $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
                                              -UserContent $combinedSummaries `
