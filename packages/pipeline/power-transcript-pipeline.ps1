@@ -3672,6 +3672,7 @@ foreach ($calendarEvent in $events) {
 
         # --- Fetch and concatenate all transcript segments (handles split/reconnected meetings) ---
         $contentSegments = [System.Collections.Generic.List[string]]::new()
+        $transcriptContentForbidden = $false
         foreach ($t in $transcriptsForThisEvent) {
             $transcriptId = $t.id
             $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
@@ -3688,7 +3689,10 @@ foreach ($calendarEvent in $events) {
                         Write-Host "  [DIAG] Content not ready (404). Retrying ($retryCount/$retryLimit)..." -ForegroundColor Yellow
                         Start-Sleep -Seconds (2 * $retryCount)
                     } elseif ($err -match "403") {
-                        Write-Host "  [DIAG] Content access forbidden (403). Policy may still be propagating for $organiserId." -ForegroundColor Yellow
+                        # Transcript content access forbidden — same tenant policy issue as GraphAccessToTranscriptsDisabled.
+                        # Skip cleanly: do NOT write to master log so meeting is retried on next run.
+                        Write-Warning "  [SKIP] Transcript content access forbidden (403) for '$subject'. Meeting will be retried automatically when the policy is re-enabled."
+                        $transcriptContentForbidden = $true
                         break
                     } else {
                         throw $_
@@ -3699,6 +3703,7 @@ foreach ($calendarEvent in $events) {
         }
 
         if ($contentSegments.Count -eq 0) {
+            if ($transcriptContentForbidden) { continue }  # 403 skip — no master log entry, retried next run
             throw "Failed to fetch transcript content after $retryLimit attempts or due to terminal error."
         }
 
