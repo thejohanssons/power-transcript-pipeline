@@ -3933,39 +3933,69 @@ if ($log -and $log.Count -gt 0) {
         })
     }
 
-    $summaryLine = "Run summary: $totalMeetings meetings processed ($newMeetings new, $skippedMeetings skipped, $errorMeetings errors) | $dateRangeStr"
+    # ── BUILD MEETING-BY-MEETING NOTIFICATION ───────────────────────────────────
+    $runDate    = (Get-Date).ToString("yyyy-MM-dd HH:mm")
+    $headerIcon = if ($errorMeetings -gt 0) { "⚠️" } elseif ($global:PipelineWarnings.Count -gt 0) { "⚠️" } else { "✅" }
+    $batchMsg   = "$headerIcon EIP Pipeline — $runDate`n"
+    $batchMsg  += "────────────────────────────────`n"
+    $batchMsg  += "Period: $dateRangeStr`n"
+    $batchMsg  += "Meetings: $totalMeetings evaluated · $newMeetings processed · $skippedMeetings skipped · $errorMeetings errors`n"
 
-    if ($global:PipelineWarnings.Count -eq 0) {
-        $batchMsg = "✅ Pipeline ran without warnings`n$summaryLine"
-    } else {
-        $batchMsg = "⚠️ Pipeline completed with $($global:PipelineWarnings.Count) warning(s)`n$summaryLine`n"
+    # ── Per-meeting section ──────────────────────────────────────────────────
+    $processedEntries = $log | Where-Object { $_.AgentState -notin @("skipped", "error") -and $_.Status -ne "error" }
+    $errorEntries     = $log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" }
+    $skippedEntries   = $log | Where-Object { $_.AgentState -eq "skipped" }
 
-        # Brand integrity warnings
-        $brandWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "BrandIntegrity" }
-        if ($brandWarnings) {
-            $batchMsg += "`n⚠️ BRAND INTEGRITY ($($brandWarnings.Count))`n"
-            foreach ($w in $brandWarnings) {
-                $dateStr = if ($w.EventDate) { " [$($w.Subject), $([datetime]$w.EventDate -f 'yyyy-MM-dd')]" } else { "" }
-                $batchMsg += "  • $($w.Detail)$dateStr`n"
-            }
+    if ($processedEntries) {
+        $batchMsg += "`n✅ PROCESSED`n"
+        foreach ($e in $processedEntries) {
+            $dateStr    = if ($e.EventDate) { ([datetime]$e.EventDate).ToString("MM-dd HH:mm") } else { "" }
+            $topicsStr  = if ($e.TopicCount -gt 0) { " · $($e.TopicCount) topics" } else { "" }
+            $contextStr = if ($e.ExecutionContext) { " · $($e.ExecutionContext)" } else { "" }
+            $batchMsg  += "  $dateStr  $($e.Subject)$contextStr$topicsStr`n"
         }
+    }
 
-        # Unresolved people warnings
-        $peopleWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "UnresolvedPerson" }
-        if ($peopleWarnings) {
-            $batchMsg += "`n⚠️ UNRESOLVED PEOPLE ($($peopleWarnings.Count))`n"
-            foreach ($w in $peopleWarnings) {
-                $batchMsg += "  • $($w.Detail)`n"
-            }
+    if ($errorEntries) {
+        $batchMsg += "`n❌ ERRORS`n"
+        foreach ($e in $errorEntries) {
+            $dateStr   = if ($e.EventDate) { ([datetime]$e.EventDate).ToString("MM-dd HH:mm") } else { "" }
+            $reasonStr = if ($e.ErrorMessage) { " — $($e.ErrorMessage)" } elseif ($e.Notes) { " — $($e.Notes)" } else { "" }
+            # Truncate reason to keep it concise
+            if ($reasonStr.Length -gt 80) { $reasonStr = $reasonStr.Substring(0, 77) + "..." }
+            $batchMsg += "  $dateStr  $($e.Subject)$reasonStr`n"
         }
+    }
 
-        # Pipeline errors
-        $errorWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "PipelineError" }
-        if ($errorWarnings) {
-            $batchMsg += "`n❌ ERRORS ($($errorWarnings.Count))`n"
-            foreach ($w in $errorWarnings) {
-                $batchMsg += "  • $($w.Subject)`n"
-            }
+    if ($skippedEntries) {
+        $batchMsg += "`n⏭️ SKIPPED`n"
+        foreach ($e in $skippedEntries) {
+            $dateStr   = if ($e.EventDate) { ([datetime]$e.EventDate).ToString("MM-dd HH:mm") } else { "" }
+            $reasonStr = if ($e.Notes) { " — $($e.Notes)" } else { "" }
+            if ($reasonStr.Length -gt 60) { $reasonStr = $reasonStr.Substring(0, 57) + "..." }
+            $batchMsg += "  $dateStr  $($e.Subject)$reasonStr`n"
+        }
+    }
+
+    # ── Pipeline-level warnings (brand, people) ──────────────────────────────
+    $brandWarnings  = $global:PipelineWarnings | Where-Object { $_.Type -eq "BrandIntegrity" }
+    $peopleWarnings = $global:PipelineWarnings | Where-Object { $_.Type -eq "UnresolvedPerson" }
+
+    if ($brandWarnings) {
+        $batchMsg += "`n⚠️ BRAND INTEGRITY ($($brandWarnings.Count))`n"
+        foreach ($w in $brandWarnings) {
+            $meetingStr = if ($w.Subject) { " [$($w.Subject)]" } else { "" }
+            $batchMsg  += "  $($w.Detail)$meetingStr`n"
+        }
+    }
+
+    if ($peopleWarnings) {
+        $batchMsg += "`n👤 UNRESOLVED PEOPLE ($($peopleWarnings.Count))`n"
+        foreach ($w in $peopleWarnings | Select-Object -First 5) {
+            $batchMsg += "  $($w.Detail)`n"
+        }
+        if ($peopleWarnings.Count -gt 5) {
+            $batchMsg += "  … and $($peopleWarnings.Count - 5) more`n"
         }
     }
 
