@@ -3602,7 +3602,20 @@ foreach ($calendarEvent in $events) {
         Write-Host "  [DIAG] Meeting ID resolved ($resolvedUsingId): $meetingId" -ForegroundColor Gray
         
         $transcriptsUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts"
-        $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
+        $transcripts = $null
+        try {
+            $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
+        } catch {
+            $errBody = $_.ErrorDetails.Message
+            if ($errBody -match "GraphAccessToTranscriptsDisabled") {
+                # Tenant-level Graph transcript access is disabled — not our fault, not a code error.
+                # Do NOT write to master log — absence means this meeting will be retried next run.
+                Write-Warning "  [SKIP] Graph API transcript access disabled at tenant level for '$subject'. Meeting will be retried automatically when the policy is re-enabled."
+                continue
+            }
+            # Any other error — re-throw so the outer catch handles it normally
+            throw
+        }
 
         $eventStartTime = [datetime]$start
         $eventEndTime   = if ($end) { [datetime]$end } else { $eventStartTime.AddHours(1) }
