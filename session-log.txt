@@ -100,6 +100,31 @@ Staging:
   - POST /participants → staging D1
   - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
 
+## Session Summary — 2026-07-31 (GPT-5.6 Terra compat + Graph 403 hardening)
+
+### GPT-5.6 Terra compatibility fixes (commits 226feba, 2cc8d8a)
+1. Removed temperature=0 (GPT-5.6 does not support it) ✅
+2. Added "Respond with a JSON object." to summary prompt (Pass 3) ✅
+3. Added "Respond with a JSON object." to records prompt (Pass 3) ✅
+   Root cause: GPT-5.6 strictly requires the word "json" in messages when
+   response_format=json_object is used. Prompts inherited from
+   classification_rules.json did not contain this word → 400 error.
+
+### Graph 403 hardening (commits 226feba, b762975)
+1. /transcripts list 403 (GraphAccessToTranscriptsDisabled) → clean [SKIP], no master log entry ✅
+2. /transcripts/{id}/content 403 → clean [SKIP] via transcriptContentForbidden flag, no master log entry ✅
+   Both paths now retry automatically on next run when policy is re-enabled.
+
+### Verified working end-to-end (local run)
+- gpt-5.6-terra ✅, chunk size 400,000 ✅, single-chunk processing ✅
+- ExCo daily (07/28): summary synthesised, 4 topic records extracted ✅
+- 403 meetings: [SKIP] warnings only, no master log entries ✅
+
+### Pending (action required by M365 Global Admin)
+- Enable "Graph API access to meeting transcripts" in Teams Admin Center
+  (admin.teams.microsoft.com → Meetings → Meeting policies → Global)
+  Tenant ID: f9e144a5-228f-4e5a-86c4-2cc253376402
+
 ## Session Summary — 2026-07-31 (Graph Transcript Access — Diagnosis + Fix)
 
 ### Diagnosed (2026-07-31)
