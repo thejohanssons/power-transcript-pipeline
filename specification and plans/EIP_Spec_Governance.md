@@ -14,9 +14,9 @@ This register establishes document precedence for EIP and records known conflict
 2. [`EIP_Implementation_Description_v1.7.7.md`](EIP_Implementation_Description_v1.7.7.md:1) — **CANONICAL IMPLEMENTATION PLAN**
    - Governs current-state implementation detail and delivery design needed to fulfil the roadmap.
    - Cannot expand, contradict, or reprioritise the roadmap.
-3. `EIP_Taxonomy_v2.md` — **planned normative semantic contract**
-   - When approved, governs controlled vocabulary, entity boundaries, evidence anchors, and identity/matching rules.
-   - Until approved, [`config/taxonomy.json`](../config/taxonomy.json:1) is an interim machine-readable registry only; [`config/mapping_rules.json`](../config/mapping_rules.json:1) is extraction/matching heuristic configuration only.
+3. [`EIP_Taxonomy_v2.md`](EIP_Taxonomy_v2.md:1) — **approved normative semantic contract**
+   - Governs target controlled vocabulary, entity boundaries, evidence anchors, and identity/matching rules.
+   - [`config/taxonomy.json`](../config/taxonomy.json:1) remains an interim machine-readable registry and [`config/mapping_rules.json`](../config/mapping_rules.json:1) remains extraction/matching heuristic configuration until separately approved reconciliation changes are delivered.
 4. Runtime code, migrations, configuration, deployment records, and verification artefacts — **deployed-state evidence**
    - Describe what is implemented, not what is authorised as target product scope.
 5. Historical specifications, PRSs, architecture notes, blueprints, handover notes, plans, and generated documentation — **reference only unless reconciled**.
@@ -30,6 +30,7 @@ When documents conflict, the higher-precedence document governs. Conflicts must 
 | **Canonical** | Binding source of truth within its stated authority. |
 | **Active** | Valid supporting document that must align with canonical documents. |
 | **Planned normative** | Intended future binding contract; not authoritative until approved. |
+| **Approved normative** | Binding target contract; implementation remains subject to separately approved runtime changes. |
 | **Reference only** | Useful historical or technical context; cannot govern product or semantic decisions. |
 | **Superseded** | Retained for history; must not be used for new decisions. |
 

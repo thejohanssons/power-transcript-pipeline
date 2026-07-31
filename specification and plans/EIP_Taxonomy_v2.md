@@ -1,14 +1,15 @@
 # EIP Taxonomy and Memory Contract v2
 
-> **Document status:** Draft — proposed normative semantic contract
-> **Version:** 2.0.0-draft.1
-> **Scope:** Phase 0 sandbox proposal only; it is not approved and does not alter deployed extraction or storage behaviour.
+> **Document status:** Approved normative semantic contract
+> **Version:** 2.0.0
+> **Approval disposition:** Approved at the completion of Phase 0. It authorises separate implementation planning only; it does not itself authorise runtime code, registry, mapping-rule, storage, API, or deployment changes.
+> **Scope:** This contract governs target semantic design. The existing deployed extraction and storage behaviour remains unchanged until separately approved implementation changes reconcile it with this contract.
 
 ## 1. Authority, Purpose, and Normative Language
 
-This contract defines the semantic model needed to turn source evidence into durable organisational memory. On approval, it governs controlled vocabulary, entity boundaries, identity, evidence provenance, classification semantics, and change compatibility. It implements Phase 0 of [the roadmap](WIP-roadmap.md:113) and is subordinate to that roadmap.
+This contract defines the semantic model needed to turn source evidence into durable organisational memory. It governs controlled vocabulary, entity boundaries, identity, evidence provenance, classification semantics, and change compatibility. It implements Phase 0 of [the roadmap](WIP-roadmap.md:113) and is subordinate to that roadmap.
 
-The terms **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. Until approved, [the current registry](../config/taxonomy.json:1) and [matching rules](../config/mapping_rules.json:1) remain deployed-state configuration, not this contract's implementation.
+The terms **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. [The current registry](../config/taxonomy.json:1) and [matching rules](../config/mapping_rules.json:1) remain deployed-state configuration, not this contract's implementation, until separately approved reconciliation changes are delivered.
 
 ## 2. Design Rules
 
@@ -179,13 +180,58 @@ Tags are optional, controlled, and secondary to the dimensions above. Proposed a
 
 Evidence MUST retain source-specific authorisation metadata. Retrieval MUST enforce evidence-level access controls, write an audit event, honour retention requirements, and apply source-required redaction before exposure. The system MUST distinguish withheld/redacted evidence from absent evidence.
 
-## 7. Append-Only Events and Current-State Projection
+## 7. System of Record and Azure Coexistence
+
+### 7.1 Phase 0 architecture decision
+
+The target Topic Memory platform is a Cloudflare service. A Cloudflare Worker/API owns Topic Memory write validation, authentication, audit emission, and retrieval authorisation. Cloudflare D1 stores canonical relational memory state and append-only events; Cloudflare R2 stores immutable source-object captures and extraction-payload snapshots where retention and source handling permit. D1 stores R2 keys and evidence metadata; it MUST NOT treat R2 object location as a replacement for source-native provenance or access controls.
+
+During the approved coexistence period, the existing Azure pipeline remains the authoritative operational system of record. It continues to acquire Microsoft 365 source material and publish its existing outputs. It MUST dual-write an idempotent evidence-and-extraction-candidate submission to Topic Memory. Topic Memory is the target canonical memory projection during this period, but it MUST NOT independently supersede Azure as authority until the cutover gate in section 7.4 is approved.
+
+Azure/SharePoint publications are derived outputs during coexistence. Corrections, merges, and governance changes made in Topic Memory MUST remain traceable as events and MUST be reconciled to Azure-owned output until cutover. Neither system may silently overwrite a conflicting record.
+
+### 7.2 Ownership and data boundaries
+
+| Concern | Azure pipeline during coexistence | Cloudflare Topic Memory |
+|---|---|---|
+| Source acquisition | Retrieves Microsoft 365 source material and preserves source-native identifiers | Receives source references and permitted immutable captures |
+| Evidence objects | Produces evidence submissions | Stores evidence metadata in D1 and permitted immutable objects in R2 |
+| Extraction | Produces classifications and candidate claims | Validates contract conformance and stores reviewable candidates/events |
+| Canonical operational authority | Authoritative until cutover | Target authority; no unilateral authority before cutover |
+| Current-state projection | Existing Azure outputs | D1 projection derived from append-only memory events |
+| Publication | Existing SharePoint/Confluence outputs | API/read model; later publication authority after cutover |
+
+D1 must evolve the current topic/occurrence model to represent the distinct entities in section 3: taxonomy topics, topic cases, evidence items, claims, decisions, governance items, and memory events. R2 is an immutable-object store only; relational identity, state, and event history belong in D1.
+
+### 7.3 Submission, idempotency, retry, and authentication
+
+1. Azure owns a stable submission identifier for each source-processing attempt and MUST submit `source_system`, `source_native_id`, `source_locator`, `content_hash`, `source_version`, and extraction-run identity.
+2. Topic Memory MUST use the evidence tuple in section 4.1 as its evidence idempotency key and return the existing identity for an exact replay. A changed source version MUST produce a new evidence item and a supersession relationship.
+3. Azure MAY retry a failed submission without creating duplicate evidence, claims, or events. The Worker/API MUST return a durable receipt or a retryable failure; retries and reconciliation outcomes MUST be auditable.
+4. Azure-to-Cloudflare writes MUST use an authenticated machine-to-machine identity. Secrets MUST be stored in the respective platform secret stores and MUST NOT be embedded in transcripts, source metadata, or repository configuration.
+5. Azure retains Microsoft 365 source permissions and provenance. Topic Memory MUST enforce evidence-level access classification, audit retrieval, and distinguish unavailable, withheld, and redacted evidence.
+
+### 7.4 Reconciliation, backfill, and cutover gate
+
+A reconciliation process MUST compare each Azure-processed source to its Topic Memory submission and projection using source-native identifiers, evidence idempotency keys, and a versioned canonical-projection comparison. Backfill is append-only: historical source evidence and extraction results are ingested as dated events without rewriting original Azure history.
+
+Azure remains authoritative until a named decision owner formally approves cutover after all of the following are demonstrated for an approval-defined pilot duration:
+
+- idempotent dual-writes succeed and every processed source is reconciled;
+- no unresolved high-severity divergence exists in evidence identity, case/claim linkage, governance state, or publication-relevant projection;
+- access control, audit, retention, and redaction controls have been verified;
+- retry, recovery, and replay procedures have been tested; and
+- the cutover decision, owner, effective date, rollback approach, and outstanding discrepancies are recorded as append-only governance events.
+
+The pilot duration and detailed severity thresholds remain subject to formal approval. After cutover, Topic Memory becomes the authoritative canonical memory system of record; Azure remains an evidence/extraction producer and may retain derived publication responsibilities only under the approved post-cutover contract.
+
+## 8. Append-Only Events and Current-State Projection
 
 Allowed event types are `Extracted`, `Reviewed`, `Corrected`, `Superseded`, `CaseLinked`, `CaseMergeProposed`, `CaseMerged`, `GovernanceUpdated`, `Redacted`, and `SourceReprocessed`. Each event MUST identify actor or automation, timestamp, reason, affected entities, and prior-event reference where applicable.
 
 No record is destructively overwritten. A current view is derived by replaying ordered events and applying approved projection rules. A correction MUST retain the original claim and identify the correcting evidence or reviewer rationale.
 
-## 8. Versioning and Change Control
+## 9. Versioning and Change Control
 
 This contract follows semantic versioning:
 
@@ -209,12 +255,17 @@ A semantic change proposal MUST include: decision owner, affected contract secti
 | Legacy Categories omit `Assumption` | v2 adds `Assumption` because the roadmap requires explicit assumptions |
 | Legacy `T15` fallback behaviour in older specifications | Prohibited. Use an unclassified review outcome |
 
-## Appendix B. Approval Checklist
+## Appendix B. Approval Record and Implementation Prerequisites
 
-Before this draft becomes normative:
+### B.1 Approval evidence completed in Phase 0
 
-1. Two reviewers independently classify 10–20 representative excerpts using this vocabulary and resolve disagreement.
-2. The machine registry and heuristic rules are reconciled in a separately reviewed change.
-3. The initial system-of-record and Azure coexistence contract are approved.
-4. Required regression fixtures cover every boundary rule and legacy mapping.
-5. Governance decision rights, retention, access, and audit implementation ownership are named.
+1. Two reviewers independently classified 24 representative excerpts from two local sources and resolved every disagreement; see [the reviewer fixture pack](../artifacts/phase0/semantic-contract-review-fixtures.md:18).
+2. The initial Topic Memory system-of-record, Azure dual-write coexistence model, and cutover gate are specified in sections 7.1–7.4.
+3. This contract is approved as version `2.0.0` for separate implementation planning.
+
+### B.2 Prerequisites before runtime implementation or cutover
+
+1. Reconcile the machine registry and heuristic rules in a separately reviewed and approved change.
+2. Add regression fixtures covering every boundary rule and legacy mapping.
+3. Name governance decision rights and implementation ownership for retention, access, and audit controls.
+4. Approve implementation plans and changes for the Cloudflare Topic Memory data model, API, Azure dual-write integration, reconciliation, and cutover controls.
