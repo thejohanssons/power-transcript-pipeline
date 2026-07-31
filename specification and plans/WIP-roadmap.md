@@ -1,5 +1,9 @@
-# EIP WIP Roadmap — Organisational Memory Platform
- 
+# EIP Roadmap — Organisational Memory Platform
+
+> **Document status:** **CANONICAL ROADMAP** — Active
+>
+> **Authority:** This document is the binding source of truth for EIP product direction, scope, phase sequencing, target outcomes, and acceptance priorities. Where another workspace document conflicts with it, this roadmap prevails. The implementation plan in [`EIP_Implementation_Description_v1.7.7.md`](EIP_Implementation_Description_v1.7.7.md:1) is the canonical delivery plan and must implement this roadmap; it may describe current-state detail but cannot expand or redefine roadmap scope.
+>
 > **Vision:** "EIP is Salesforce for organisational memory: a configurable platform that converts scattered organisational activity into a living, persistent memory that executives, teams and AI systems can actually reason over."
  
 ## 0. Business Value & Scenario-Driven Outcomes
@@ -106,47 +110,61 @@ Source: [`EIP_Implementation_Description_v1.7.7.md`](specification and plans/EIP
 
 Phased plan from current Azure pipeline to a full organisational memory platform.
 
-### Phase 0 — Spec Consolidation & Canonical Model (immediate)
+### Phase 0 — Canonical Contract, Governance & Architecture Decision (immediate)
 
-**Goal:** One authoritative conceptual model for classification and topic memory; remove conflicts between PRS/specs.
+**Goal:** Establish one authoritative, versioned semantic and data contract before changing extraction behaviour or expanding the storage/API surface.
 
 **Key Outcomes:**
-- Single canonical taxonomy and 3D classification model (Topic, Category, ContextType + Domains, TopicFamilies, Tags).
-- Updated specs and deprecation notes for older documents.
+- An approved canonical taxonomy and 3D classification contract.
+- Explicit identity boundaries between taxonomy topics, live topic cases, evidence, extracted claims, and ExCo governance items.
+- An agreed Azure-to-Topic-Memory migration decision and coexistence contract.
+- Older specifications marked with clear status and precedence.
+
+**Exit criteria:** Two reviewers classify 10–20 representative transcript excerpts consistently; every extracted record has an unambiguous schema destination; and a decision has been made on the initial system of record.
 
 **Workstreams:**
 
-1. **Canonical Taxonomy & 3D Model**
-   - Freeze authoritative vocabularies for:
-     - `DOMAIN`
-     - `TOPIC_FAMILY`
-     - `TOPIC_ID` / `CANONICAL_TOPIC`
-     - `CATEGORY`
-     - `CONTEXT_TYPE`
-     - `TAGS`
-   - Produce explicit mapping tables from legacy vocabularies:
-     - Domain: Execution/Organisation/Financial → new domains (Operations, People, Finance, Governance, etc.).
-     - Category: Execution/Problem/Learning/etc. → final Category values.
-     - ContextType: Status Update/Issue/Risk etc. → final CONTEXT_TYPE values.
+1. **Canonical Taxonomy & Memory Contract**
+    - Create `EIP_Taxonomy_v2.md` as the normative contract; retain `taxonomy.json` as the machine-readable registry and `mapping_rules.json` as extraction/matching heuristics only.
+    - Freeze authoritative vocabularies for `DOMAIN`, `TOPIC_FAMILY`, `TOPIC_ID`, `CATEGORY`, `CONTEXT_TYPE`, and `TAGS`.
+    - Define entity boundaries and stable identities for:
+      - canonical taxonomy topic (configured business concept);
+      - topic case (a specific live instance of a concern or initiative);
+      - evidence item (immutable source artefact or source fragment);
+      - claim (decision, action, risk, issue, dependency, or assumption extracted from evidence); and
+      - ExCo governance item (a material decision, risk, dependency, action, or outcome requiring ExCo visibility or intervention).
+    - Define Category versus ContextType boundary rules, including risk versus issue, decision versus proposal, and action versus progress.
+    - Define controlled governance fields: ExCo materiality (`Inform`, `Monitor`, `Discuss`, `Decide`, `Escalate`), governance status, accountable executive, review cycle, next review date, and escalation/staleness rules.
+    - Produce explicit mappings from legacy vocabularies and resolve internal registry inconsistencies before approval.
 
-2. **Document Precedence & Supersession**
-   - Publish a short spec: `EIP_Spec_Governance.md` with:
-     - Spec hierarchy (e.g. Implementation Description + Taxonomy CR are source of truth).
-     - Status markers on PRS / blueprints (Active, Superseded, Deprecated, Draft).
+2. **Evidence, History & Identity Rules**
+    - Specify mandatory evidence anchors: source-native ID, source locator, timestamp, content/version hash, ingestion time, and confidence.
+    - Define corrections, merges, and review decisions as append-only events; mutable current state must be reproducible from that history.
+    - Define threshold and review rules: matching may suggest an existing case, but must not silently create or merge canonical taxonomy topics.
 
-3. **Update Implementation Spec**
-   - Rev EIP Implementation Description to align with canonical taxonomy and 3D model.
-   - Ensure pipeline description explicitly states processing order: ContextType → Topic → Category.
+3. **Document Precedence, Change Governance & Security Baseline**
+    - Publish `EIP_Spec_Governance.md` defining the spec hierarchy, statuses (Active, Superseded, Deprecated, Draft), named decision rights, semantic versioning, and regression-test requirements for taxonomy changes.
+    - Define the minimum information-governance baseline for all evidence: access control, audit history, retention, source-specific handling, and redaction requirements.
+
+4. **Migration and System-of-Record Decision**
+    - Time-box the decision whether the Azure pipeline will initially remain the extractor while Topic Memory becomes the system of record, or whether it will be fully replaced.
+    - Document API ownership, source identifiers, idempotency keys, retry behaviour, authentication, and coexistence/backfill boundaries.
+
+5. **Update Implementation Specification**
+    - Rev the implementation description to reference the canonical contract and state the mandatory processing order: ContextType → Topic → Category → enrichment.
 
 ---
 
-### Phase 1 — Harden Current Pipeline as "EIP v1 Memory Extractor" (short term)
+### Phase 1 — Prove the Decision-to-Evidence Vertical Slice (short term)
 
-**Goal:** Make the existing Azure pipeline a robust, trustworthy extractor into the canonical memory model.
+**Goal:** Prove EIP's central promise with a governed, end-to-end path from transcript evidence to a reconstructable decision trail.
 
 **Key Outcomes:**
-- Stable, verified extraction of meetings into the canonical topic schema.
-- Backfill strategy for historical meetings.
+- Stable, verified extraction into the canonical memory contract.
+- A decision record linked to immutable transcript evidence, assumptions, risks, dependencies, actions, and intended outcome where stated.
+- A query/API result that reconstructs one real decision end-to-end.
+- An ExCo-ready governance item that states materiality, accountable executive, required intervention, review cycle, and next review date.
+- A validated, idempotent historical-backfill approach for the same contract.
 
 **Workstreams:**
 
@@ -156,12 +174,11 @@ Phased plan from current Azure pipeline to a full organisational memory platform
      - ContextType assignment → Topic mapping → Category selection.
    - Refine `Select-Category` and ContextType derivation rules using verification artefacts.
 
-2. **Topic Record Schema Finalisation**
-   - Lock a final Topic Record schema consistent with:
-     - Canonical taxonomy axes (Domain, TopicFamily, Topic, Category, ContextType, Tags).
-     - Ownership / governance fields.
-     - Evidence anchors (People, Products, Projects, Systems, Dependencies).
-   - Mark older topic record plans as superseded.
+2. **Canonical Record & Decision Slice**
+    - Finalise schemas for evidence items, claims, topic cases, decision records, assumptions, risks, dependencies, actions, outcomes, ExCo governance items, and append-only review/correction events.
+    - Make evidence anchors and taxonomy version mandatory for every extracted claim.
+    - Implement one decision-to-evidence vertical slice from transcript ingestion through retrieval, including its materiality, accountable executive, required ExCo intervention, and intended outcome; do not defer Scenario 1 until dashboards or broad multi-source ingestion.
+    - Treat fuzzy or semantic matching as candidate generation only, with reviewable and reversible case merge decisions.
 
 3. **Verification & Quality Metrics**
    - Extend `artifacts/verification` to include:
@@ -196,68 +213,82 @@ Phased plan from current Azure pipeline to a full organisational memory platform
 
 **Workstreams:**
 
-1. **Schema & Data Model Design**
-   - Translate canonical Topic Record + master log formats into relational schema (D1) and object model:
-     - `topics` (identity, labels, domains, owners).
-     - `evidence` (meetings, docs, emails) with source metadata.
-     - `topic_evidence_links` (many-to-many + context fields).
-     - `decisions`, `actions`, `risks` tables for first-class decision/evidence tracking.
-   - Preserve append-only history semantics.
+1. **Schema & Data Model Implementation**
+    - Implement the Phase 1 canonical contract in D1 and R2:
+      - canonical taxonomy topics and separately identified topic cases;
+      - immutable `evidence` with source metadata and R2 references;
+      - claims and typed links between cases, evidence, decisions, actions, risks, dependencies, assumptions, outcomes, and ExCo governance items;
+      - append-only event/revision history plus materialised current state.
+    - Preserve lineage through corrections, merges, and source reprocessing.
 
 2. **Ingestion Adapters**
    - Phase 2a: Azure pipeline writes into Topic Memory service via API (coexistence period).
    - Phase 2b: Cloudflare-native ingestion paths for new sources (e.g. Jira, Confluence, M365 connectors).
 
 3. **Matching Engine Implementation**
-   - Implement `Topic Matching Engine` per PRS with updated classification stack:
-     - Domain/Topic/Category/ContextType/Brand.
-     - Semantic similarity + entity/relationship similarity.
-   - Expose API endpoints for:
-     - Upsert evidence.
-     - Match evidence → topic(s).
-     - Create new topics when confidence threshold not met.
+    - Implement the Topic Matching Engine using the canonical classification stack: Domain/Topic/Category/ContextType/Brand.
+    - Use semantic similarity and entity/relationship similarity only to propose topic-case links or merge candidates; the relational memory model remains the source of truth.
+    - Expose API endpoints to upsert evidence, return match candidates with confidence/provenance, and create reviewable candidate cases when confidence is insufficient.
 
-4. **Topic Query & Signals API**
-   - Provide APIs for:
-     - Get topic history (timeline of evidence, decisions, actions, status).
-     - Get topic signals (repeated risks, stalled work, escalations).
-     - Get per-executive views (topics by owner, domain, capability).
+4. **Topic Query, Signals & ExCo Governance API**
+    - Provide APIs for:
+      - Get topic history (timeline of evidence, decisions, actions, status).
+      - Get topic signals (repeated risks, stalled work, escalations).
+      - Get the ExCo governance queue filtered by materiality, governance status, accountable executive, review date, and stale-item threshold.
+      - Get per-executive views (topics by owner, domain, capability).
+    - Define the evidence-backed `EmergingExecutiveRisk` signal contract: a reviewable candidate generated when related risks, blockers, or dependencies converge across a configurable minimum number of live topic cases and organisational domains/capabilities within a configurable observation window.
+    - Require every `EmergingExecutiveRisk` candidate to retain its contributing evidence and cases, detection rationale, observation window, probability, impact, confidence, accountable executive or triage owner, and review state. Automated detection may propose a signal but cannot mark it material or escalated without human governance review.
+    - Add an acceptance fixture in which converging evidence from at least two distinct domains/capabilities produces one explainable candidate signal; unrelated evidence must not be aggregated, and a reviewer must be able to confirm, dismiss, or split the candidate without losing provenance.
+
+5. **ExCo Continuity Brief API**
+    - Generate an evidence-backed continuity brief for a departing or newly appointed ExCo member or strategic accountable executive.
+    - The brief must identify the person's material decisions, open assumptions, risks, dependencies, actions, outcomes, governance items, ownership-transfer needs, next review dates, and evidence links; it must distinguish recorded facts from unresolved or low-confidence claims.
+    - Add an acceptance fixture where a reviewer can reconstruct the material context and required handover actions for one role from Topic Memory without relying on the departing person's mailbox or recollection.
 
 ---
 
-### Phase 3 — Management & Governance Surfaces (medium term)
+### Phase 3 — ExCo Governance Cockpit (medium term)
 
-**Goal:** Turn the topic memory into a usable management tool and governance system.
+**Goal:** Turn Topic Memory into a focused Board/ExCo management and governance control surface; broader organisational hierarchy dashboards remain out of scope.
 
 **Key Outcomes:**
-- Management dashboards and review workflows based on Topic Memory.
-- Formal governance of taxonomy and classification quality.
+- An ExCo Governance Cockpit that converts material memory records into an actionable agenda and review workflow.
+- Formal governance of taxonomy, access, and classification quality.
+- A closed feedback loop from decision and action to intended and evidenced outcomes.
 
 **Workstreams:**
 
-1. **Executive Views & Dashboards**
-   - Build views for:
-     - Topic health (status, trajectory, risk level).
-     - Domain/owner views (per executive, per board).
-     - Stalled work and repeated risks.
-   - Initial implementation can be:
-     - Power BI or similar BI tool over Topic Memory service.
-     - Lightweight web UI served from Workers.
+1. **ExCo Governance Cockpit**
+   - Build four connected views:
+     - **Executive overview:** material risks, overdue decisions, stuck actions, deteriorating confidence, reviewable `EmergingExecutiveRisk` candidates, and the required ExCo intervention.
+     - **Decision register:** proposed, approved, rejected, reversed, or superseded decisions with authority, rationale, assumptions, dependencies, evidence, and linked outcomes.
+     - **Risk and dependency tracker:** material cross-domain risks and dependencies with exposure, mitigation, accountable executive, aging, next review, escalation status, and drill-down to any contributing `EmergingExecutiveRisk` candidate.
+     - **Outcome tracker:** intended outcome, success measure, baseline, target, target date, latest actual, confidence, and evidence of result for decisions and strategic actions.
+   - Initial implementation can be Power BI or a lightweight Workers-served web UI over Topic Memory.
 
-2. **Decision & Evidence Explorer**
+2. **Governance Workflow Tracker**
+   - Provide explicit queues for:
+     - decisions awaiting ExCo authority;
+     - approved decisions missing evidence, assumptions, owners, or outcome definitions;
+     - material risks without mitigation, accountable executive, or next review date;
+     - overdue actions or actions lacking evidence of completion;
+     - outcomes with missed targets, declining confidence, or no measurement update;
+     - reviewable `EmergingExecutiveRisk` candidates that require confirmation, dismissal, splitting, or escalation;
+     - stale governance items and low-confidence material claims awaiting human review.
+   - Every material item must show why it is material, what changed since its previous review, who is accountable, what is due next, supporting evidence, and the decision or intervention required from ExCo.
+
+3. **Decision & Evidence Explorer**
    - UI/API to:
      - Search decisions by topic, person, timeframe.
      - Drill down from decision → evidence artefacts.
      - Export decision trails for audits and board packs.
 
-3. **Taxonomy & Rule Governance**
-   - Establish an internal governance process:
-     - Monthly taxonomy review.
-     - Change requests for new topics/domains/categories.
-   - Tooling:
-     - Config UI or repository-based change workflow with validation (linting + regression tests).
+4. **Taxonomy, Rule & Access Governance**
+    - Operate the named decision-rights and versioned change process established in Phase 0, including compatibility review, migration plans, and regression fixtures for every semantic change.
+    - Establish a monthly taxonomy review and a repository-based or UI workflow with validation, regression tests, audit history, and approval controls.
+    - Apply evidence-level authorisation, retention, and audit requirements before exposing management or agent surfaces.
 
-4. **Quality & Drift Monitoring**
+5. **Quality & Drift Monitoring**
    - Operational dashboards:
      - Classification drift indicators.
      - Volume of unmatched evidence.
@@ -276,21 +307,21 @@ Phased plan from current Azure pipeline to a full organisational memory platform
 **Workstreams:**
 
 1. **Additional Evidence Sources**
-   - Prioritise high-value integrations:
-     - Jira / DevOps boards (implementation work items).
-     - Confluence / SharePoint pages (design docs, specs).
-     - Email/Chat (decisions and commitments, with strong filters).
-   - Normalise all evidence into the same Topic Memory schema.
+    - Prioritise high-value integrations:
+      - Jira / DevOps boards (implementation work items).
+      - Confluence / SharePoint pages (design docs, specs).
+      - Email/Chat (decisions and commitments, with strong filters and source-specific privacy/retention controls).
+    - Normalise all evidence into the same Topic Memory contract, including immutable provenance and access metadata.
 
 2. **Cross-System Identity & Entity Resolution**
    - Unify people IDs across platforms.
    - Normalise product/project/system names across sources.
 
 3. **Onboarding & Offboarding Use Cases**
-   - Specific persona flows:
-     - "New manager for Domain X" → curated topic tour (history, key decisions, open risks).
-     - "Engineer joining project Y" → project-specific topic history.
-   - Packaged views and summaries generated from Topic Memory.
+    - Build on the Phase 2 ExCo continuity brief with broader persona flows:
+      - "New manager for Domain X" → curated topic tour (history, key decisions, open risks).
+      - "Engineer joining project Y" → project-specific topic history.
+    - Packaged views and summaries generated from Topic Memory.
 
 4. **AI Assistant & Co-pilot Integration**
    - Provide:
@@ -302,27 +333,33 @@ Phased plan from current Azure pipeline to a full organisational memory platform
 
 ## 5. Near-Term Concrete Next Steps
 
-1. **Create Canonical Taxonomy Spec**
-   - New file: `specification and plans/EIP_Taxonomy_v2.md` consolidating DOMAIN, TOPIC_FAMILY, TOPIC, CATEGORY, CONTEXT_TYPE, TAGS + mapping tables from legacy terms.
+1. **Approve the Canonical Taxonomy and Memory Contract**
+    - Complete `EIP_Taxonomy_v2.md` as the normative specification for vocabulary, entity boundaries, evidence anchors, identity/matching, legacy mappings, and semantic versioning.
+    - Resolve registry conflicts, including declared domain values that are used by topic entries but absent from the domain list, and the inaccurate “9-axis” terminology.
 
-2. **Align Implementation Description with Canonical Model**
-   - Update [`EIP_Implementation_Description_v1.7.7.md`](specification and plans/EIP_Implementation_Description_v1.7.7.md:1) to:
-     - Explicitly reference the canonical taxonomy spec.
-     - Document the mandatory 3D processing order.
+2. **Validate the Contract Against Real Evidence**
+    - Annotate 10–20 representative transcript excerpts with ContextType, Topic, Category, evidence anchors, and proposed case identity.
+    - Add adjudicated examples for risk versus issue, decision versus proposal, action versus progress, and existing case versus new case.
 
-3. **Refine `classification_rules.json` and Verification Artifacts**
-   - Update prompts to enforce:
-     - Non-overlap of Category vs ContextType.
-     - Exact vocabularies.
-   - Add verification cases that target ambiguous Category/ContextType boundaries.
+3. **Publish Governance and Decide the Initial System of Record**
+    - Create `EIP_Spec_Governance.md` with precedence, document statuses, named decision rights, change approvals, and required regression tests.
+    - Time-box the Azure/Cloudflare migration decision; document coexistence, idempotency, authentication, and backfill behaviour.
 
-4. **Design Topic Memory Schema (Draft)**
-   - Draft a `TopicMemorySchema_v1.sql` (or markdown spec) based on D1, reflecting:
-     - Topics, Evidence, Links, Decisions, Actions, Risks.
+4. **Build the Decision-to-Evidence-and-Outcome Vertical Slice**
+   - Ingest one transcript as immutable evidence, extract a decision with its stated assumptions, risks, dependencies, actions, materiality, accountable executive, and intended outcome, and retrieve its complete evidence trail.
+   - Use the result as the acceptance test for Scenario 1 and the first ExCo governance item before implementing broad signals, dashboards, or extra connectors.
 
-5. **Decide Migration Strategy**
-   - Document whether the Azure pipeline becomes:
-     - a) A long-term extractor feeding the Cloudflare Topic Memory service; or
-     - b) A temporary bridge to be fully replaced by Cloudflare Workers.
+5. **Define ExCo Governance Controls, Risk-Signal, and Tracker Acceptance Criteria**
+    - Approve controlled values and rules for materiality, governance status, accountable executive, next review, escalation, staleness, outcome measurement, and human-review thresholds.
+    - Define the `EmergingExecutiveRisk` detection contract and fixture: configurable convergence and observation-window thresholds, probability/impact/confidence semantics, evidence/provenance requirements, and reviewer confirm/dismiss/split/escalate actions.
+    - Define acceptance tests for the Executive overview, Decision register, Risk and dependency tracker, Outcome tracker, and governance queues.
 
-These steps move the project from a powerful transcript pipeline towards a coherent organisational memory platform aligned with the stated objectives.
+6. **Prove an ExCo Continuity Brief**
+    - Define and test a role-handover brief for one departing or newly appointed ExCo member or strategic accountable executive, covering material decisions, open assumptions, risks, dependencies, actions, outcomes, ownership transfers, next reviews, and supporting evidence.
+    - Require a reviewer to verify that the brief supports a complete, evidence-backed handover without relying on the departing person's private knowledge.
+
+7. **Align Pipeline Rules, Verification, and Storage Design**
+    - Update classification rules and verification artefacts to enforce exact vocabularies and Category/ContextType separation.
+    - Draft and review the D1/R2 schema for evidence, claims, cases, decision records, typed links, and append-only history before expanding the API.
+
+These steps establish a governed evidence-and-decision spine first, allowing the later platform phases to extend a validated organisational-memory system rather than create a parallel one.

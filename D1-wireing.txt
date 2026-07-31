@@ -1,0 +1,105 @@
+Here's the full D1 schema map:
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                        EIP Platform — D1 Schema                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  transcripts                        sessions                            │
+│  ─────────────                      ────────                            │
+│  transcript_id PK                   session_id PK                       │
+│  meeting_ref  ◄─────────────────────────────────────────────────-─┐     │
+│  r2_key ──────────────► R2                                        │     │
+│  meeting_date                       session_date                  │     │
+│  source_system (M365/Google)        session_type                  │     │
+│  segment_count                      user_intent                   │     │
+│  processed                          topics_reviewed               │     │
+└──────────────────────────┬──────────topics_added                  │     │
+                           │          topics_rejected               │     │
+                           │          agent_summary                 │     │
+                           │          follow_up_flags (JSON)        │     │
+          meeting_ref ─────┘          └──────────┬────────────────-─┘     │
+          (soft link, no FK)                      │ session_id            │
+                                                  │                       │
+┌─────────────────────────┐                       │                       │
+│  topics                 │                       │                       │
+│  ──────                 │                       │                       │
+│  topic_id PK (T-code)   │◄──────────────────────┼────────────────────┐  │
+│  topic_name             │                       │                    │  │
+│  domain                 │   ┌───────────────────▼──────────────────┐ │  │
+│  category               │   │  topic_occurrences                   │ │  │
+│  current_status         │   │  ─────────────────                   │ │  │
+│  current_priority       │   │  occurrence_id PK                    │ │  │
+│  owner                  │   │  topic_id FK ──────────────────────► │─┘  │
+│  first_seen             │   │  meeting_ref ◄─────────────────────────── ┘
+│  last_seen              │   │  meeting_date                        │
+│  occurrence_count       │   │  context (Commercial/NPI/etc.)       │
+│  trend                  │   │  priority                            │
+│  topic_family           │   │  summary                             │
+│  confluence_url         │   │  key_facts                           │
+│  sp_list_item_id        │   │  decisions (JSON array) ─────────────┼──► decisions table (topic_ref)
+│                         │   │  actions (JSON array) ───────────────┼──► actions table   (topic_ref)
+└─────────────────────────┘   │  risks (JSON array) ─────────────────┼──► risks table     (topic_ref)
+                              │  next_steps                          │
+                              │  retrieval_anchors (JSON)            │
+                              │  r2_key ──────────────────────────► R2 (.md file)
+                              │  session_id FK ──────────────────► sessions
+                              │  status (Pending/Approved/etc.)      │
+                              └──────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  meeting_participants                                                   │
+│  ────────────────────                                                   │
+│  participant_id PK                                                      │
+│  meeting_ref ◄──────────────────── (soft link to transcripts.meeting_ref)
+│  person_id                                                              │
+│  display_name                                                           │
+│  role                                                                   │
+│  was_organiser                                                          │
+│  summary                                                                │
+│  topics_referenced (JSON) ──────────────────────────► topics.topic_name │
+│  stance (JSON {topic: stance})                                          │
+│  contributions_r2_key ────────────────────────────► R2 (narrative .md)  │
+│  UNIQUE(meeting_ref, person_id)                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  topic_merge_candidates                                                 │
+│  ──────────────────────                                                 │
+│  candidate_id PK                                                        │
+│  topic_id_a FK ────────────────────────────────────► topics.topic_id    │
+│  topic_id_b FK ────────────────────────────────────► topics.topic_id    │
+│  similarity_score                                                       │
+│  recommended_action (merge/keep)                                        │
+│  status (Pending/Approved/Rejected)                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│  actions         │  │  decisions       │  │  risks           │
+│  ───────         │  │  ─────────       │  │  ─────           │
+│  action_id PK    │  │  decision_id PK  │  │  risk_id PK      │
+│  meeting_ref     │  │  meeting_ref     │  │  meeting_ref     │
+│  meeting_date    │  │  meeting_date    │  │  meeting_date    │
+│  assigned_to     │  │  owner           │  │  raised_by       │
+│  assigned_by     │  │  topic_ref ──►T  │  │  topic_ref ──►T  │
+│  topic_ref ──►T  │  │  description     │  │  description     │
+│  description     │  │  rationale       │  │  severity        │
+│  due_date        │  │  source_r2_key   │  │  status          │
+│  status          │  └──────────────────┘  │  source_r2_key   │
+│  source_r2_key   │                        └──────────────────┘
+└──────────────────┘
+  ──►T = soft link to topics.topic_name (not enforced FK)
+```
+
+### Key design notes
+
+| Pattern | How it works |
+|---------|-------------|
+| **Hard FK** | `topic_occurrences.topic_id → topics.topic_id` and `topic_merge_candidates.topic_id_a/b → topics.topic_id` — enforced by SQLite |
+| **Soft links** | Everything else using `meeting_ref` — no FK, just a consistent string value shared across tables. Allows transcripts to be registered independently of participants/occurrences |
+| **JSON columns** | `decisions`, `actions`, `risks`, `retrieval_anchors`, `follow_up_flags`, `stance`, `topics_referenced` — stored as JSON strings. The standalone `actions/decisions/risks` tables are the normalised form for querying; the JSON in `topic_occurrences` is the source snapshot |
+| **R2 pointers** | `r2_key` on transcripts, `r2_key` on topic_occurrences, `contributions_r2_key` on participants, `source_r2_key` on actions/decisions/risks — all point into R2 for the actual file content |
+| **Empty tables** | `actions`, `decisions`, `risks` have schema but no data yet — population from people files is next backlog item |
+
+Good night! 🌙

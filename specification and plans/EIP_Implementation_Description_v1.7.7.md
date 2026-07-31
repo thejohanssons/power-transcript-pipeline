@@ -1,12 +1,17 @@
-# Executive Intelligence Pipeline (EIP) — Complete Implementation Description
-**Version:** 1.7.9 | **Date:** 2026-07-20  
-**Purpose:** Full system specification to enable recreation on a new platform.
+# Executive Intelligence Pipeline (EIP) — Canonical Implementation Plan
+**Document status:** **CANONICAL IMPLEMENTATION PLAN** — Active
+**Version:** 1.7.9 | **Date:** 2026-07-20
+**Purpose:** The binding delivery plan for the canonical product direction in [`WIP-roadmap.md`](WIP-roadmap.md:1). It documents the current Azure extraction implementation and the ordered target-state work required to deliver the roadmap; it must not expand, contradict, or reprioritise roadmap scope.
+
+**Precedence:** [`WIP-roadmap.md`](WIP-roadmap.md:1) governs product direction, scope, phase sequencing, target outcomes, and acceptance priorities. This document governs implementation detail only. In a conflict, the roadmap prevails. Runtime code and configuration describe deployed behaviour and must be treated as subordinate evidence until reconciled with this plan.
 
 ---
 
 ## 1. SYSTEM OVERVIEW
 
 The **Executive Intelligence Pipeline (EIP)** is a PowerShell-based automated system that converts raw Microsoft Teams meeting transcripts into structured executive intelligence. It runs as an Azure Function (daily timer) and can also be triggered manually or via a VTT file inbox.
+
+The current implementation is the extraction layer. Its target product surface is an **ExCo Governance Cockpit**: a focused Board/ExCo control surface that turns evidence-backed decisions, risks, dependencies, actions, and outcomes into an actionable governance agenda. Broader multi-level organisational hierarchy reporting is explicitly out of scope for this target.
 
 **Inputs:**
 - Microsoft Teams calendar (via Microsoft Graph API)
@@ -238,7 +243,39 @@ Determines meeting classification (CEO/CPO/COO/CMO/CSO/CFO/CTO):
       "NextSteps": ["step1"],
       "RetrievalAnchors": {
         "People": [], "Projects": [], "Products": [], "Systems": [], "Dependencies": []
+      },
+      "Governance": {
+        "ExCoMateriality": "Inform|Monitor|Discuss|Decide|Escalate",
+        "GovernanceStatus": "Open|InReview|AwaitingDecision|Committed|OnTrack|AtRisk|Blocked|Closed|Superseded",
+        "AccountableExecutive": "<CEO|CPO|COO|CMO|CSO|CFO|CTO>",
+        "RequiredExCoIntervention": "<decision, challenge, escalation, or null>",
+        "NextReviewDate": "YYYY-MM-DD",
+        "ReviewCadence": "<weekly|monthly|quarterly|ad-hoc>",
+        "Outcome": {
+          "Intended": "<measurable result>",
+          "SuccessMeasure": "<metric or observable condition>",
+          "Baseline": "<optional starting value>",
+          "Target": "<optional target value>",
+          "TargetDate": "YYYY-MM-DD",
+          "LatestActual": "<optional observed result>",
+          "Confidence": "High|Medium|Low"
+        }
       }
+    }
+  ],
+  "EmergingExecutiveRiskCandidates": [
+    {
+      "SignalId": "<stable candidate identifier>",
+      "ObservationWindow": {"Start": "YYYY-MM-DD", "End": "YYYY-MM-DD"},
+      "ContributingTopicCaseIds": ["<case-id>"],
+      "ContributingEvidenceIds": ["<immutable-evidence-id>"],
+      "ContributingDomainsOrCapabilities": ["<domain-or-capability>"],
+      "DetectionRationale": "<explainable convergence of related risks, blockers, or dependencies>",
+      "Probability": "Low|Medium|High",
+      "Impact": "Low|Medium|High|Critical",
+      "Confidence": "High|Medium|Low",
+      "TriageOwner": "<executive or governance reviewer>",
+      "ReviewState": "Candidate|Confirmed|Dismissed|Split|Escalated"
     }
   ]
 }
@@ -260,6 +297,8 @@ Post-processes raw LLM output:
 - Adds history context (`Get-StalledWork` — detects topic persistence, trajectory shifts)
 - Validates all records (`Validate-TopicRecord` — 13 checks)
 - Rebuilds structured summary with `## TOPIC TRENDS & PERSISTENCE` and `## STALLED WORK DETECTED` sections
+- **Target governance extension:** derives or routes for review the ExCo materiality, accountable executive, intervention required, next review, and outcome fields. These fields must be evidence-backed and are not treated as authoritative until the canonical governance contract and human-review workflow are implemented.
+- **Target risk-signal extension:** detects explainable `EmergingExecutiveRisk` candidates only when related risks, blockers, or dependencies converge across the configured minimum number of live topic cases and domains/capabilities within the configured observation window. It retains all contributing evidence and case links. A candidate cannot be marked material or escalated until human governance review confirms it.
 
 ### Step 5: People Intelligence (`Get-PeopleIntelligence`)
 **Pass 3 LLM call** — structured extraction of per-person attribution:
@@ -566,10 +605,64 @@ DOMAIN: | TOPIC_ID: | CANONICAL_TOPIC: | SIGNAL: | TRAJECTORY:
 Status: PASS (Recovered) | [check results]
 ```
 
-### 9.3 People File (`[id]-People.txt`)
+### 9.3 Canonical ExCo Governance Item (target Topic Memory record)
+
+The SharePoint topic-record format above remains the current output. The canonical Topic Memory implementation will additionally produce an append-only, evidence-backed ExCo governance item when a decision, risk, dependency, action, or outcome is material to Board/ExCo governance.
+
+| Field | Requirement |
+|:---|:---|
+| `governance_item_id` | Stable identifier; never reused. |
+| `item_type` | `Decision`, `Risk`, `Dependency`, `Action`, or `Outcome`. |
+| `topic_case_id` | Required link to the specific live topic case; canonical taxonomy topic alone is insufficient. |
+| `evidence_ids` | One or more immutable evidence anchors, including source locator and source/version hash. |
+| `exco_materiality` | `Inform`, `Monitor`, `Discuss`, `Decide`, or `Escalate`; determines default cockpit visibility. |
+| `governance_status` | `Open`, `InReview`, `AwaitingDecision`, `Committed`, `OnTrack`, `AtRisk`, `Blocked`, `Closed`, or `Superseded`. |
+| `accountable_executive` | Exactly one accountable executive; contributors may be separately recorded. |
+| `required_exco_intervention` | The decision, challenge, escalation, or acknowledgement required; null only for `Inform`. |
+| `review_cadence` and `next_review_date` | Required for every non-closed material item. |
+| `outcome` | For decisions and strategic actions: intended result, success measure, optional baseline/target, target date, latest actual, confidence, and evidence of result. |
+| `history` | Append-only record of extraction, review, correction, status, ownership, and materiality changes. |
+
+A governance item must make clear: why it is material now; what changed since the prior review; who is accountable; what is due next; what evidence supports the reported position; and what ExCo action is required. Fuzzy or semantic matching may propose a topic-case link but must not silently merge cases or establish governance status.
+
+### 9.4 Emerging Executive Risk Signal (target Topic Memory record)
+
+An `EmergingExecutiveRisk` is a reviewable signal candidate, not an automatically authoritative governance fact. It identifies an explainable convergence of related risks, blockers, or dependencies across the configured minimum number of live topic cases and organisational domains/capabilities within a configured observation window.
+
+| Field | Requirement |
+|:---|:---|
+| `signal_id` | Stable identifier; never reused. |
+| `observation_window` | Start and end timestamps used for the convergence assessment. |
+| `contributing_topic_case_ids` and `contributing_evidence_ids` | Required links to every case and immutable evidence item used by the candidate. |
+| `detection_rationale` | Human-readable, explainable account of the observed convergence; unrelated evidence must not be aggregated. |
+| `probability`, `impact`, and `confidence` | Controlled assessments; the extraction method and evidence must support them. |
+| `triage_owner` | Named accountable executive or governance reviewer. |
+| `review_state` | `Candidate`, `Confirmed`, `Dismissed`, `Split`, or `Escalated`; only a human reviewer may move beyond `Candidate`. |
+| `history` | Append-only detection, review, confirmation, dismissal, split, and escalation events. |
+
+The signal acceptance fixture must show that evidence spanning at least two distinct domains/capabilities creates one explainable candidate, unrelated evidence remains separate, and a reviewer can confirm, dismiss, or split the candidate without losing provenance.
+
+### 9.5 ExCo Continuity Brief (target Topic Memory view)
+
+For a departing or newly appointed ExCo member or strategic accountable executive, Topic Memory must generate an evidence-backed continuity brief. The brief must identify material decisions, open assumptions, risks, dependencies, actions, outcomes, governance items, ownership-transfer needs, next review dates, and supporting evidence. It must explicitly distinguish recorded facts from unresolved or low-confidence claims.
+
+The continuity acceptance fixture must allow a reviewer to reconstruct the role's material context and required handover actions from Topic Memory without reliance on the departing person's mailbox or recollection.
+
+### 9.6 ExCo Governance Cockpit (target management surface)
+
+The cockpit is limited to Board/ExCo governance and comprises four connected views:
+
+1. **Executive overview:** material risks, reviewable `EmergingExecutiveRisk` candidates, decisions awaiting authority, stuck actions, deteriorating confidence, and required interventions.
+2. **Decision register:** decision authority, rationale, assumptions, dependencies, evidence, status, and linked outcomes.
+3. **Risk and dependency tracker:** exposure, mitigation, accountable executive, age, next review, escalation status, and drill-down to contributing risk-signal candidates.
+4. **Outcome tracker:** intended outcome, measure, baseline, target, target date, actual result, confidence, and supporting evidence.
+
+It must also provide workflow queues for decisions awaiting authority; incomplete approved decisions; unowned or unmitigated material risks; overdue actions; reviewable risk-signal candidates that require confirmation, dismissal, splitting, or escalation; stale items; missed or unmeasured outcomes; and low-confidence material claims awaiting human review.
+
+### 9.7 People File (`[id]-People.txt`)
 Standard header (MEETING ID, SUBJECT, DATE, PIPELINE_VERSION, TYPE: People Intelligence) followed by per-person structured blocks from LLM output.
 
-### 9.4 Master Log Entry (`master_log.json`)
+### 9.8 Master Log Entry (`master_log.json`)
 ```json
 {
   "MeetingId": "2026-07-15_0400_mandar_peter__channel_meeting",
@@ -609,6 +702,9 @@ Standard header (MEETING ID, SUBJECT, DATE, PIPELINE_VERSION, TYPE: People Intel
 - **Grounding:** Specific facts from transcript present in Topic Records (e.g., "Canada sales uptake", "100 new schools")
 - **Schema:** JSON structure conformance
 - **Retrieval:** Named entity anchor completeness
+- **Governance (target):** Material governance items have evidence anchors, one accountable executive, valid materiality/status, a required intervention where applicable, and a next review date; decisions and strategic actions with outcome commitments include measurable outcome fields.
+- **Emerging Executive Risk (target):** A candidate has a configured observation window, evidence-backed convergence across at least two distinct domains/capabilities, an explainable rationale, probability/impact/confidence, a triage owner, and an append-only review state. Fixtures prove that unrelated evidence is not aggregated and reviewers can confirm, dismiss, or split candidates without losing provenance.
+- **Continuity brief (target):** A fixture proves a reviewer can reconstruct one departing or newly appointed ExCo/strategic-owner role's material context and handover actions from linked Topic Memory evidence, while unresolved or low-confidence claims remain visibly distinguished.
 
 ---
 
@@ -648,6 +744,10 @@ Standard header (MEETING ID, SUBJECT, DATE, PIPELINE_VERSION, TYPE: People Intel
 8. **Retry window is 5 days** by default — meetings from the past 5 days are always re-evaluated (dedup prevents reprocessing of successes).
 9. **Chunking is mandatory** for long transcripts — the LLM's context window is insufficient for full-day meeting transcripts. Map-reduce at 32K chars is the solution.
 10. **Confluence mirror is opt-in** via `pipeline_config.json.enable_confluence_mirror`. It can be disabled without affecting SharePoint output.
+11. **ExCo Governance Cockpit is the target management surface.** It is limited to Board/ExCo control: material decisions, risks, dependencies, actions, and outcomes; organisation-wide hierarchy dashboards are out of scope.
+12. **Governance records are evidence-backed and append-only.** Every material item must retain immutable source evidence and a reviewable history; current status is a materialised view, not a replacement for history.
+13. **Materiality drives attention, not truth.** `Inform`, `Monitor`, `Discuss`, `Decide`, and `Escalate` control cockpit visibility and review priority. Automated extraction can propose these values but human governance review must approve material items.
+14. **Outcomes close the governance loop.** Material decisions and strategic actions require an intended outcome, a success measure, a target date, and evidence of the latest result where available.
 
 ---
 
