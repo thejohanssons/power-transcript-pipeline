@@ -1,5 +1,5 @@
 # EIP Platform — Session State Log
-# Last updated: 2026-07-30 12:14 UTC
+# Last updated: 2026-07-31 08:18 UTC
 # Branch: main
 
 ## Current Git State
@@ -99,6 +99,26 @@ Staging:
   - POST /transcripts → staging D1
   - POST /participants → staging D1
   - POST /files     → staging R2 (NEW — transcript, summary, topic-records, people)
+
+## Session Summary — 2026-07-31 (Graph Transcript Access — Diagnosis + Fix)
+
+### Diagnosed (2026-07-31)
+- Production run showed 403 on all transcript fetches (every meeting except 3 already processed)
+- Root cause: Microsoft tenant-level policy "Graph API access to transcripts is disabled"
+  Error code: GraphAccessToTranscriptsDisabled
+- Confirmed via direct Graph API call — token has correct roles incl. OnlineMeetingTranscript.Read.All
+- Not related to any of our code changes — a tenant admin policy setting
+
+### Fix shipped (2026-07-31, commit 226feba, deploy run 30609261845)
+- Wrapped transcript fetch in targeted try/catch for GraphAccessToTranscriptsDisabled
+- On this error: log [SKIP] warning, continue — NO master log entry written
+- Effect: affected meetings are retried automatically on every subsequent run
+- When tenant admin re-enables policy → all missed meetings process on next run automatically
+
+### Pending (action required by M365 Global Admin)
+- Enable "Graph API access to meeting transcripts" in Teams Admin Center
+  (admin.teams.microsoft.com → Meetings → Meeting policies → Global)
+- Draft sent to Global Admin 2026-07-31 08:03
 
 ## Session Summary — 2026-07-30 (LLM Model Upgrade + Chunk Config Refactor)
 
