@@ -1,0 +1,19 @@
+{
+  "name": "@eip/runtime-shadow",
+  "version": "0.1.0",
+  "description": "Staging-only Cloudflare fixture parity runtime for EIP Azure replacement",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --env staging",
+    "deploy:dry-run": "wrangler deploy --env staging --dry-run",
+    "types": "wrangler types src/env.d.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.118.0"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eip-runtime-shadow",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "env": {
+    "staging": {
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "SHADOW_MODE": "fixture_parity",
+        "AZURE_OPENAI_ENDPOINT": "",
+        "AZURE_OPENAI_DEPLOYMENT": "",
+        "AZURE_OPENAI_API_VERSION": "2024-10-21"
+      },
+      "d1_databases": [
+        {
+          "binding": "SHADOW_DB",
+          "database_name": "eip-runtime-shadow-staging",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "SHADOW_ARTIFACTS",
+          "bucket_name": "eip-runtime-shadow-staging-fixtures"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "FIXTURE_JOBS",
+            "queue": "eip-runtime-shadow-staging-jobs"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "eip-runtime-shadow-staging-jobs",
+            "max_batch_size": 1,
+            "max_batch_timeout": 30,
+            "max_retries": 3
+          }
+        ]
+      }
+    }
+  }
+}

@@ -310,3 +310,86 @@ DELETE /files/{key}             — NEW: delete from R2
   Runtime: PowerShell 7.x
   Trigger: Timer (daily)
 AI assistant session started
+
+## Session Decision — 2026-08-03 (Phase 1 Canonical Topic Memory)
+
+### Approved next action
+- Proceed with a **staging-only operational pilot** for the Phase 1 canonical Topic Memory vertical slice.
+- Azure/SharePoint remains authoritative throughout the pilot. Cloudflare D1/R2 is a secondary, dual-write destination only; no production enablement or authority cutover is approved.
+
+### Completed implementation baseline
+- Phase 1 implementation was completed, locally validated, committed, and pushed in the separate `phase0-contract` worktree/branch at commit `e23eb68` (`feat: add phase 1 canonical topic memory slice`).
+- The increment provides canonical D1 migrations, authenticated `POST /v2/submissions` and receipt retrieval, deterministic Azure envelopes, durable reconciliation records, and the ExCo VAT evidence vertical-slice fixture.
+- Local validation passed: Worker typecheck, fresh SQLite migration application, fixture persistence/idempotency/supersession checks, PowerShell parser validation, and deterministic Azure-envelope validation.
+
+### Staging pilot completed — manual API only
+- Staging D1 migrations `0009_canonical_topic_memory.sql` and `0010_seed_taxonomy_v2.sql` were applied to `eip-platform-staging` only. Migration `0008_topic_summary_variants.sql` had already altered the staging schema, so its missing history entry was reconciled before the canonical migrations were applied.
+- The canonical Worker was deployed to `eip-api-worker-staging` only; the staging health endpoint confirmed D1 connectivity.
+- A staging-only `TOPIC_MEMORY_SUBMISSION_TOKEN` secret was provisioned in the Worker. Its value was supplied to the manual PowerShell client only through that terminal session and was not recorded here.
+- The ExCo VAT fixture (`phase1-exco-vat-2026-07-22-lines-577-596-v1`) was accepted with evidence ID `evidence-exco-vat-2026-07-22-577-596-v1`, two candidate claims, and event ID `e10c4bd0-dbe1-44e5-a9fc-2e0a2f229aab`.
+- Reposting the identical fixture returned the original receipt and event ID, confirming receipt-level idempotency.
+- Authenticated receipt retrieval succeeded. Unauthenticated `GET /v2/submissions/{id}` and unauthenticated `POST /v2/submissions` each returned HTTP `401`.
+
+### Explicitly not approved / not performed
+- No Azure Function app setting, deployment, runtime-configuration, or durable-reconciliation-storage change. The completed test was manual API only.
+- No production D1 migration or Worker deployment.
+- No production secret, app-setting, or runtime-configuration change.
+- No Cloudflare authority cutover.
+- No canonical source-content copy to R2.
+- Do not begin Phase 2 until the successful staging pilot result is reviewed and a separate Azure staging integration decision is approved.
+
+### Decision after pilot review
+- The successful manual API pilot is accepted as the Phase 1 endpoint for now.
+- Do not create or modify Azure staging integration, Azure Function configuration, Azure durable storage, SharePoint processing, production resources, or runtime flags.
+- Do not start Phase 2. Any Azure integration or Phase 2 work requires a new explicit approval.
+
+## Session Summary — 2026-08-03 (Cloudflare Runtime Shadow, Phases A–C)
+
+### Approved scope and boundary
+- The Cloudflare runtime-replacement and parallel-comparison plan was approved for **Phases A–C only**: immutable fixtures, staging-only fixture processing, normalized comparison, and review foundations.
+- Direct Microsoft Graph acquisition, Graph credential/permission changes, SharePoint/Confluence/Teams/Topic Memory/legacy-sync publishing, Azure Function changes, production deployment, and cutover remain explicitly out of scope.
+- Azure remains unchanged and authoritative. No Azure schedule, write path, resource, configuration, or secret was changed.
+
+### Implemented locally (not deployed)
+- Created a new isolated Worker project at `packages/runtime-shadow/`; it does not reuse Phase 1 Worker, D1, R2, Queue, or secrets.
+- Added explicit staging configuration for a future dedicated Queue (`eip-runtime-shadow-staging-jobs`), D1 (`eip-runtime-shadow-staging`), and R2 fixture/comparison bucket (`eip-runtime-shadow-staging-fixtures`).
+- Added versioned fixture-manifest, normalized-output, LLM-adapter, comparison, and reviewer-disposition contracts.
+- Added a direct Azure OpenAI adapter with a secret-only API key expectation; no Azure endpoint, deployment, or secret has been configured.
+- Added fixture validation, expiry and SHA-256 integrity checks, queue dispatch, D1 run reservation/idempotency, retry path, and sanitized metadata-only logging.
+- Added frozen Azure normalized-output and publication-intent verification, severity-band comparison, and R2 output artifacts: Cloudflare normalized output, Cloudflare publication intent, JSON comparison, and Markdown review report.
+- Added D1 migration `packages/runtime-shadow/migrations/0001_shadow_runs.sql` for run state and reviewer disposition storage. It has not been applied locally or remotely.
+
+### User verification completed
+- From `packages/runtime-shadow`, `npm run typecheck` completed successfully with no TypeScript errors.
+- From the same folder, `npx wrangler deploy --env staging --dry-run` completed successfully.
+- The dry run recognized only the intended future staging bindings and ended with `--dry-run: exiting now.` No Worker deployment, Cloudflare resource creation, D1 migration, R2 write, Queue creation, secret creation, or Cloudflare account change occurred.
+
+### Current blockers / next implementation work
+- The D1 database ID in `packages/runtime-shadow/wrangler.jsonc` is deliberately a placeholder; do not deploy this Worker.
+- Dedicated staging resources have not been provisioned; no approved fixture package has been exported; Azure OpenAI non-secret configuration and secret are unset.
+- Remaining A–C work: fixture-export procedure and sample corpus for calendar/VTT inbox/direct VTT; deterministic processing modules; reviewer-disposition API; tests for comparison/hash/idempotency/recovery/no-publisher behavior; local D1 migration verification; safe provisioning/runbook documentation.
+- This project directory is currently untracked in Git. Review and commit the implementation before any future provisioning work.
+
+### Resume guidance
+- A **new task is recommended** when returning. Start it in the same main workspace (`/Users/peter/git-stuff/power-transcript-pipeline`) and reference this section plus `plans/cloudflare-runtime-replacement-parallel-comparison-plan.md`.
+- Suggested new-task instruction: `Continue the approved Cloudflare runtime-shadow Phases A–C only. Read session-log.txt and the parallel-comparison plan first. Do not provision, deploy, access Graph, or add publishing without separate explicit approval.`
+
+## Session Update — 2026-08-03 (Cloudflare Runtime Shadow A–C local foundations)
+
+### Completed locally
+- Added `packages/runtime-shadow/FIXTURE-RUNBOOK.md`, a non-operational fixture and local-validation procedure. It requires manual approval and immutable SHA-256-addressed fixture packages, and explicitly prohibits provisioning, remote access, deployment, Graph activity, Azure changes, and publishing.
+- Added `packages/runtime-shadow/src/fixture-run-lifecycle.ts` to make fixture-run request handling deterministic: a new immutable reservation is created once, queued/processing/completed runs replay without another queue send, and only failed runs recover using the same run ID.
+- Updated `packages/runtime-shadow/src/index.ts` so a failed run can be safely reset to `queued`, clear its error classification, and be re-sent using its original immutable reservation. This remains isolated to the future dedicated shadow D1 and Queue bindings.
+- Expanded `packages/runtime-shadow/src/runtime-shadow.test.ts` from six to eight local tests, adding normalized-output rejection plus idempotency/recovery-state coverage. The test suite continues to assert that no Graph or publisher client is implemented.
+
+### Local validation completed
+- `npm run typecheck` passed.
+- `npm test` passed: 8 tests in 1 file.
+- `npm run deploy:dry-run` passed and ended with `--dry-run: exiting now.`
+- `npx wrangler d1 migrations apply eip-runtime-shadow-staging --local --env staging` was run locally only; a subsequent local migration listing reported no migrations remaining. Wrangler explicitly identified the resource location as local and no `--remote` flag was used.
+- `git diff --check -- packages/runtime-shadow` passed. The shadow project remains untracked; unrelated trailing whitespace in `local-pipeline-output.txt` was not changed.
+
+### Still not performed / requires separate approval
+- No Cloudflare resources, secrets, remote D1/R2/Queue objects, or Worker deployment were created or accessed.
+- No real fixture/transcript was exported or uploaded, Azure OpenAI invocation was made, Graph was accessed, Azure was changed, or publisher was added.
+- Remaining A–C work is limited to approved local design/implementation tasks such as deterministic processing decomposition and any future fixture corpus work after explicit source-data approval.
