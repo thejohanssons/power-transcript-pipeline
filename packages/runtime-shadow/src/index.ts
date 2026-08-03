@@ -4,6 +4,7 @@ import { renderComparisonReport } from './comparison-report';
 import {
   type FixtureJob,
   type FixtureManifest,
+  type NormalizedOutput,
 } from './contracts';
 import {
   isFixtureManifest,
@@ -12,6 +13,7 @@ import {
   isSafeObjectKey,
   stableJson,
 } from './fixture-validation';
+import { buildNormalizationInput } from './fixture-processing';
 import {
   CLAIM_FIXTURE_RUN_PROCESSING_SQL,
   didClaimFixtureRunProcessing,
@@ -63,7 +65,8 @@ function hasUsableAzureOpenAiConfiguration(env: RuntimeEnv): boolean {
     && env.AZURE_OPENAI_API_KEY.length > 0;
 }
 
-function outputPrompt(manifest: FixtureManifest, transcript: string): string {
+function outputPrompt(manifest: FixtureManifest, transcript: string, configurationSnapshot: Record<string, unknown>): string {
+  const input = buildNormalizationInput(manifest, transcript);
   return JSON.stringify({
     task: 'Return only a normalized EIP output JSON object matching schema version 1.0.0.',
     constraints: [
@@ -71,14 +74,15 @@ function outputPrompt(manifest: FixtureManifest, transcript: string): string {
       'Use evidence only from the supplied transcript.',
       'Use null rather than inventing a controlled value.',
       'Preserve source transcript SHA-256 and acquisition mode exactly.',
+      'Treat the supplied configuration snapshot as read-only fixture context.',
     ],
     source: {
-      system: manifest.source.system,
-      nativeId: manifest.source.nativeId,
+      ...input.source,
       transcriptSha256: manifest.transcript.sha256,
-      acquisitionMode: manifest.acquisitionMode,
     },
-    transcript,
+    transcript: input.transcript,
+    configuration: manifest.configuration,
+    configurationSnapshot,
   });
 }
 
@@ -91,10 +95,34 @@ interface ModelResponseCheckpoint {
   responseSha256: string;
 }
 
+function assertOutputMatchesFixtureContract(
+  output: NormalizedOutput,
+  manifest: FixtureManifest,
+  runtime: 'azure' | 'cloudflare',
+): void {
+  const expectedConfigurationHashes = Object.fromEntries(
+    manifest.configuration.map((reference) => [reference.name, reference.sha256]),
+  );
+  if (output.source.system !== manifest.source.system
+    || output.source.nativeId !== manifest.source.nativeId
+    || output.source.acquisitionMode !== manifest.acquisitionMode) {
+    throw new Error(`${runtime} output source does not match immutable fixture manifest`);
+  }
+  if (output.processing.runtime !== runtime
+    || output.processing.pipelineVersion !== manifest.processing.azurePipelineVersion
+    || output.processing.promptVersion !== manifest.processing.promptVersion
+    || output.processing.model !== manifest.processing.model
+    || output.processing.deployment !== manifest.processing.deployment
+    || stableJson(output.processing.configurationHashes) !== stableJson(expectedConfigurationHashes)) {
+    throw new Error(`${runtime} output processing contract does not match immutable fixture manifest`);
+  }
+}
+
 async function loadOrCreateModelResponseCheckpoint(
   job: FixtureJob,
   manifest: FixtureManifest,
   transcript: string,
+  configurationSnapshot: Record<string, unknown>,
   env: RuntimeEnv,
 ): Promise<ModelResponseCheckpoint> {
   const checkpointKey = `runs/${job.runId}/model-response-checkpoint.json`;
@@ -125,7 +153,7 @@ async function loadOrCreateModelResponseCheckpoint(
   const llm = await adapter.invoke({
     correlationId: job.runId,
     systemPrompt: 'You are an evidence-bound EIP normalization engine.',
-    userContent: outputPrompt(manifest, transcript),
+    userContent: outputPrompt(manifest, transcript, configurationSnapshot),
     maxTokens: 16000,
     responseFormat: 'json_object',
     promptVersion: manifest.processing.promptVersion,
@@ -161,7 +189,8 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
   try {
     if (!isSafeObjectKey(manifest.transcript.key, 'fixtures/')
       || !isSafeObjectKey(manifest.azureBaseline.normalizedOutput.key, 'fixtures/')
-      || !isSafeObjectKey(manifest.azureBaseline.publicationIntent.key, 'fixtures/')) {
+      || !isSafeObjectKey(manifest.azureBaseline.publicationIntent.key, 'fixtures/')
+      || !isSafeObjectKey(manifest.configurationSnapshot.key, 'fixtures/')) {
       throw new Error('Fixture manifest references an invalid object key');
     }
     const transcriptObject = await env.SHADOW_ARTIFACTS.get(manifest.transcript.key);
@@ -169,13 +198,23 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
     const transcript = await transcriptObject.text();
     if (await sha256(transcript) !== manifest.transcript.sha256) throw new Error('Fixture transcript hash mismatch');
 
+    const configurationSnapshotObject = await env.SHADOW_ARTIFACTS.get(manifest.configurationSnapshot.key);
+    if (!configurationSnapshotObject) throw new Error('Fixture configuration snapshot does not exist');
+    const configurationSnapshot = await configurationSnapshotObject.text();
+    if (await sha256(configurationSnapshot) !== manifest.configurationSnapshot.sha256) throw new Error('Fixture configuration snapshot hash mismatch');
+    const parsedConfigurationSnapshot = JSON.parse(configurationSnapshot) as unknown;
+    if (!parsedConfigurationSnapshot || typeof parsedConfigurationSnapshot !== 'object' || Array.isArray(parsedConfigurationSnapshot)) {
+      throw new Error('Fixture configuration snapshot does not satisfy schema');
+    }
+
     // Persist the model response before comparison artifacts and D1 completion.
     // A retry after a downstream persistence failure reuses this checkpoint and
     // does not invoke the model again.
-    const llm = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, env);
+    const llm = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, parsedConfigurationSnapshot as Record<string, unknown>, env);
     const cloudflareOutput = JSON.parse(llm.responseText) as unknown;
     if (!isNormalizedOutput(cloudflareOutput)) throw new Error('Cloudflare LLM output does not satisfy normalized output schema');
     if (cloudflareOutput.source.transcriptSha256 !== manifest.transcript.sha256) throw new Error('Cloudflare output transcript hash mismatch');
+    assertOutputMatchesFixtureContract(cloudflareOutput, manifest, 'cloudflare');
 
     const baselineObject = await env.SHADOW_ARTIFACTS.get(manifest.azureBaseline.normalizedOutput.key);
     if (!baselineObject) throw new Error('Azure normalized baseline does not exist');
@@ -183,6 +222,8 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
     if (await sha256(baselineText) !== manifest.azureBaseline.normalizedOutput.sha256) throw new Error('Azure normalized baseline hash mismatch');
     const azureOutput = JSON.parse(baselineText) as unknown;
     if (!isNormalizedOutput(azureOutput)) throw new Error('Azure baseline does not satisfy normalized output schema');
+    if (azureOutput.source.transcriptSha256 !== manifest.transcript.sha256) throw new Error('Azure baseline transcript hash mismatch');
+    assertOutputMatchesFixtureContract(azureOutput, manifest, 'azure');
 
     const publicationIntentObject = await env.SHADOW_ARTIFACTS.get(manifest.azureBaseline.publicationIntent.key);
     if (!publicationIntentObject) throw new Error('Azure publication-intent baseline does not exist');

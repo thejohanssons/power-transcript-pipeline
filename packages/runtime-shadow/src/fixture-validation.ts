@@ -11,6 +11,7 @@ const CLASSIFICATIONS = new Set(['internal', 'confidential']);
 const VALIDATION_STATUSES = new Set(['pass', 'warning', 'fail']);
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const FIXTURE_PREFIX = 'fixtures/';
+const MAX_FIXTURE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function isSafeObjectKey(key: unknown, prefix: string): key is string {
   return typeof key === 'string'
@@ -66,6 +67,7 @@ export function isFixtureManifest(value: unknown): value is FixtureManifest {
     && isObjectReference(manifest.transcript, FIXTURE_PREFIX)
     && isObjectReference(manifest.azureBaseline?.normalizedOutput, FIXTURE_PREFIX)
     && isObjectReference(manifest.azureBaseline?.publicationIntent, FIXTURE_PREFIX)
+    && isObjectReference(manifest.configurationSnapshot, FIXTURE_PREFIX)
     && Array.isArray(manifest.configuration)
     && manifest.configuration.every(isVersionReference)
     && isNonEmptyString(manifest.processing?.azurePipelineVersion)
@@ -76,7 +78,8 @@ export function isFixtureManifest(value: unknown): value is FixtureManifest {
     && isNonEmptyString(manifest.approvedBy)
     && isIsoTimestamp(manifest.approvedAt)
     && isIsoTimestamp(manifest.expiresAt)
-    && expiresAt > approvedAt;
+    && expiresAt > approvedAt
+    && expiresAt <= approvedAt + MAX_FIXTURE_RETENTION_MS;
 }
 
 export function isPublicationIntent(value: unknown): value is PublicationIntent {

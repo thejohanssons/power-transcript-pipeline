@@ -1,6 +1,6 @@
 # Runtime-Shadow Review Checklist
 
-**Review targets:** local commits `597e441` (`feat: add runtime shadow parity foundation`), `d93954a` (`fix: serialize runtime shadow fixture claims`), `6bd4984` (`test: add synthetic runtime shadow integration flow`), and the local review-correction follow-up.
+**Review targets:** local commits `597e441` (`feat: add runtime shadow parity foundation`), `d93954a` (`fix: serialize runtime shadow fixture claims`), `6bd4984` (`test: add synthetic runtime shadow integration flow`), the local review-correction follow-up, and the local A–C readiness follow-up.
 
 ## Scope and non-actions
 
@@ -17,7 +17,9 @@
 
 ## Fixture integrity and processing controls
 
-- [ ] Confirm fixture manifests enforce supported schema, approval/expiry ordering, SHA-256 values, safe `fixtures/` object keys, and frozen Azure baselines.
+- [ ] Confirm fixture manifests enforce supported schema, a maximum 30-day approval/expiry window, SHA-256 values, safe `fixtures/` object keys, frozen Azure baselines, and an immutable configuration snapshot.
+- [ ] Confirm only locally supplied VTT/plain-text fixture content is parsed; no Graph acquisition or publisher behavior exists.
+- [ ] Confirm baseline and Cloudflare outputs match the immutable fixture source, transcript hash, processing contract, and declared configuration hashes before semantic comparison.
 - [ ] Confirm comparison output is normalized and classifies differences as blocking, material, or permitted.
 - [ ] Confirm fixture submission is idempotent: active/completed runs replay, while failed runs recover using the existing immutable run ID.
 - [ ] Confirm a persisted model-response checkpoint is reused after downstream comparison-artifact persistence failure, avoiding a repeat model invocation after that checkpoint exists.
@@ -31,13 +33,13 @@
 
 ## Local evidence
 
-- [ ] Verify the recorded local checks passed: `npm run typecheck`, `npm test` (11 tests, including one synthetic local Worker-flow integration test), `npm run deploy:dry-run`, and local D1 migration apply/list.
+- [ ] Verify the recorded local checks passed: `npm run typecheck`, `npm test` (17 tests, including one synthetic local Worker-flow integration test), `npm run deploy:dry-run`, scoped `git diff --check -- packages/runtime-shadow`, and local D1 migration apply/list.
 - [ ] Verify the dry-run was not a deployment and migration commands did not use `--remote`.
 
 ## Decision
 
 - [ ] Approve the local commit for retention and a future separately authorized push/review.
-- [x] Request changes before any further action.
+- [ ] Request changes before any further action.
 - [x] Require separate operational approval before provisioning, deployment, fixture handling, Azure invocation, Graph work, or publishing.
 
-**Recorded disposition:** The fixture-run recovery race identified in review was corrected locally: conditional D1 transitions grant one processing/recovery claimant, while delayed competing deliveries no-op. The follow-up correction also requires a distinct submission token and persists a model-response checkpoint before comparison artifacts and completion-state writes, so retryable downstream persistence failures reuse the model response. The synthetic local integration test covers authorized and rejected submission, a recovery/delayed-delivery race, checkpoint reuse after a synthetic local R2 failure, completed state, and duplicate-delivery no-op behavior. Neither local commit nor this checklist authorizes a push, provisioning, deployment, real-fixture handling, Azure invocation, Graph work, or publishing.
+**Recorded disposition:** The fixture-run recovery race identified in review was corrected locally: conditional D1 transitions grant one processing/recovery claimant, while delayed competing deliveries no-op. The follow-up correction also requires a distinct submission token and persists a model-response checkpoint before comparison artifacts and completion-state writes, so retryable downstream persistence failures reuse the model response. The local A–C readiness follow-up adds immutable configuration snapshots, bounded fixture retention validation, local VTT/plain-text parsing, output-to-manifest contract checks, and blocking processing-contract comparison. The synthetic local integration test covers authorized and rejected submission, a recovery/delayed-delivery race, checkpoint reuse after a synthetic local R2 failure, completed state, and duplicate-delivery no-op behavior. Neither local commit nor this checklist authorizes a push, provisioning, deployment, real-fixture handling, Azure invocation, Graph work, or publishing.

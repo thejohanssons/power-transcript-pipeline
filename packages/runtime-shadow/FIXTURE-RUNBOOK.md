@@ -92,7 +92,7 @@ Local Wrangler state is stored beneath `.wrangler/` and is ignored by version co
 
 Do not run any command that provisions, accesses, or mutates a remote Cloudflare resource, including commands with `--remote`, deployment commands without `--dry-run`, or secret/resource creation commands. A separate written approval is also required before:
 
-- supplying `AZURE_OPENAI_API_KEY` or `SHADOW_REVIEWER_TOKEN`;
+- supplying `AZURE_OPENAI_API_KEY`, `SHADOW_SUBMISSION_TOKEN`, or `SHADOW_REVIEWER_TOKEN`;
 - uploading an approved fixture package to R2;
 - sending a fixture job to the Queue;
 - invoking Azure OpenAI with a real fixture;

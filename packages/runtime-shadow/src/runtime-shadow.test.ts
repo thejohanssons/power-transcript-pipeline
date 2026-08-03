@@ -11,6 +11,7 @@ import {
   RECOVER_FIXTURE_RUN_SQL,
 } from './fixture-run-lifecycle';
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
+import { buildNormalizationInput, normalizeFixtureSource, parseFixtureTranscript } from './fixture-processing';
 
 const SHA256 = 'a'.repeat(64);
 const publicationIntent = {
@@ -52,9 +53,10 @@ function manifest(overrides: Partial<FixtureManifest> = {}): FixtureManifest {
       normalizedOutput: { key: 'fixtures/fixture-1/hash/baseline/azure-normalized-output.json', sha256: SHA256, bytes: 10, contentType: 'application/json' },
       publicationIntent: { key: 'fixtures/fixture-1/hash/baseline/azure-publication-intent.json', sha256: SHA256, bytes: 10, contentType: 'application/json' },
     },
+    configurationSnapshot: { key: 'fixtures/fixture-1/hash/baseline/config-snapshot.json', sha256: SHA256, bytes: 10, contentType: 'application/json' },
     configuration: [{ name: 'taxonomy', sha256: SHA256 }],
     processing: { azurePipelineVersion: '1', promptVersion: '1', model: 'model', deployment: 'deployment' },
-    classification: 'internal', approvedBy: 'reviewer@example.test', approvedAt: '2026-08-01T00:00:00.000Z', expiresAt: '2026-08-31T00:00:00.000Z',
+    classification: 'internal', approvedBy: 'reviewer@example.test', approvedAt: '2026-08-01T00:00:00.000Z', expiresAt: '2026-08-30T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -64,12 +66,19 @@ describe('fixture contract and integrity guards', () => {
     expect(isFixtureManifest(manifest())).toBe(true);
   });
 
-  it('rejects expired-before-approved manifests and unsafe object keys', () => {
+  it('rejects invalid retention windows and unsafe object keys', () => {
     expect(isFixtureManifest(manifest({ expiresAt: '2026-07-31T00:00:00.000Z' }))).toBe(false);
+    expect(isFixtureManifest(manifest({ expiresAt: '2026-09-01T00:00:00.000Z' }))).toBe(false);
     expect(isSafeObjectKey('fixtures/../secret.json', 'fixtures/')).toBe(false);
     expect(isSafeObjectKey('/fixtures/fixture.json', 'fixtures/')).toBe(false);
     expect(isSafeObjectKey('fixtures/fixture-1/manifest.json', 'fixtures/')).toBe(true);
     expect(isSafeObjectKey('fixtures\\fixture-1\\manifest.json', 'fixtures/')).toBe(false);
+  });
+
+  it('requires a hashed configuration snapshot alongside frozen Azure baselines', () => {
+    const incomplete = manifest() as unknown as Record<string, unknown>;
+    delete incomplete.configurationSnapshot;
+    expect(isFixtureManifest(incomplete)).toBe(false);
   });
 
   it('rejects an incomplete normalized output projection', () => {
@@ -79,6 +88,35 @@ describe('fixture contract and integrity guards', () => {
   });
 });
 
+describe('local fixture processing primitives', () => {
+  it('parses WebVTT cue text without performing source acquisition', () => {
+    expect(parseFixtureTranscript('WEBVTT\n\n1\n00:00.000 --> 00:02.000\nApprove <b>the budget</b>.\n'))
+      .toEqual({ format: 'webvtt', text: 'Approve the budget.', cueCount: 1 });
+  });
+
+  it('excludes multi-line WebVTT metadata blocks and rejects an empty transcript', () => {
+    expect(parseFixtureTranscript('WEBVTT\n\nNOTE internal metadata\nDo not send to the model.\n\n00:00.000 --> 00:02.000\nApproved.\n'))
+      .toEqual({ format: 'webvtt', text: 'Approved.', cueCount: 1 });
+    expect(() => parseFixtureTranscript('  \n\t')).toThrow('Fixture transcript is empty');
+  });
+
+  it('normalizes declared metadata for every supported acquisition mode', () => {
+    for (const acquisitionMode of ['calendar', 'vtt_inbox', 'direct_vtt'] as const) {
+      const fixture = manifest({ acquisitionMode, source: { system: ' Azure Fixture ', nativeId: ' fixture-1 ', organiser: ' OWNER@EXAMPLE.TEST ' } });
+      expect(normalizeFixtureSource(fixture)).toMatchObject({
+        system: 'Azure Fixture', nativeId: 'fixture-1', acquisitionMode, organiser: 'owner@example.test',
+      });
+    }
+  });
+
+  it('builds evidence-only model input from a local immutable fixture', () => {
+    const input = buildNormalizationInput(manifest(), 'A locally supplied transcript.');
+    expect(input).toMatchObject({
+      source: { system: 'azure_fixture_export', acquisitionMode: 'calendar' },
+      transcript: { format: 'plain_text', text: 'A locally supplied transcript.', cueCount: 0 },
+    });
+  });
+});
 
 describe('fixture run idempotency and recovery', () => {
   it('creates new reservations, replays active/completed runs, and recovers only failed runs', () => {
@@ -102,6 +140,15 @@ describe('fixture run idempotency and recovery', () => {
 });
 
 describe('normalized comparison and review workflow', () => {
+  it('treats a frozen processing-contract change as blocking', () => {
+    const cloudflare = output({
+      processing: { ...output().processing, runtime: 'cloudflare', promptVersion: 'unexpected-prompt' },
+    });
+    const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', output(), cloudflare);
+    expect(result.status).toBe('blocked');
+    expect(result.differences).toContainEqual(expect.objectContaining({ path: 'processing', severity: 'blocking' }));
+  });
+
   it('treats a publication-intent change as blocking', () => {
     const cloudflare = output({ processing: { ...output().processing, runtime: 'cloudflare' }, publicationIntent: { ...publicationIntent, confluence: true } });
     const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', output(), cloudflare);

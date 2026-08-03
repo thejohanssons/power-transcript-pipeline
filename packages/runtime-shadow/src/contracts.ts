@@ -42,6 +42,8 @@ export interface FixtureManifest {
     normalizedOutput: ObjectReference;
     publicationIntent: ObjectReference;
   };
+  /** Immutable configuration snapshot used to construct the Azure baseline. */
+  configurationSnapshot: ObjectReference;
   configuration: VersionReference[];
   processing: {
     azurePipelineVersion: string;

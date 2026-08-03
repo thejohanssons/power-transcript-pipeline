@@ -103,6 +103,10 @@ describe('runtime-shadow synthetic local Worker integration', () => {
     const cloudflareOutput = normalizedOutput(transcriptSha256, 'cloudflare');
     const baselineText = JSON.stringify(azureOutput);
     const publicationIntentText = JSON.stringify(publicationIntent);
+    const configurationSnapshotText = JSON.stringify({
+      taxonomy: { version: '1', sha256: 'b'.repeat(64) },
+      processing: { promptVersion: 'synthetic-prompt-1', model: 'synthetic-model', deployment: 'synthetic-deployment' },
+    });
     const manifest: FixtureManifest = {
       schemaVersion: '1.0.0',
       fixtureId,
@@ -129,7 +133,13 @@ describe('runtime-shadow synthetic local Worker integration', () => {
           contentType: 'application/json',
         },
       },
-      configuration: [{ name: 'synthetic-taxonomy', version: '1', sha256: 'b'.repeat(64) }],
+      configurationSnapshot: {
+        key: `${fixtureRoot}/baseline/config-snapshot.json`,
+        sha256: await sha256(configurationSnapshotText),
+        bytes: new TextEncoder().encode(configurationSnapshotText).byteLength,
+        contentType: 'application/json',
+      },
+      configuration: [{ name: 'taxonomy', version: '1', sha256: 'b'.repeat(64) }],
       processing: {
         azurePipelineVersion: 'synthetic-1',
         promptVersion: 'synthetic-prompt-1',
@@ -139,7 +149,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       classification: 'internal',
       approvedBy: 'synthetic-reviewer@example.test',
       approvedAt: '2026-08-01T00:00:00.000Z',
-      expiresAt: '2027-08-01T00:00:00.000Z',
+      expiresAt: '2026-08-30T00:00:00.000Z',
     };
     const manifestText = JSON.stringify(manifest);
     const manifestKey = `${fixtureRoot}/manifest.json`;
@@ -148,6 +158,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
     r2.objects.set(manifest.transcript.key, transcript);
     r2.objects.set(manifest.azureBaseline.normalizedOutput.key, baselineText);
     r2.objects.set(manifest.azureBaseline.publicationIntent.key, publicationIntentText);
+    r2.objects.set(manifest.configurationSnapshot.key, configurationSnapshotText);
 
     const d1 = new LocalD1();
     const queuedJobs: FixtureJob[] = [];

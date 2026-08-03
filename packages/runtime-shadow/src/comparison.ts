@@ -70,6 +70,23 @@ export function compareNormalizedOutputs(
   if (azure.schemaVersion !== cloudflare.schemaVersion) {
     differences.push(difference('schemaVersion', 'blocking', 'Normalized output schema differs', azure.schemaVersion, cloudflare.schemaVersion));
   }
+  const azureProcessingContract = {
+    pipelineVersion: azure.processing.pipelineVersion,
+    promptVersion: azure.processing.promptVersion,
+    model: azure.processing.model,
+    deployment: azure.processing.deployment,
+    configurationHashes: azure.processing.configurationHashes,
+  };
+  const cloudflareProcessingContract = {
+    pipelineVersion: cloudflare.processing.pipelineVersion,
+    promptVersion: cloudflare.processing.promptVersion,
+    model: cloudflare.processing.model,
+    deployment: cloudflare.processing.deployment,
+    configurationHashes: cloudflare.processing.configurationHashes,
+  };
+  if (!equal(azureProcessingContract, cloudflareProcessingContract)) {
+    differences.push(difference('processing', 'blocking', 'Pipeline, prompt, model, deployment, or configuration contract differs', azureProcessingContract, cloudflareProcessingContract));
+  }
   if (!equal(azure.publicationIntent, cloudflare.publicationIntent)) {
     differences.push(...comparePublicationIntent(azure.publicationIntent, cloudflare.publicationIntent));
   }
