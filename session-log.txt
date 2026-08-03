@@ -393,3 +393,25 @@ AI assistant session started
 - No Cloudflare resources, secrets, remote D1/R2/Queue objects, or Worker deployment were created or accessed.
 - No real fixture/transcript was exported or uploaded, Azure OpenAI invocation was made, Graph was accessed, Azure was changed, or publisher was added.
 - Remaining A–C work is limited to approved local design/implementation tasks such as deterministic processing decomposition and any future fixture corpus work after explicit source-data approval.
+
+## Session Update — 2026-08-03 (Runtime Shadow A–C local completion and GitHub backup)
+
+### Local A–C readiness completed
+- The local-only runtime-shadow A–C implementation is complete and committed in the following `main` history: `597e441` (parity foundation), `d93954a` (serialized fixture claims), `6bd4984` (synthetic Worker integration flow), `18618e8` (submission and checkpoint hardening), and `60e56d8` (A–C readiness completion).
+- Final local validation passed: `npm run typecheck`, `npm test` (17 tests: 16 unit and 1 synthetic integration), `npm run deploy:dry-run`, and `git diff --check -- packages/runtime-shadow`.
+- Fixture contracts now require immutable input, Azure normalized-output and publication-intent baselines, and a non-secret configuration snapshot. The local processor safely parses supplied WebVTT or plain text only; it does not acquire source data.
+- Integrity controls enforce the fixture source identity, transcript SHA-256, pipeline/prompt/model/deployment identity, and declared configuration hashes before comparison. Processing-contract drift is a blocking difference.
+- The synthetic integration flow covers submission authorization, delayed Queue delivery versus recovery, durable model-response checkpoint reuse after a downstream artifact failure, successful completion, and duplicate-delivery no-op behavior.
+
+### Operational boundary and next authorization
+- The next separately authorized operational phase is A–C fixture-parity staging: provision isolated staging resources, handle specifically approved fixture packages, configure staging-only secrets, deploy the staging Worker, and run non-publishing comparisons against frozen Azure baselines.
+- That future staging exercise excludes direct Microsoft Graph access, publisher modules, SharePoint/Confluence/Teams/Topic Memory/legacy-sync writes, Azure runtime changes, production traffic, and cutover.
+- Phase D (read-only direct Graph shadow) and Phase E (publisher readiness/cutover) each require separate explicit approval after the A–C operational gate is met.
+
+### Git backup handoff
+- `session-log.txt` is tracked. This update should be committed by itself, without staging unrelated local work.
+- Before this update, local `main` was ahead of `origin/main` by the five runtime-shadow commits listed above. Push the committed `main` history to GitHub only; the unrelated modified/untracked files must remain local and uncommitted.
+
+### Resume guidance
+- Start a new task in this workspace with the current session log and `plans/cloudflare-runtime-replacement-parallel-comparison-plan.md` as context.
+- Suggested instruction: `Review the completed local runtime-shadow A–C readiness and propose the separately authorized fixture-parity staging plan. Do not provision, deploy, handle real fixtures, access Graph, or add publishing until explicitly approved.`
