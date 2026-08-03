@@ -12,7 +12,13 @@ import {
   isSafeObjectKey,
   stableJson,
 } from './fixture-validation';
-import { fixtureRunRequestAction } from './fixture-run-lifecycle';
+import {
+  CLAIM_FIXTURE_RUN_PROCESSING_SQL,
+  didClaimFixtureRunProcessing,
+  fixtureRunRequestAction,
+  MARK_QUEUE_SUBMISSION_FAILED_SQL,
+  RECOVER_FIXTURE_RUN_SQL,
+} from './fixture-run-lifecycle';
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
 
 const RUNTIME_VERSION = '1.0.0';
@@ -79,18 +85,14 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
   const { manifest, manifestSha256 } = await loadFixture(env, job.manifestKey);
   if (manifest.fixtureId !== job.fixtureId || manifestSha256 !== job.manifestSha256) throw new Error('Queue job does not match immutable fixture manifest');
 
-  const existing = await env.SHADOW_DB.prepare(
-    'SELECT run_id, state FROM fixture_runs WHERE fixture_id = ? AND manifest_sha256 = ? AND runtime_version = ?',
-  ).bind(manifest.fixtureId, manifestSha256, RUNTIME_VERSION).first<{ run_id: string; state: string }>();
-  if (!existing || existing.run_id !== job.runId) {
-    log('fixture_run_duplicate', { fixtureId: manifest.fixtureId, runId: existing?.run_id ?? 'missing_reservation' });
+  // Claim only a queued reservation. The conditional transition is the
+  // concurrency boundary between a recovered job and any delayed queue retry.
+  const claim = await env.SHADOW_DB.prepare(CLAIM_FIXTURE_RUN_PROCESSING_SQL)
+    .bind(new Date().toISOString(), job.runId, manifest.fixtureId, manifestSha256, RUNTIME_VERSION).run();
+  if (!didClaimFixtureRunProcessing(claim.meta.changes)) {
+    log('fixture_run_unclaimed', { fixtureId: manifest.fixtureId, runId: job.runId });
     return;
   }
-  if (existing.state === 'completed') return;
-
-  await env.SHADOW_DB.prepare(
-    'UPDATE fixture_runs SET state = ?, updated_at = ? WHERE run_id = ?',
-  ).bind('processing', new Date().toISOString(), job.runId).run();
 
   try {
     if (!isSafeObjectKey(manifest.transcript.key, 'fixtures/')
@@ -208,8 +210,18 @@ export default {
         ? { fixtureId: manifest.fixtureId, manifestKey: body.manifestKey, manifestSha256, runId: existing.run_id }
         : { fixtureId: manifest.fixtureId, manifestKey: body.manifestKey, manifestSha256, runId: crypto.randomUUID() };
       if (action === 'recover') {
-        await env.SHADOW_DB.prepare('UPDATE fixture_runs SET state = ?, error_class = NULL, updated_at = ? WHERE run_id = ?')
-          .bind('queued', now, job.runId).run();
+        // Do not overwrite a concurrent Queue retry that already claimed this
+        // failed reservation. Only the caller that performs this transition
+        // owns the recovered queue submission.
+        const recovery = await env.SHADOW_DB.prepare(RECOVER_FIXTURE_RUN_SQL)
+          .bind(now, job.runId).run();
+        if (!didClaimFixtureRunProcessing(recovery.meta.changes)) {
+          const replay = await env.SHADOW_DB.prepare(
+            'SELECT run_id, state FROM fixture_runs WHERE fixture_id = ? AND manifest_sha256 = ? AND runtime_version = ?',
+          ).bind(manifest.fixtureId, manifestSha256, RUNTIME_VERSION).first<{ run_id: string; state: string }>();
+          if (replay) return json({ runId: replay.run_id, state: replay.state, replayed: true });
+          throw new Error('Unable to recover fixture run');
+        }
       } else {
         try {
           await env.SHADOW_DB.prepare(
@@ -226,8 +238,8 @@ export default {
       try {
         await env.FIXTURE_JOBS.send(job);
       } catch {
-        await env.SHADOW_DB.prepare('UPDATE fixture_runs SET state = ?, error_class = ?, updated_at = ? WHERE run_id = ?')
-          .bind('failed', 'queue_submission_failed', new Date().toISOString(), job.runId).run();
+        await env.SHADOW_DB.prepare(MARK_QUEUE_SUBMISSION_FAILED_SQL)
+          .bind('queue_submission_failed', new Date().toISOString(), job.runId).run();
         throw new Error('Unable to queue fixture run');
       }
       return json({ runId: job.runId, state: 'queued', replayed: false, recovered: action === 'recover' }, 202);

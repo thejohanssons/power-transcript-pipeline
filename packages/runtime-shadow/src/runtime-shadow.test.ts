@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { compareNormalizedOutputs } from './comparison';
 import type { FixtureManifest, NormalizedOutput } from './contracts';
 import { isFixtureManifest, isNormalizedOutput, isSafeObjectKey } from './fixture-validation';
-import { fixtureRunRequestAction } from './fixture-run-lifecycle';
+import {
+  CLAIM_FIXTURE_RUN_PROCESSING_SQL,
+  didClaimFixtureRunProcessing,
+  fixtureRunRequestAction,
+  MARK_QUEUE_SUBMISSION_FAILED_SQL,
+  RECOVER_FIXTURE_RUN_SQL,
+} from './fixture-run-lifecycle';
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
 
 const SHA256 = 'a'.repeat(64);
@@ -81,6 +87,17 @@ describe('fixture run idempotency and recovery', () => {
     expect(fixtureRunRequestAction('processing')).toBe('replay');
     expect(fixtureRunRequestAction('completed')).toBe('replay');
     expect(fixtureRunRequestAction('failed')).toBe('recover');
+  });
+
+  it('allows only one atomic retry or recovered delivery to claim processing', () => {
+    // A Queue retry may reclaim a failed run, while a recovery request first
+    // re-queues it. In either case, only one conditional update can change it.
+    expect(CLAIM_FIXTURE_RUN_PROCESSING_SQL).toContain("state IN ('queued', 'failed')");
+    expect(RECOVER_FIXTURE_RUN_SQL).toContain("state = 'failed'");
+    expect(MARK_QUEUE_SUBMISSION_FAILED_SQL).toContain("state = 'queued'");
+    expect(didClaimFixtureRunProcessing(1)).toBe(true);
+    expect(didClaimFixtureRunProcessing(0)).toBe(false);
+    expect(didClaimFixtureRunProcessing(2)).toBe(false);
   });
 });
 
