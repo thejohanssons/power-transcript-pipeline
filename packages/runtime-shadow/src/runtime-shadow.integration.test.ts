@@ -76,6 +76,7 @@ class LocalD1 {
 
 class LocalR2 {
   readonly objects = new Map<string, string>();
+  failNextPutFor: string | undefined;
 
   async get(key: string) {
     const value = this.objects.get(key);
@@ -83,6 +84,10 @@ class LocalR2 {
   }
 
   async put(key: string, value: string): Promise<void> {
+    if (key === this.failNextPutFor) {
+      this.failNextPutFor = undefined;
+      throw new Error(`Synthetic local R2 failure for ${key}`);
+    }
     this.objects.set(key, value);
   }
 }
@@ -92,7 +97,7 @@ afterEach(() => {
 });
 
 describe('runtime-shadow synthetic local Worker integration', () => {
-  it('runs a synthetic fixture request through local D1, Queue, R2, and a stubbed model response exactly once', async () => {
+  it('authorizes submission, serializes recovery against a delayed delivery, and reuses a checkpoint after artifact persistence failure', async () => {
     const transcriptSha256 = await sha256(transcript);
     const azureOutput = normalizedOutput(transcriptSha256, 'azure');
     const cloudflareOutput = normalizedOutput(transcriptSha256, 'cloudflare');
@@ -163,16 +168,17 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       AZURE_OPENAI_DEPLOYMENT: 'synthetic-deployment',
       AZURE_OPENAI_API_VERSION: '2024-10-21',
       AZURE_OPENAI_API_KEY: 'synthetic-local-key',
+      SHADOW_SUBMISSION_TOKEN: 'synthetic-submission-token',
       SHADOW_REVIEWER_TOKEN: 'synthetic-review-token',
       SHADOW_DB: d1,
       SHADOW_ARTIFACTS: r2,
       FIXTURE_JOBS: { send: async (job: FixtureJob) => { queuedJobs.push(job); } },
-    } as unknown as Cloudflare.StagingEnv & { AZURE_OPENAI_API_KEY: string; SHADOW_REVIEWER_TOKEN: string };
+    } as unknown as Cloudflare.StagingEnv & { AZURE_OPENAI_API_KEY: string; SHADOW_SUBMISSION_TOKEN: string; SHADOW_REVIEWER_TOKEN: string };
 
     try {
       const submission = await worker.fetch(new Request('https://worker.local/v1/fixture-runs', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', authorization: 'Bearer synthetic-submission-token' },
         body: JSON.stringify({ manifestKey }),
       }), env);
       expect(submission.status).toBe(202);
@@ -180,15 +186,45 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       expect(submissionBody).toMatchObject({ state: 'queued', replayed: false });
       expect(queuedJobs).toHaveLength(1);
 
-      const delivery = { body: queuedJobs[0], ack: vi.fn(), retry: vi.fn() };
-      await worker.queue({ messages: [delivery] } as unknown as MessageBatch<FixtureJob>, env);
-      expect(delivery.ack).toHaveBeenCalledOnce();
-      expect(delivery.retry).not.toHaveBeenCalled();
+      const rejectedSubmission = await worker.fetch(new Request('https://worker.local/v1/fixture-runs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ manifestKey }),
+      }), env);
+      expect(rejectedSubmission.status).toBe(401);
+
+      // Model a failed attempt followed by a recovery submission racing the
+      // delayed original Queue delivery. Whichever caller wins the conditional
+      // D1 transition owns processing; the other no-ops/replays.
+      await d1.prepare("UPDATE fixture_runs SET state = 'failed' WHERE run_id = ?")
+        .bind(submissionBody.runId).run();
+      r2.failNextPutFor = `runs/${submissionBody.runId}/cloudflare-normalized-output.json`;
+      const delayedDelivery = { body: queuedJobs[0], ack: vi.fn(), retry: vi.fn() };
+      const recovery = worker.fetch(new Request('https://worker.local/v1/fixture-runs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer synthetic-submission-token' },
+        body: JSON.stringify({ manifestKey }),
+      }), env);
+      await Promise.all([
+        recovery,
+        worker.queue({ messages: [delayedDelivery] } as unknown as MessageBatch<FixtureJob>, env),
+      ]);
+      expect([200, 202]).toContain((await recovery).status);
+      expect(delayedDelivery.ack.mock.calls.length + delayedDelivery.retry.mock.calls.length).toBe(1);
+      expect(fetchStub).toHaveBeenCalledOnce();
+
+      // Any recovered queue job and the retry after the synthetic R2 failure
+      // reuse the persisted model result rather than call the adapter again.
+      for (const job of queuedJobs) {
+        const delivery = { body: job, ack: vi.fn(), retry: vi.fn() };
+        await worker.queue({ messages: [delivery] } as unknown as MessageBatch<FixtureJob>, env);
+      }
       expect(fetchStub).toHaveBeenCalledOnce();
 
       const run = await d1.prepare('SELECT state, comparison_status FROM fixture_runs WHERE run_id = ?')
         .bind(submissionBody.runId).first<{ state: string; comparison_status: string }>();
       expect(run).toEqual({ state: 'completed', comparison_status: 'pass' });
+      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoint.json`)).toContain('"responseSha256"');
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-normalized-output.json`)).toBe(JSON.stringify(cloudflareOutput));
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-publication-intent.json`)).toBe(JSON.stringify(publicationIntent));
       expect(r2.objects.get(`runs/${submissionBody.runId}/comparison.json`)).toContain('"status":"pass"');

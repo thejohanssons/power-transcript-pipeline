@@ -26,6 +26,8 @@ const RUNTIME_VERSION = '1.0.0';
 type RuntimeEnv = Cloudflare.StagingEnv & {
   /** Set only with `wrangler secret put AZURE_OPENAI_API_KEY --env staging`. */
   AZURE_OPENAI_API_KEY: string;
+  /** Set only with `wrangler secret put SHADOW_SUBMISSION_TOKEN --env staging`. */
+  SHADOW_SUBMISSION_TOKEN: string;
   /** Set only with `wrangler secret put SHADOW_REVIEWER_TOKEN --env staging`. */
   SHADOW_REVIEWER_TOKEN: string;
 };
@@ -80,6 +82,68 @@ function outputPrompt(manifest: FixtureManifest, transcript: string): string {
   });
 }
 
+interface ModelResponseCheckpoint {
+  responseText: string;
+  provider: 'azure_openai' | 'workers_ai';
+  model: string;
+  deployment: string;
+  requestSha256: string;
+  responseSha256: string;
+}
+
+async function loadOrCreateModelResponseCheckpoint(
+  job: FixtureJob,
+  manifest: FixtureManifest,
+  transcript: string,
+  env: RuntimeEnv,
+): Promise<ModelResponseCheckpoint> {
+  const checkpointKey = `runs/${job.runId}/model-response-checkpoint.json`;
+  const checkpointObject = await env.SHADOW_ARTIFACTS.get(checkpointKey);
+  if (checkpointObject) {
+    const checkpoint = JSON.parse(await checkpointObject.text()) as ModelResponseCheckpoint;
+    if (typeof checkpoint.responseText !== 'string'
+      || typeof checkpoint.provider !== 'string'
+      || typeof checkpoint.model !== 'string'
+      || typeof checkpoint.deployment !== 'string'
+      || typeof checkpoint.requestSha256 !== 'string'
+      || typeof checkpoint.responseSha256 !== 'string') {
+      throw new Error('Model response checkpoint is invalid');
+    }
+    if (await sha256(checkpoint.responseText) !== checkpoint.responseSha256) {
+      throw new Error('Model response checkpoint hash mismatch');
+    }
+    return checkpoint;
+  }
+
+  if (!hasUsableAzureOpenAiConfiguration(env)) throw new Error('Azure OpenAI staging configuration is incomplete');
+  const adapter = new AzureOpenAiAdapter({
+    endpoint: env.AZURE_OPENAI_ENDPOINT,
+    deployment: env.AZURE_OPENAI_DEPLOYMENT,
+    apiVersion: env.AZURE_OPENAI_API_VERSION,
+    apiKey: env.AZURE_OPENAI_API_KEY,
+  });
+  const llm = await adapter.invoke({
+    correlationId: job.runId,
+    systemPrompt: 'You are an evidence-bound EIP normalization engine.',
+    userContent: outputPrompt(manifest, transcript),
+    maxTokens: 16000,
+    responseFormat: 'json_object',
+    promptVersion: manifest.processing.promptVersion,
+  });
+  const checkpoint: ModelResponseCheckpoint = {
+    responseText: llm.responseText,
+    provider: llm.provider,
+    model: llm.model,
+    deployment: llm.deployment,
+    requestSha256: llm.requestSha256,
+    responseSha256: llm.responseSha256,
+  };
+  await env.SHADOW_ARTIFACTS.put(checkpointKey, JSON.stringify(checkpoint), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return checkpoint;
+}
+
 async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
   if (!isSafeObjectKey(job.manifestKey, 'fixtures/')) throw new Error('Queue job references an invalid fixture key');
   const { manifest, manifestSha256 } = await loadFixture(env, job.manifestKey);
@@ -105,21 +169,10 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
     const transcript = await transcriptObject.text();
     if (await sha256(transcript) !== manifest.transcript.sha256) throw new Error('Fixture transcript hash mismatch');
 
-    if (!hasUsableAzureOpenAiConfiguration(env)) throw new Error('Azure OpenAI staging configuration is incomplete');
-    const adapter = new AzureOpenAiAdapter({
-      endpoint: env.AZURE_OPENAI_ENDPOINT,
-      deployment: env.AZURE_OPENAI_DEPLOYMENT,
-      apiVersion: env.AZURE_OPENAI_API_VERSION,
-      apiKey: env.AZURE_OPENAI_API_KEY,
-    });
-    const llm = await adapter.invoke({
-      correlationId: job.runId,
-      systemPrompt: 'You are an evidence-bound EIP normalization engine.',
-      userContent: outputPrompt(manifest, transcript),
-      maxTokens: 16000,
-      responseFormat: 'json_object',
-      promptVersion: manifest.processing.promptVersion,
-    });
+    // Persist the model response before comparison artifacts and D1 completion.
+    // A retry after a downstream persistence failure reuses this checkpoint and
+    // does not invoke the model again.
+    const llm = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, env);
     const cloudflareOutput = JSON.parse(llm.responseText) as unknown;
     if (!isNormalizedOutput(cloudflareOutput)) throw new Error('Cloudflare LLM output does not satisfy normalized output schema');
     if (cloudflareOutput.source.transcriptSha256 !== manifest.transcript.sha256) throw new Error('Cloudflare output transcript hash mismatch');
@@ -195,6 +248,7 @@ export default {
     }
 
     if (request.method !== 'POST' || url.pathname !== '/v1/fixture-runs') return json({ error: 'Not found' }, 404);
+    if (!await hasMatchingReviewerToken(request, env.SHADOW_SUBMISSION_TOKEN)) return json({ error: 'Unauthorized' }, 401);
     try {
       const body = await request.json() as { manifestKey?: string };
       if (!body.manifestKey || !isSafeObjectKey(body.manifestKey, 'fixtures/')) return json({ error: 'manifestKey must be a safe key under fixtures/' }, 400);

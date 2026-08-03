@@ -1,6 +1,6 @@
 # Runtime-Shadow Review Checklist
 
-**Review targets:** local commits `597e441` (`feat: add runtime shadow parity foundation`) and `d93954a` (`fix: serialize runtime shadow fixture claims`), plus the local synthetic integration-test addition.
+**Review targets:** local commits `597e441` (`feat: add runtime shadow parity foundation`), `d93954a` (`fix: serialize runtime shadow fixture claims`), `6bd4984` (`test: add synthetic runtime shadow integration flow`), and the local review-correction follow-up.
 
 ## Scope and non-actions
 
@@ -12,13 +12,16 @@
 
 - [ ] Confirm `wrangler.jsonc` names only dedicated future staging resources and does not reuse Phase 1 or production resources.
 - [ ] Confirm the all-zero D1 database ID is an intentional placeholder, not a deployable resource identifier.
-- [ ] Confirm no credentials, endpoint values, or reviewer tokens are committed.
+- [ ] Confirm no credentials, endpoint values, submission tokens, or reviewer tokens are committed.
+- [ ] Confirm fixture-run submission requires a distinct authorized bearer token before it can enqueue model work.
 
 ## Fixture integrity and processing controls
 
 - [ ] Confirm fixture manifests enforce supported schema, approval/expiry ordering, SHA-256 values, safe `fixtures/` object keys, and frozen Azure baselines.
 - [ ] Confirm comparison output is normalized and classifies differences as blocking, material, or permitted.
 - [ ] Confirm fixture submission is idempotent: active/completed runs replay, while failed runs recover using the existing immutable run ID.
+- [ ] Confirm a persisted model-response checkpoint is reused after downstream comparison-artifact persistence failure, avoiding a repeat model invocation after that checkpoint exists.
+- [ ] Confirm local coverage races failed-run recovery against a delayed delivery and verifies that only one claimant processes the run.
 
 ## Review and publication boundaries
 
@@ -37,4 +40,4 @@
 - [x] Request changes before any further action.
 - [x] Require separate operational approval before provisioning, deployment, fixture handling, Azure invocation, Graph work, or publishing.
 
-**Recorded disposition:** The fixture-run recovery race identified in review was corrected and committed locally in `d93954a`: conditional D1 transitions grant one processing/recovery claimant, while delayed competing deliveries no-op. The synthetic local integration test verifies request submission, local D1 reservation, local queue delivery, in-memory R2 artifacts, a stubbed non-network model response, completed state, and duplicate-delivery no-op behavior. Local typecheck, 11 tests, and Worker dry-run pass. Neither local commit nor this checklist authorizes a push, provisioning, deployment, real-fixture handling, Azure invocation, Graph work, or publishing.
+**Recorded disposition:** The fixture-run recovery race identified in review was corrected locally: conditional D1 transitions grant one processing/recovery claimant, while delayed competing deliveries no-op. The follow-up correction also requires a distinct submission token and persists a model-response checkpoint before comparison artifacts and completion-state writes, so retryable downstream persistence failures reuse the model response. The synthetic local integration test covers authorized and rejected submission, a recovery/delayed-delivery race, checkpoint reuse after a synthetic local R2 failure, completed state, and duplicate-delivery no-op behavior. Neither local commit nor this checklist authorizes a push, provisioning, deployment, real-fixture handling, Azure invocation, Graph work, or publishing.
