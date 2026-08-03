@@ -152,3 +152,49 @@ export interface PostParticipantsBatchBody {
   }>;
   source?: string;
 }
+
+export type ContextType =
+  | 'Discussion' | 'Update' | 'Decision' | 'Agreement' | 'Proposal'
+  | 'Concern' | 'Commitment' | 'Observation' | 'Assumption';
+
+export type Category =
+  | 'Risk' | 'Issue' | 'Action' | 'Decision' | 'Progress'
+  | 'Opportunity' | 'Dependency' | 'Strategy' | 'Insight' | 'Assumption';
+
+export interface CanonicalClaimCandidate {
+  // The Azure producer MUST retain this stable identity for retries and reconciliation.
+  claim_id: string;
+  case_id: string;
+  case_title: string;
+  lifecycle_state?: 'Open' | 'Monitoring' | 'Resolved' | 'Closed' | 'Superseded';
+  context_type: ContextType;
+  topic_id?: string;
+  category: Category;
+  classification_status: 'Candidate' | 'Reviewed' | 'Rejected' | 'Unclassified';
+  claim_text: string;
+  confidence: number;
+  provenance?: Record<string, unknown>;
+}
+
+export interface PostCanonicalSubmissionBody {
+  submission_id: string;
+  contract_version: '2.0.0';
+  taxonomy_version: string;
+  extraction_run_id: string;
+  evidence: {
+    // The Azure producer MUST retain this stable identity for retries and reconciliation.
+    evidence_id: string;
+    source_system: string;
+    source_native_id: string;
+    source_locator: string;
+    occurred_at: string;
+    content_hash: string;
+    source_version: string;
+    confidence: number;
+    access_classification: string;
+    r2_key?: string;
+    source_metadata?: Record<string, unknown>;
+    supersedes_evidence_id?: string;
+  };
+  claims: CanonicalClaimCandidate[];
+}

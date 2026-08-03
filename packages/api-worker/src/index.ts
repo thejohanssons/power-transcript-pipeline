@@ -24,13 +24,14 @@
 import { findFuzzyMatches } from './fuzzy';
 import type {
   Topic, PostTopicBody, PostTranscriptBody, PatchQueueBody, PostSessionBody,
-  PostParticipantsBatchBody
+  PostParticipantsBatchBody, PostCanonicalSubmissionBody
 } from './types';
 
 export interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   ENVIRONMENT: string;
+  TOPIC_MEMORY_SUBMISSION_TOKEN?: string;
 }
 
 const CORS_HEADERS = {
@@ -99,6 +100,14 @@ export default {
       }
       if (path.match(/^\/topics\/[^/]+\/occurrences$/) && method === 'GET') {
         return handleGetOccurrences(env, path.split('/')[2]);
+      }
+
+      // --- Canonical Topic Memory v2 ---
+      if (path === '/v2/submissions' && method === 'POST') {
+        return handlePostCanonicalSubmission(env, request);
+      }
+      if (path.match(/^\/v2\/submissions\/[^/]+$/) && method === 'GET') {
+        return handleGetCanonicalSubmission(env, request, decodeURIComponent(path.split('/')[3]));
       }
 
       // --- Transcripts ---
@@ -176,6 +185,194 @@ async function handleHealth(env: Env): Promise<Response> {
     db: dbCheck?.ok === 1 ? 'connected' : 'error',
     timestamp: now(),
   });
+}
+
+// ---------------------------------------------------------------
+// Canonical Topic Memory v2 — Azure submission boundary
+// ---------------------------------------------------------------
+const CONTEXT_TYPES = new Set([
+  'Discussion', 'Update', 'Decision', 'Agreement', 'Proposal',
+  'Concern', 'Commitment', 'Observation', 'Assumption',
+]);
+const CATEGORIES = new Set([
+  'Risk', 'Issue', 'Action', 'Decision', 'Progress',
+  'Opportunity', 'Dependency', 'Strategy', 'Insight', 'Assumption',
+]);
+const CLASSIFICATION_STATUSES = new Set(['Candidate', 'Reviewed', 'Rejected', 'Unclassified']);
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+async function isAuthorisedSubmission(request: Request, env: Env): Promise<boolean> {
+  const expectedToken = env.TOPIC_MEMORY_SUBMISSION_TOKEN;
+  const authorisation = request.headers.get('Authorization');
+  if (!expectedToken || !authorisation?.startsWith('Bearer ')) return false;
+
+  const suppliedBytes = new TextEncoder().encode(authorisation.slice('Bearer '.length));
+  const expectedBytes = new TextEncoder().encode(expectedToken);
+  return suppliedBytes.byteLength === expectedBytes.byteLength &&
+    crypto.subtle.timingSafeEqual(suppliedBytes, expectedBytes);
+}
+
+function validIso8601(value: unknown): value is string {
+  return isNonEmptyString(value) && !Number.isNaN(Date.parse(value));
+}
+
+async function handlePostCanonicalSubmission(env: Env, request: Request): Promise<Response> {
+  if (!await isAuthorisedSubmission(request, env)) return errorResponse('Unauthorised', 401);
+
+  let body: PostCanonicalSubmissionBody;
+  try {
+    body = await request.json() as PostCanonicalSubmissionBody;
+  } catch {
+    return errorResponse('Request body must be valid JSON', 400);
+  }
+
+  const evidence = body.evidence;
+  if (!isNonEmptyString(body.submission_id) || body.contract_version !== '2.0.0' ||
+      !isNonEmptyString(body.taxonomy_version) || !isNonEmptyString(body.extraction_run_id) ||
+      !evidence || !Array.isArray(body.claims) || body.claims.length === 0) {
+    return errorResponse('Invalid canonical submission envelope', 400);
+  }
+  if (!isNonEmptyString(evidence.evidence_id) || !isNonEmptyString(evidence.source_system) ||
+      !isNonEmptyString(evidence.source_native_id) || !isNonEmptyString(evidence.source_locator) ||
+      !isNonEmptyString(evidence.content_hash) || !isNonEmptyString(evidence.source_version) ||
+      !isNonEmptyString(evidence.access_classification) || !validIso8601(evidence.occurred_at) ||
+      typeof evidence.confidence !== 'number' || evidence.confidence < 0 || evidence.confidence > 1) {
+    return errorResponse('Invalid required evidence anchors', 400);
+  }
+
+  const existingReceipt = await env.DB.prepare(
+    'SELECT response_json FROM submission_receipts WHERE submission_id = ?'
+  ).bind(body.submission_id).first<{ response_json: string }>();
+  if (existingReceipt) return jsonResponse(JSON.parse(existingReceipt.response_json), 200);
+
+  for (const claim of body.claims) {
+    const isUnclassified = claim.classification_status === 'Unclassified';
+    if (!isNonEmptyString(claim.claim_id) || !isNonEmptyString(claim.case_id) ||
+        !isNonEmptyString(claim.case_title) || !isNonEmptyString(claim.claim_text) ||
+        !CONTEXT_TYPES.has(claim.context_type) || !CATEGORIES.has(claim.category) ||
+        !CLASSIFICATION_STATUSES.has(claim.classification_status) ||
+        typeof claim.confidence !== 'number' || claim.confidence < 0 || claim.confidence > 1 ||
+        (isUnclassified && claim.topic_id) || (!isUnclassified && !isNonEmptyString(claim.topic_id))) {
+      return errorResponse('Invalid claim candidate', 400);
+    }
+  }
+
+  const classifiedTopicIds = [...new Set(body.claims
+    .filter((claim) => claim.classification_status !== 'Unclassified')
+    .map((claim) => claim.topic_id!))];
+  if (classifiedTopicIds.length > 0) {
+    const topicPlaceholders = classifiedTopicIds.map(() => '?').join(', ');
+    const { results } = await env.DB.prepare(`
+      SELECT topic_id FROM taxonomy_topics
+      WHERE taxonomy_version = ? AND topic_id IN (${topicPlaceholders})
+    `).bind(body.taxonomy_version, ...classifiedTopicIds).all<{ topic_id: string }>();
+    if (results.length !== classifiedTopicIds.length) {
+      return errorResponse('Unknown canonical topic for supplied taxonomy version', 400);
+    }
+  }
+
+  const receivedAt = now();
+  const evidenceId = evidence.evidence_id;
+  const existingEvidence = await env.DB.prepare(`
+    SELECT evidence_id FROM evidence_items
+    WHERE source_system = ? AND source_native_id = ? AND source_locator = ? AND content_hash = ?
+  `).bind(evidence.source_system, evidence.source_native_id, evidence.source_locator, evidence.content_hash)
+    .first<{ evidence_id: string }>();
+  if (existingEvidence && existingEvidence.evidence_id !== evidenceId) {
+    return errorResponse('Evidence identity conflicts with its idempotency tuple', 409);
+  }
+  if (evidence.supersedes_evidence_id) {
+    if (evidence.supersedes_evidence_id === evidenceId) {
+      return errorResponse('Evidence cannot supersede itself', 400);
+    }
+    const supersededEvidence = await env.DB.prepare(
+      'SELECT evidence_id FROM evidence_items WHERE evidence_id = ?'
+    ).bind(evidence.supersedes_evidence_id).first<{ evidence_id: string }>();
+    if (!supersededEvidence) return errorResponse('Superseded evidence was not found', 400);
+  }
+  const durableEvidenceId = existingEvidence?.evidence_id ?? evidenceId;
+
+  const claimIds: string[] = [];
+  const statements: D1PreparedStatement[] = [];
+  if (!existingEvidence) {
+    statements.push(env.DB.prepare(`
+      INSERT INTO evidence_items (
+        evidence_id, source_system, source_native_id, source_locator, occurred_at, content_hash,
+        ingested_at, source_version, confidence, access_classification, r2_key, source_metadata_json,
+        supersedes_evidence_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      durableEvidenceId, evidence.source_system, evidence.source_native_id, evidence.source_locator,
+      evidence.occurred_at, evidence.content_hash, receivedAt, evidence.source_version, evidence.confidence,
+      evidence.access_classification, evidence.r2_key ?? null, JSON.stringify(evidence.source_metadata ?? {}),
+      evidence.supersedes_evidence_id ?? null
+    ));
+  }
+  for (const claim of body.claims) {
+    const claimId = claim.claim_id;
+    claimIds.push(claimId);
+    statements.push(env.DB.prepare(`
+      INSERT OR IGNORE INTO topic_cases (case_id, case_title, lifecycle_state, creation_evidence_id, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(claim.case_id, claim.case_title, claim.lifecycle_state ?? 'Open', durableEvidenceId, receivedAt));
+    if (claim.topic_id) {
+      statements.push(env.DB.prepare(`
+        INSERT OR IGNORE INTO case_topics (case_id, topic_id, taxonomy_version, rationale, provenance_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(claim.case_id, claim.topic_id, body.taxonomy_version, 'Submitted candidate classification', JSON.stringify(claim.provenance ?? {}), receivedAt));
+    }
+    statements.push(env.DB.prepare(`
+      INSERT OR IGNORE INTO claims (
+        claim_id, case_id, context_type, topic_id, taxonomy_version, category, classification_status,
+        claim_text, confidence, provenance_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(claimId, claim.case_id, claim.context_type, claim.topic_id ?? null, body.taxonomy_version,
+      claim.category, claim.classification_status, claim.claim_text, claim.confidence,
+      JSON.stringify(claim.provenance ?? {}), receivedAt));
+    statements.push(env.DB.prepare(`
+      INSERT OR IGNORE INTO claim_evidence (claim_id, evidence_id, support_role, created_at)
+      VALUES (?, ?, 'Primary', ?)
+    `).bind(claimId, durableEvidenceId, receivedAt));
+  }
+  const eventId = generateId();
+  const receipt = {
+    submission_id: body.submission_id,
+    status: 'Accepted',
+    evidence_id: durableEvidenceId,
+    claim_ids: claimIds,
+    event_id: eventId,
+    replayed: Boolean(existingEvidence),
+    received_at: receivedAt,
+  };
+  statements.push(env.DB.prepare(`
+    INSERT INTO memory_events (
+      event_id, event_type, actor_type, actor_id, occurred_at, reason,
+      affected_entity_type, affected_entity_id, payload_json
+    ) VALUES (?, 'Extracted', 'Automation', ?, ?, ?, 'EvidenceItem', ?, ?)
+  `).bind(eventId, `azure:${body.extraction_run_id}`, receivedAt, 'Canonical submission accepted',
+    durableEvidenceId, JSON.stringify({ submission_id: body.submission_id, claim_ids: claimIds })));
+  statements.push(env.DB.prepare(`
+    INSERT INTO submission_receipts (
+      submission_id, contract_version, extraction_run_id, status, evidence_id, response_json, received_at
+    ) VALUES (?, ?, ?, 'Accepted', ?, ?, ?)
+  `).bind(body.submission_id, body.contract_version, body.extraction_run_id, durableEvidenceId,
+    JSON.stringify(receipt), receivedAt));
+  await env.DB.batch(statements);
+
+  return jsonResponse(receipt, 201);
+}
+
+async function handleGetCanonicalSubmission(env: Env, request: Request, submissionId: string): Promise<Response> {
+  if (!await isAuthorisedSubmission(request, env)) return errorResponse('Unauthorised', 401);
+
+  const receipt = await env.DB.prepare(
+    'SELECT response_json FROM submission_receipts WHERE submission_id = ?'
+  ).bind(submissionId).first<{ response_json: string }>();
+  if (!receipt) return errorResponse('Submission not found', 404);
+  return jsonResponse(JSON.parse(receipt.response_json));
 }
 
 // ---------------------------------------------------------------

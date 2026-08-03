@@ -115,7 +115,8 @@ $rolesConfig = if (Test-Path (Join-Path $configDir "roles_config.json")) { Get-C
 $sentimentRules = if (Test-Path (Join-Path $configDir "sentiment_rules.json")) { Get-Content -Path (Join-Path $configDir "sentiment_rules.json") | ConvertFrom-Json } else { @{ Positive = @(); Negative = @(); ResolutionPriority = @() } }
 $pipelineConfig = if (Test-Path (Join-Path $PSScriptRoot "pipeline_config.json")) { Get-Content -Path (Join-Path $PSScriptRoot "pipeline_config.json") | ConvertFrom-Json } else { @{ enable_stable_topic_classification = $false } }
 
-# Cloudflare sync config
+# Cloudflare legacy-sync config. The canonical Topic Memory path is deliberately
+# separate and opt-in so Azure remains authoritative throughout coexistence.
 $script:cfSyncEnabled = ($pipelineConfig.eip_cloudflare_sync -eq "staging" -or $pipelineConfig.eip_cloudflare_sync -eq "production")
 $script:cfApiBase     = if ($pipelineConfig.eip_cloudflare_sync -eq "production") {
     $pipelineConfig.eip_api_worker_url
@@ -123,6 +124,21 @@ $script:cfApiBase     = if ($pipelineConfig.eip_cloudflare_sync -eq "production"
     $pipelineConfig.eip_api_worker_url_staging
 } else { $null }
 if ($script:cfSyncEnabled) { Write-Host "  [CF] Cloudflare sync enabled → $($script:cfApiBase)" -ForegroundColor Cyan }
+
+# Canonical submissions are separately environment-scoped from the legacy sync.
+# The bearer token is read only from an Azure app setting/environment variable,
+# never from repository config.
+$script:canonicalTopicMemoryEnabled = ($pipelineConfig.eip_canonical_topic_memory_sync -eq "staging" -or $pipelineConfig.eip_canonical_topic_memory_sync -eq "production")
+$script:canonicalTopicMemoryApiBase = if ($pipelineConfig.eip_canonical_topic_memory_sync -eq "production") {
+    $pipelineConfig.eip_api_worker_url
+} elseif ($pipelineConfig.eip_canonical_topic_memory_sync -eq "staging") {
+    $pipelineConfig.eip_api_worker_url_staging
+} else { $null }
+$script:canonicalTopicMemoryToken = $env:EIP_TOPIC_MEMORY_SUBMISSION_TOKEN
+$script:canonicalReconciliationDir = $env:EIP_TOPIC_MEMORY_RECONCILIATION_DIR
+if ($script:canonicalTopicMemoryEnabled) {
+    Write-Host "  [CF] Canonical Topic Memory dual-write requested → $($script:canonicalTopicMemoryApiBase) (Azure remains authoritative)." -ForegroundColor Cyan
+}
 
 # SharePoint skip flag — set true on develop/staging branch to avoid contaminating Petersplace
 $script:skipSharePoint = ($pipelineConfig.skip_sharepoint -eq $true)
@@ -1069,6 +1085,155 @@ function Invoke-CloudflareSync {
 }
 
 # ---------------------------------------------------------------
+# Canonical Topic Memory submission helpers. These helpers are intentionally
+# independent of legacy Cloudflare sync and only run when explicitly enabled.
+# A durable reconciliation directory is required before a POST is attempted so
+# Azure can retry the exact same envelope without becoming dependent on D1.
+# ---------------------------------------------------------------
+function Get-TopicMemorySha256 {
+    param([Parameter(Mandatory=$true)][string]$Value)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($Value)
+        return ([System.BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
+function Write-TopicMemoryReconciliationRecord {
+    param(
+        [Parameter(Mandatory=$true)][hashtable]$Record
+    )
+    if (-not $script:canonicalReconciliationDir) {
+        throw "EIP_TOPIC_MEMORY_RECONCILIATION_DIR must be configured on durable Azure storage before canonical submission."
+    }
+    if (-not (Test-Path $script:canonicalReconciliationDir)) {
+        $null = New-Item -ItemType Directory -Path $script:canonicalReconciliationDir -Force
+    }
+    $recordPath = Join-Path $script:canonicalReconciliationDir ("$($Record.submission_id).json")
+    $Record | ConvertTo-Json -Depth 20 | Set-Content -Path $recordPath -Encoding utf8
+    return $recordPath
+}
+
+function Invoke-CanonicalTopicMemorySubmission {
+    param(
+        [Parameter(Mandatory=$true)][hashtable]$Envelope
+    )
+
+    if (-not $script:canonicalTopicMemoryEnabled) { return $null }
+    if (-not $script:canonicalTopicMemoryApiBase) {
+        Write-Warning "  [CF] Canonical Topic Memory submission skipped: no canonical Worker URL is configured."
+        return $null
+    }
+    if (-not $script:canonicalTopicMemoryToken) {
+        Write-Warning "  [CF] Canonical Topic Memory submission skipped: EIP_TOPIC_MEMORY_SUBMISSION_TOKEN is not configured."
+        return $null
+    }
+
+    $record = @{
+        submission_id = $Envelope.submission_id
+        attempted_at  = [System.DateTime]::UtcNow.ToString("o")
+        status        = "Pending"
+        envelope      = $Envelope
+    }
+    try {
+        # Persist before transport so the exact stable submission identity can be replayed.
+        $recordPath = Write-TopicMemoryReconciliationRecord -Record $record
+    } catch {
+        Write-Warning "  [CF] Canonical Topic Memory submission skipped: durable reconciliation record unavailable: $($_.Exception.Message)"
+        return $null
+    }
+
+    try {
+        $response = Invoke-RestMethod -Method Post `
+            -Uri "$($script:canonicalTopicMemoryApiBase.TrimEnd('/'))/v2/submissions" `
+            -Headers @{ Authorization = "Bearer $script:canonicalTopicMemoryToken" } `
+            -Body ($Envelope | ConvertTo-Json -Depth 20) `
+            -ContentType "application/json" `
+            -TimeoutSec 20
+        $record.status = "Accepted"
+        $record.received_at = [System.DateTime]::UtcNow.ToString("o")
+        $record.receipt = $response
+        $record | ConvertTo-Json -Depth 20 | Set-Content -Path $recordPath -Encoding utf8
+        Write-Host "  [CF] Canonical Topic Memory submission accepted: $($Envelope.submission_id)" -ForegroundColor Cyan
+        return $response
+    } catch {
+        $httpStatus = $null
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            $httpStatus = [int]$_.Exception.Response.StatusCode
+        }
+        $record.status = if ($httpStatus -ge 400 -and $httpStatus -lt 500) { "ValidationRejected" } else { "TransportFailed" }
+        $record.failed_at = [System.DateTime]::UtcNow.ToString("o")
+        $record.http_status = $httpStatus
+        $record.error = $_.Exception.Message
+        $record | ConvertTo-Json -Depth 20 | Set-Content -Path $recordPath -Encoding utf8
+        if ($record.status -eq "ValidationRejected") {
+            Write-Warning "  [CF] Canonical Topic Memory submission rejected; reconciliation record retained: $recordPath"
+        } else {
+            Write-Warning "  [CF] Canonical Topic Memory submission deferred; reconciliation record retained: $recordPath"
+        }
+        return $null
+    }
+}
+
+function New-CanonicalTopicMemoryEnvelope {
+    param(
+        [Parameter(Mandatory=$true)][string]$MeetingId,
+        [Parameter(Mandatory=$true)][datetime]$EventDate,
+        [Parameter(Mandatory=$true)][string]$TranscriptText,
+        [Parameter(Mandatory=$true)][object[]]$TopicRecords,
+        [Parameter(Mandatory=$true)][string]$ExtractionRunId
+    )
+
+    $allowedContextTypes = @('Discussion', 'Update', 'Decision', 'Agreement', 'Proposal', 'Concern', 'Commitment', 'Observation', 'Assumption')
+    $allowedCategories = @('Risk', 'Issue', 'Action', 'Decision', 'Progress', 'Opportunity', 'Dependency', 'Strategy', 'Insight', 'Assumption')
+    $legacyCategoryMap = @{ Execution = 'Action'; Problem = 'Issue'; Learning = 'Insight'; Governance = 'Decision' }
+    $contentHash = Get-TopicMemorySha256 -Value $TranscriptText
+    $sourceLocator = "m365://meetings/$MeetingId#transcript"
+    $evidenceId = "evidence-" + (Get-TopicMemorySha256 -Value "M365|$MeetingId|$sourceLocator|$contentHash").Substring(0, 32)
+    $claims = @()
+
+    foreach ($topicRecord in $TopicRecords) {
+        $contextType = [string]$topicRecord.ContextType
+        $category = [string]$topicRecord.Category
+        if ($legacyCategoryMap.ContainsKey($category)) { $category = $legacyCategoryMap[$category] }
+        $topicId = [string]$topicRecord.TopicId
+        $claimText = if ($topicRecord.Summary) { [string]$topicRecord.Summary } elseif ($topicRecord.Content) { [string]$topicRecord.Content } else { $null }
+        if ($allowedContextTypes -notcontains $contextType -or $allowedCategories -notcontains $category -or [string]::IsNullOrWhiteSpace($claimText)) {
+            Write-Verbose "  [CF] Canonical candidate omitted: incomplete or unsupported controlled values."
+            continue
+        }
+
+        $isUnclassified = [string]::IsNullOrWhiteSpace($topicId) -or $topicId -eq 'T00'
+        $classificationStatus = if ($isUnclassified) { 'Unclassified' } else { 'Candidate' }
+        $caseTitle = if ($topicRecord.Label) { [string]$topicRecord.Label } elseif ($topicRecord.TopicName) { [string]$topicRecord.TopicName } else { "Meeting $MeetingId topic" }
+        $caseId = "case-" + (Get-TopicMemorySha256 -Value "$MeetingId|$caseTitle").Substring(0, 32)
+        $claimId = "claim-" + (Get-TopicMemorySha256 -Value "$evidenceId|$contextType|$category|$topicId|$claimText").Substring(0, 32)
+        $claims += [ordered]@{
+            claim_id = $claimId; case_id = $caseId; case_title = $caseTitle; lifecycle_state = 'Open'
+            context_type = $contextType; topic_id = if ($isUnclassified) { $null } else { $topicId }
+            category = $category; classification_status = $classificationStatus; claim_text = $claimText
+            confidence = 0.5
+            provenance = @{ review_required = $true; producer = 'azure-eip-pipeline'; source_topic_record = $caseTitle }
+        }
+    }
+    if ($claims.Count -eq 0) { return $null }
+
+    $submissionId = "submission-" + (Get-TopicMemorySha256 -Value "$evidenceId|$ExtractionRunId").Substring(0, 32)
+    return [ordered]@{
+        submission_id = $submissionId; contract_version = '2.0.0'; taxonomy_version = '2.0.0'; extraction_run_id = $ExtractionRunId
+        evidence = [ordered]@{
+            evidence_id = $evidenceId; source_system = 'M365'; source_native_id = $MeetingId; source_locator = $sourceLocator
+            occurred_at = $EventDate.ToUniversalTime().ToString('o'); content_hash = $contentHash; source_version = "pipeline-$PIPELINE_VERSION"
+            confidence = 1.0; access_classification = 'Internal-Confidential'
+            source_metadata = @{ azure_authoritative = $true; producer = 'azure-eip-pipeline'; source_reference_type = 'M365 meeting transcript' }
+        }
+        claims = $claims
+    }
+}
+
+# ---------------------------------------------------------------
 # Normalize-TopicIds — maps LLM-generated topic IDs to canonical
 # T-codes from mapping_rules.json. Runs after Get-MeetingClassification
 # on all paths so D1 always receives consistent IDs.
@@ -1500,6 +1665,21 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     } catch {
         Write-Warning "  [$PathLabel] SharePoint upload failed: $_"
+    }
+
+    # ── 10b. CANONICAL TOPIC MEMORY DUAL-WRITE ─────────────────────
+    # Azure/SharePoint output above remains authoritative. A failure here is
+    # recorded for reconciliation and never changes the pipeline result.
+    $canonicalEnvelope = New-CanonicalTopicMemoryEnvelope `
+        -MeetingId $MeetingId `
+        -EventDate $EventDate `
+        -TranscriptText $PlainText `
+        -TopicRecords $topicRecords3D `
+        -ExtractionRunId $RunId
+    if ($canonicalEnvelope) {
+        $null = Invoke-CanonicalTopicMemorySubmission -Envelope $canonicalEnvelope
+    } elseif ($script:canonicalTopicMemoryEnabled) {
+        Write-Warning "  [CF] Canonical Topic Memory submission skipped: no contract-valid candidate claims were produced."
     }
 
     # ── 11. CONFLUENCE MIRROR ─────────────────────────────────────

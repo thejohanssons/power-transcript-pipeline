@@ -1,0 +1,59 @@
+{
+  "submission_id": "phase1-exco-vat-2026-07-22-lines-577-596-v1",
+  "contract_version": "2.0.0",
+  "taxonomy_version": "2.0.0",
+  "extraction_run_id": "phase1-vertical-slice-vat-20260802",
+  "evidence": {
+    "evidence_id": "evidence-exco-vat-2026-07-22-577-596-v1",
+    "source_system": "M365",
+    "source_native_id": "2026-07-22_0900_exco_daily____lunch_time_",
+    "source_locator": "packages/pipeline/2026-07-22_1100-ExCo_daily_lunch_time.txt#lines=577-596;time=00:24:51.326-00:25:20.086",
+    "occurred_at": "2026-07-22T11:00:00.000Z",
+    "content_hash": "751f0e2c483fc40dff56e183c1872857250d4c92035843a098869bcea916871d",
+    "source_version": "local-fixture-2026-08-02",
+    "confidence": 1,
+    "access_classification": "Internal-Confidential",
+    "source_metadata": {
+      "meeting_type": "ExCo",
+      "fixture_purpose": "Phase 1 decision-to-evidence vertical slice",
+      "source_excerpt_is_retained_locally": true
+    }
+  },
+  "claims": [
+    {
+      "claim_id": "claim-exco-vat-2026-07-22-uncertain-payment-status-v1",
+      "case_id": "case-exco-vat-payment-status-2026-07",
+      "case_title": "VAT payment-status clarification",
+      "lifecycle_state": "Open",
+      "context_type": "Concern",
+      "topic_id": "T11",
+      "category": "Risk",
+      "classification_status": "Candidate",
+      "claim_text": "The exchange indicates uncertainty about a VAT-related amount of 60,000 and whether payment through July remains viable; it does not establish a confirmed payment decision.",
+      "confidence": 0.76,
+      "provenance": {
+        "source_speaker_roles": ["ExCo participant"],
+        "evidence_time_range": "00:24:51.326-00:25:16.006",
+        "review_required": true,
+        "review_reason": "The claimed prior decision is referenced but not restated with sufficient authority or detail."
+      }
+    },
+    {
+      "claim_id": "claim-exco-vat-2026-07-22-reply-commitment-v1",
+      "case_id": "case-exco-vat-payment-status-2026-07",
+      "case_title": "VAT payment-status clarification",
+      "lifecycle_state": "Open",
+      "context_type": "Commitment",
+      "topic_id": "T11",
+      "category": "Action",
+      "classification_status": "Candidate",
+      "claim_text": "Sharmella commits to replying with a clarification about the VAT-payment discussion.",
+      "confidence": 0.92,
+      "provenance": {
+        "evidence_time_range": "00:25:15.286-00:25:20.086",
+        "review_required": true,
+        "review_reason": "The exact recipient, wording, and deadline are not stated."
+      }
+    }
+  ]
+}

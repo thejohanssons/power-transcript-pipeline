@@ -1,8 +1,18 @@
 {
   "_copyright": "Copyright (c) 2026 Virrata AB. All rights reserved. Proprietary and confidential.",
-    "Version": "4.2",
-  "Description": "Frozen EIP 1.1 Taxonomy. Implements versioned topics and canonical 9-axis metadata schema.",
+  "Version": "5.0",
+  "Description": "EIP taxonomy aligned to the approved canonical Topic Memory contract v2.0.0. Classification proceeds ContextType \u2192 Topic \u2192 Category \u2192 enrichment; no fallback topic is permitted.",
   "Changelog": [
+    {
+      "version": "5.0",
+      "date": "2026-08-02",
+      "changes": [
+        "Aligned controlled vocabularies and canonical topic identity to Topic Memory contract v2.0.0",
+        "Declared ContextType \u2192 Topic \u2192 Category \u2192 enrichment classification order",
+        "Added Assumption category and explicit T19/T20 identity for AI/Data",
+        "Added canonical registry metadata without changing legacy topic-record generation fields"
+      ]
+    },
     {
       "version": "4.2",
       "date": "2026-07-11",
@@ -13,14 +23,13 @@
       ]
     }
   ],
-
   "MetadataAxes": [
+    "CONTEXT_TYPE",
+    "TOPIC",
+    "CATEGORY",
     "DOMAIN",
     "TOPIC_FAMILY",
-    "TOPIC",
     "TITLE",
-    "CATEGORY",
-    "CONTEXT_TYPE",
     "OWNERSHIP",
     "STRATEGIC_IMPACT",
     "EXECUTIVE_PRIORITY",
@@ -29,7 +38,6 @@
     "STATUS",
     "TRAJECTORY"
   ],
-
   "StrategicImpactScales": {
     "1": "Operational: Business as usual, minor local impact.",
     "2": "Functional: Affects a specific department or process.",
@@ -37,14 +45,12 @@
     "4": "Strategic: Significant impact on quarterly goals or major releases.",
     "5": "Critical: Affects core business viability or major pivot."
   },
-
   "ExecutivePriorityLevels": [
     "Low",
     "Medium",
     "High",
     "Critical"
   ],
-
   "AlignmentLevels": [
     "Consensus",
     "Majority",
@@ -52,20 +58,17 @@
     "Conflicted",
     "Unknown"
   ],
-
   "Domains": [
-    "Product",
-    "Sales",
-    "Marketing",
-    "Technology",
-    "IT",
-    "Operations",
-    "SupplyChain",
-    "Finance",
-    "People",
-    "Governance"
+    "PRODUCT",
+    "DELIVERY",
+    "COMMERCIAL",
+    "FINANCE",
+    "PEOPLE",
+    "OPERATIONS",
+    "TECHNOLOGY",
+    "GOVERNANCE",
+    "STRATEGY"
   ],
-
   "TopicFamilies": [
     "Product",
     "Delivery",
@@ -75,32 +78,222 @@
     "Process",
     "Technology",
     "Operations",
+    "Finance",
+    "Governance",
     "Strategy"
   ],
-
   "Topics": {
-    "Product Performance":              { "Version": "1.0", "Domain": "Product",    "TopicFamily": "Product",    "Capability": "Product Management", "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Functional performance, UX, speed" },
-    "Product Quality & Compliance":     { "Version": "1.0", "Domain": "Product",    "TopicFamily": "Product",    "Capability": "Product Quality",    "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Bugs, defects, safety, compliance" },
-    "Product Value & Perception":       { "Version": "1.0", "Domain": "Product",    "TopicFamily": "Product",    "Capability": "Product Strategy",   "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Customer feedback, perception" },
-    "Product Scope & Prioritisation":   { "Version": "1.0", "Domain": "Product",    "TopicFamily": "Product",    "Capability": "Product Management", "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Feature set, MVP, backlog" },
-    "Delivery Progress & Readiness":    { "Version": "1.0", "Domain": "Governance", "TopicFamily": "Delivery",   "Capability": "Product Delivery",     "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Milestones, launch readiness", "ContextOverride": { "COO": { "Capability": "Commercial Execution", "Governor": "Commercial Planning" } } },
-    "Delivery Risk & Constraints":      { "Version": "1.0", "Domain": "Governance", "TopicFamily": "Delivery",   "Capability": "Product Delivery",     "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Blockers, bottlenecks, delays", "ContextOverride": { "COO": { "Capability": "Commercial Execution", "Governor": "Commercial Planning" } } },
-    "Development Execution":            { "Version": "1.0", "Domain": "Product",    "TopicFamily": "Delivery",   "Capability": "Product Development", "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Engineering activity, sprint progress" },
-    "Cash Flow & Liquidity":            { "Version": "1.0", "Domain": "Finance",    "TopicFamily": "Commercial", "Capability": "Cash Flow Management", "Phase": "Capability Operation", "Governor": "Finance Management", "Description": "Liquidity, capital requirements" },
-    "Cost Structure & Margins":         { "Version": "1.0", "Domain": "Finance",    "TopicFamily": "Commercial", "Capability": "Financial Planning", "Phase": "Capability Operation", "Governor": "Finance Management", "Description": "Margins, BOM cost" },
-    "Revenue & Commercial Performance": { "Version": "1.0", "Domain": "Finance",    "TopicFamily": "Commercial", "Capability": "Sales", "Phase": "Capability Operation", "Governor": "Commercial Planning", "Description": "Sales, pricing, performance" },
-    "Financial Risk & Exposure":        { "Version": "1.0", "Domain": "Finance",    "TopicFamily": "Commercial", "Capability": "Financial Management", "Phase": "Capability Operation", "Governor": "Finance Management", "Description": "Exposure, credit, forex" },
-    "Organisation & Capability":        { "Version": "1.0", "Domain": "People",     "TopicFamily": "People",     "Capability": "Engineering Operations", "Phase": "Capability Operation", "Governor": "Product Board",      "Description": "Headcount, capability, structure", "ContextOverride": { "COO": { "Capability": "People Operations", "Governor": "Business Operations" } } },
-    "Resource Allocation":              { "Version": "1.0", "Domain": "People",     "TopicFamily": "People",     "Capability": "Engineering Operations", "Phase": "Capability Operation", "Governor": "Product Board",      "Description": "Bandwidth, competing priorities", "ContextOverride": { "COO": { "Capability": "People Operations", "Governor": "Business Operations" } } },
-    "Operational Effectiveness":        { "Version": "1.0", "Domain": "Operations", "TopicFamily": "Operations", "Capability": "Engineering Operations", "Phase": "Capability Operation", "Governor": "Product Board",      "Description": "Process efficiency, logistics",   "ContextOverride": { "COO": { "Capability": "Supply Operations",  "Governor": "Business Operations" } } },
-    "Strategic Direction & Alignment":  { "Version": "1.0", "Domain": "Strategy",   "TopicFamily": "Strategy",   "Capability": "Executive Governance", "Phase": "Capability Operation", "Governor": "ExCo", "Description": "Vision, priorities, direction-setting" },
-    "Product-Market Fit":               { "Version": "1.0", "Domain": "Strategy",   "TopicFamily": "Strategy",   "Capability": "Product Strategy", "Phase": "Capability Operation", "Governor": "Product Board", "Description": "Segments, TAM, positioning" },
-    "Growth & Opportunities":           { "Version": "1.0", "Domain": "Strategy",   "TopicFamily": "Strategy",   "Capability": "Commercial Execution", "Phase": "Capability Operation", "Governor": "Commercial Planning", "Description": "Initiatives, partnerships" },
-    "Delivery Confidence":              { "Version": "1.0", "Domain": "Governance", "TopicFamily": "Delivery",   "Capability": "Corporate Strategy", "Phase": "Capability Operation", "Governor": "ExCo", "Description": "Overall risk sentiment" },
-    "AI":                               { "Version": "1.0", "Domain": "Technology", "TopicFamily": "Technology", "Capability": "Technology Governance", "Phase": "Capability Operation", "Governor": "IT Governance", "Description": "Artificial intelligence and ML concepts" },
-    "Data":                             { "Version": "1.0", "Domain": "Technology", "TopicFamily": "Technology", "Capability": "Technology Governance", "Phase": "Capability Operation", "Governor": "IT Governance", "Description": "Data architecture and strategy" }
+    "Product Performance": {
+      "Version": "1.0",
+      "Domain": "Product",
+      "TopicFamily": "Product",
+      "Capability": "Product Management",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Functional performance, UX, speed"
+    },
+    "Product Quality & Compliance": {
+      "Version": "1.0",
+      "Domain": "Product",
+      "TopicFamily": "Product",
+      "Capability": "Product Quality",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Bugs, defects, safety, compliance"
+    },
+    "Product Value & Perception": {
+      "Version": "1.0",
+      "Domain": "Product",
+      "TopicFamily": "Product",
+      "Capability": "Product Strategy",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Customer feedback, perception"
+    },
+    "Product Scope & Prioritisation": {
+      "Version": "1.0",
+      "Domain": "Product",
+      "TopicFamily": "Product",
+      "Capability": "Product Management",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Feature set, MVP, backlog"
+    },
+    "Delivery Progress & Readiness": {
+      "Version": "1.0",
+      "Domain": "Governance",
+      "TopicFamily": "Delivery",
+      "Capability": "Product Delivery",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Milestones, launch readiness",
+      "ContextOverride": {
+        "COO": {
+          "Capability": "Commercial Execution",
+          "Governor": "Commercial Planning"
+        }
+      }
+    },
+    "Delivery Risk & Constraints": {
+      "Version": "1.0",
+      "Domain": "Governance",
+      "TopicFamily": "Delivery",
+      "Capability": "Product Delivery",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Blockers, bottlenecks, delays",
+      "ContextOverride": {
+        "COO": {
+          "Capability": "Commercial Execution",
+          "Governor": "Commercial Planning"
+        }
+      }
+    },
+    "Development Execution": {
+      "Version": "1.0",
+      "Domain": "Product",
+      "TopicFamily": "Delivery",
+      "Capability": "Product Development",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Engineering activity, sprint progress"
+    },
+    "Cash Flow & Liquidity": {
+      "Version": "1.0",
+      "Domain": "Finance",
+      "TopicFamily": "Commercial",
+      "Capability": "Cash Flow Management",
+      "Phase": "Capability Operation",
+      "Governor": "Finance Management",
+      "Description": "Liquidity, capital requirements"
+    },
+    "Cost Structure & Margins": {
+      "Version": "1.0",
+      "Domain": "Finance",
+      "TopicFamily": "Commercial",
+      "Capability": "Financial Planning",
+      "Phase": "Capability Operation",
+      "Governor": "Finance Management",
+      "Description": "Margins, BOM cost"
+    },
+    "Revenue & Commercial Performance": {
+      "Version": "1.0",
+      "Domain": "Finance",
+      "TopicFamily": "Commercial",
+      "Capability": "Sales",
+      "Phase": "Capability Operation",
+      "Governor": "Commercial Planning",
+      "Description": "Sales, pricing, performance"
+    },
+    "Financial Risk & Exposure": {
+      "Version": "1.0",
+      "Domain": "Finance",
+      "TopicFamily": "Commercial",
+      "Capability": "Financial Management",
+      "Phase": "Capability Operation",
+      "Governor": "Finance Management",
+      "Description": "Exposure, credit, forex"
+    },
+    "Organisation & Capability": {
+      "Version": "1.0",
+      "Domain": "People",
+      "TopicFamily": "People",
+      "Capability": "Engineering Operations",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Headcount, capability, structure",
+      "ContextOverride": {
+        "COO": {
+          "Capability": "People Operations",
+          "Governor": "Business Operations"
+        }
+      }
+    },
+    "Resource Allocation": {
+      "Version": "1.0",
+      "Domain": "People",
+      "TopicFamily": "People",
+      "Capability": "Engineering Operations",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Bandwidth, competing priorities",
+      "ContextOverride": {
+        "COO": {
+          "Capability": "People Operations",
+          "Governor": "Business Operations"
+        }
+      }
+    },
+    "Operational Effectiveness": {
+      "Version": "1.0",
+      "Domain": "Operations",
+      "TopicFamily": "Operations",
+      "Capability": "Engineering Operations",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Process efficiency, logistics",
+      "ContextOverride": {
+        "COO": {
+          "Capability": "Supply Operations",
+          "Governor": "Business Operations"
+        }
+      }
+    },
+    "Strategic Direction & Alignment": {
+      "Version": "1.0",
+      "Domain": "Strategy",
+      "TopicFamily": "Strategy",
+      "Capability": "Executive Governance",
+      "Phase": "Capability Operation",
+      "Governor": "ExCo",
+      "Description": "Vision, priorities, direction-setting"
+    },
+    "Product-Market Fit": {
+      "Version": "1.0",
+      "Domain": "Strategy",
+      "TopicFamily": "Strategy",
+      "Capability": "Product Strategy",
+      "Phase": "Capability Operation",
+      "Governor": "Product Board",
+      "Description": "Segments, TAM, positioning"
+    },
+    "Growth & Opportunities": {
+      "Version": "1.0",
+      "Domain": "Strategy",
+      "TopicFamily": "Strategy",
+      "Capability": "Commercial Execution",
+      "Phase": "Capability Operation",
+      "Governor": "Commercial Planning",
+      "Description": "Initiatives, partnerships"
+    },
+    "Delivery Confidence": {
+      "Version": "1.0",
+      "Domain": "Governance",
+      "TopicFamily": "Delivery",
+      "Capability": "Corporate Strategy",
+      "Phase": "Capability Operation",
+      "Governor": "ExCo",
+      "Description": "Overall risk sentiment"
+    },
+    "AI": {
+      "Version": "1.0",
+      "Domain": "Technology",
+      "TopicFamily": "Technology",
+      "Capability": "Technology Governance",
+      "Phase": "Capability Operation",
+      "Governor": "IT Governance",
+      "Description": "Artificial intelligence and ML concepts"
+    },
+    "Data": {
+      "Version": "1.0",
+      "Domain": "Technology",
+      "TopicFamily": "Technology",
+      "Capability": "Technology Governance",
+      "Phase": "Capability Operation",
+      "Governor": "IT Governance",
+      "Description": "Data architecture and strategy"
+    }
   },
-
   "Categories": [
     "Risk",
     "Issue",
@@ -110,9 +303,9 @@
     "Opportunity",
     "Dependency",
     "Strategy",
-    "Insight"
+    "Insight",
+    "Assumption"
   ],
-
   "ContextTypes": [
     "Discussion",
     "Update",
@@ -124,7 +317,6 @@
     "Observation",
     "Assumption"
   ],
-
   "Tags": [
     "CriticalPath",
     "BOM_Risk",
@@ -139,5 +331,153 @@
     "Product",
     "Quality",
     "ProcessImprovement"
+  ],
+  "ClassificationOrder": [
+    "CONTEXT_TYPE",
+    "TOPIC",
+    "CATEGORY",
+    "ENRICHMENT"
+  ],
+  "CanonicalTopicRegistry": [
+    {
+      "TopicId": "T01",
+      "Name": "Product Performance",
+      "PrimaryDomain": "PRODUCT",
+      "TopicFamily": "Product",
+      "LegacyLabel": "Product Performance"
+    },
+    {
+      "TopicId": "T02",
+      "Name": "Product Quality & Compliance",
+      "PrimaryDomain": "PRODUCT",
+      "TopicFamily": "Product",
+      "LegacyLabel": "Product Quality & Compliance"
+    },
+    {
+      "TopicId": "T03",
+      "Name": "Product Value & Perception",
+      "PrimaryDomain": "PRODUCT",
+      "TopicFamily": "Customer",
+      "LegacyLabel": "Product Value & Perception"
+    },
+    {
+      "TopicId": "T04",
+      "Name": "Product Scope & Prioritisation",
+      "PrimaryDomain": "PRODUCT",
+      "TopicFamily": "Product",
+      "LegacyLabel": "Product Scope & Prioritisation"
+    },
+    {
+      "TopicId": "T05",
+      "Name": "Delivery Progress & Readiness",
+      "PrimaryDomain": "DELIVERY",
+      "TopicFamily": "Delivery",
+      "LegacyLabel": "Delivery Progress & Readiness"
+    },
+    {
+      "TopicId": "T06",
+      "Name": "Delivery Risk & Constraints",
+      "PrimaryDomain": "DELIVERY",
+      "TopicFamily": "Delivery",
+      "LegacyLabel": "Delivery Risk & Constraints"
+    },
+    {
+      "TopicId": "T07",
+      "Name": "Development Execution",
+      "PrimaryDomain": "DELIVERY",
+      "TopicFamily": "Delivery",
+      "LegacyLabel": "Development Execution"
+    },
+    {
+      "TopicId": "T08",
+      "Name": "Cash Flow & Liquidity",
+      "PrimaryDomain": "FINANCE",
+      "TopicFamily": "Finance",
+      "LegacyLabel": "Cash Flow & Liquidity"
+    },
+    {
+      "TopicId": "T09",
+      "Name": "Cost Structure & Margins",
+      "PrimaryDomain": "FINANCE",
+      "TopicFamily": "Finance",
+      "LegacyLabel": "Cost Structure & Margins"
+    },
+    {
+      "TopicId": "T10",
+      "Name": "Revenue & Commercial Performance",
+      "PrimaryDomain": "COMMERCIAL",
+      "TopicFamily": "Commercial",
+      "LegacyLabel": "Revenue & Commercial Performance"
+    },
+    {
+      "TopicId": "T11",
+      "Name": "Financial Risk & Exposure",
+      "PrimaryDomain": "FINANCE",
+      "TopicFamily": "Finance",
+      "LegacyLabel": "Financial Risk & Exposure"
+    },
+    {
+      "TopicId": "T12",
+      "Name": "Organisation & Capability",
+      "PrimaryDomain": "PEOPLE",
+      "TopicFamily": "People",
+      "LegacyLabel": "Organisation & Capability"
+    },
+    {
+      "TopicId": "T13",
+      "Name": "Resource Allocation",
+      "PrimaryDomain": "PEOPLE",
+      "TopicFamily": "People",
+      "LegacyLabel": "Resource Allocation"
+    },
+    {
+      "TopicId": "T14",
+      "Name": "Operational Effectiveness",
+      "PrimaryDomain": "OPERATIONS",
+      "TopicFamily": "Operations",
+      "LegacyLabel": "Operational Effectiveness"
+    },
+    {
+      "TopicId": "T15",
+      "Name": "Strategic Direction & Alignment",
+      "PrimaryDomain": "STRATEGY",
+      "TopicFamily": "Strategy",
+      "LegacyLabel": "Strategic Direction & Alignment"
+    },
+    {
+      "TopicId": "T16",
+      "Name": "Product-Market Fit",
+      "PrimaryDomain": "STRATEGY",
+      "TopicFamily": "Strategy",
+      "LegacyLabel": "Product-Market Fit"
+    },
+    {
+      "TopicId": "T17",
+      "Name": "Growth & Opportunities",
+      "PrimaryDomain": "STRATEGY",
+      "TopicFamily": "Strategy",
+      "LegacyLabel": "Growth & Opportunities"
+    },
+    {
+      "TopicId": "T18",
+      "Name": "Delivery Confidence",
+      "PrimaryDomain": "GOVERNANCE",
+      "TopicFamily": "Governance",
+      "LegacyLabel": "Delivery Confidence"
+    },
+    {
+      "TopicId": "T19",
+      "Name": "Artificial Intelligence",
+      "PrimaryDomain": "TECHNOLOGY",
+      "TopicFamily": "Technology",
+      "LegacyLabel": "AI"
+    },
+    {
+      "TopicId": "T20",
+      "Name": "Data",
+      "PrimaryDomain": "TECHNOLOGY",
+      "TopicFamily": "Technology",
+      "LegacyLabel": "Data"
+    }
   ]
 }
