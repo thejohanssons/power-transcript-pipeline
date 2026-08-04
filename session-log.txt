@@ -415,3 +415,50 @@ AI assistant session started
 ### Resume guidance
 - Start a new task in this workspace with the current session log and `plans/cloudflare-runtime-replacement-parallel-comparison-plan.md` as context.
 - Suggested instruction: `Review the completed local runtime-shadow A–C readiness and propose the separately authorized fixture-parity staging plan. Do not provision, deploy, handle real fixtures, access Graph, or add publishing until explicitly approved.`
+
+## Session Update — 2026-08-04 (Runtime Shadow A–C fixture-parity staging provisioned)
+
+### Approved operational scope executed
+- The separately authorized A–C fixture-parity staging operation began. It remains non-publishing: Azure stays authoritative; no Azure Function, schedule, configuration, secret, Graph permission, production resource, or external publisher was changed.
+- Direct Microsoft Graph acquisition, SharePoint, Confluence, Teams, Topic Memory, legacy-sync, production traffic, cutover, and Phases D–E remain out of scope.
+
+### Dedicated isolated staging resources
+- Created the replacement-only D1 database `eip-runtime-shadow-staging` in WEUR (ID: `c7474ecb-ff28-4788-9108-15d29a022c7b`). The only runtime-shadow D1 migration, `packages/runtime-shadow/migrations/0001_shadow_runs.sql`, was applied remotely.
+- Confirmed that D1 contains `fixture_runs` and `comparison_dispositions`.
+- Created the replacement-only R2 bucket `eip-runtime-shadow-staging-fixtures` in WEUR.
+- Created the replacement-only Queue `eip-runtime-shadow-staging-jobs`.
+- Updated `packages/runtime-shadow/wrangler.jsonc` to replace the deliberate all-zero D1 placeholder with the dedicated staging D1 ID.
+
+### Staging Worker deployment and configuration
+- Configured only non-secret staging values in `packages/runtime-shadow/wrangler.jsonc`: `SHADOW_MODE=fixture_parity`, Azure OpenAI v1 endpoint `https://atlassian-rovo-forge.openai.azure.com/openai/v1`, deployment `gpt-5.6-terra`, and the existing API-version compatibility value.
+- Updated `packages/runtime-shadow/src/azure-openai.ts` so an `/openai/v1` endpoint uses `chat/completions` with the deployment as the request-body `model`, without the legacy Azure deployment URL or `api-version` query parameter. The legacy Azure deployment-path form remains available for non-v1 endpoint configurations.
+- Typecheck, tests, and staging dry-run deployment passed before remote deployment.
+- Stored `AZURE_OPENAI_API_KEY`, `SHADOW_SUBMISSION_TOKEN`, and `SHADOW_REVIEWER_TOKEN` as distinct staging Worker secrets. Secret values were entered interactively and are not retained in source, terminal logs, or this session log.
+- Deployed `eip-runtime-shadow-staging`; active deployment is version 5 (`f098ee5a-4b18-4eb3-9b60-f521e75bac2e`). Health verification at `https://eip-runtime-shadow-staging.homeassistant-8d3.workers.dev/health` returned `{"ok":true,"mode":"fixture_parity"}`.
+
+### Next controlled activity
+- Prepare source-owner-approved immutable fixture packages with a maximum 30-day expiry, independently verified hashes, frozen Azure normalized-output and publication-intent baselines, approved classification, and assigned reviewers.
+- Upload and submit only approved fixtures following `packages/runtime-shadow/FIXTURE-RUNBOOK.md`. Collect non-publishing comparison artifacts and reviewer dispositions.
+- The A–C operational gate requires zero blocking divergences, a disposition for every material difference, and successful duplicate/retry/recovery behavior across the approved expanded corpus. Phase D remains blocked pending a separate explicit approval.
+
+## Session Update — 2026-08-04 (Runtime Shadow direct Azure API-key contract and normalized-output recovery)
+
+### Direct model invocation corrected
+- Replaced the superseded Azure AI Foundry/Entra approach with the repository-proven direct Azure OpenAI Chat Completions contract in `packages/runtime-shadow/src/azure-openai.ts`.
+- The staging Worker now invokes deployment `gpt-5.6-terra` at the Azure OpenAI deployment Chat Completions route using the `api-key` secret and `api-version=2024-02-15-preview`. No Azure app registration, service principal, or Entra token exchange is used.
+- Staging configuration keeps only the Azure endpoint and deployment as non-secret variables. The API key remains a Worker secret and is not recorded here.
+
+### Immutable output-contract checkpointing
+- Strengthened `packages/runtime-shadow/src/index.ts` with `normalized-output-v2`, a concrete JSON-only prompt contract for the complete `NormalizedOutput` shape, immutable source/processing values, and every publication-intent flag.
+- Model-response checkpoints are now stored by output-contract version under `runs/{runId}/model-response-checkpoints/`. This preserves the earlier invalid checkpoint as immutable audit evidence while allowing a corrected request for the same approved fixture run.
+- A checkpoint is reused only when its contract version, response hash, normalized-output schema, transcript hash, and immutable fixture processing contract are valid.
+- Extended `packages/runtime-shadow/src/runtime-shadow.integration.test.ts` to verify strict prompt content, old-checkpoint bypass, and compatible checkpoint reuse after downstream artifact persistence failure.
+
+### Validation, deployment, and controlled synthetic recovery
+- Local validation passed: `npm run typecheck`, `npm test` (17/17), and `npx wrangler deploy --env staging --dry-run`.
+- Deployed the staging-only Worker after validation. No production resource, Azure source pipeline, Graph integration, fixture source, or publisher was changed.
+- Recovered only immutable synthetic run `788eb37a-5454-4f13-94b3-7ec29286e396`. It completed successfully and wrote the versioned direct-Azure checkpoint plus normalized-output, publication-intent, and comparison artifacts.
+- The completed comparison is intentionally `blocked`: 6 blocking and 2 material differences. Blocking paths are five publication-intent values and assertions; material paths are topic count and classification. This is comparison evidence only—nothing was published.
+
+### Resume point
+- The model transport and required output schema are now verified end to end for the synthetic fixture. Next work, if separately approved, is to analyze and correct the observed semantic comparison divergences while retaining the same non-publishing, synthetic-only boundary.

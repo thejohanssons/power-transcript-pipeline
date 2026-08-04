@@ -162,8 +162,45 @@ describe('runtime-shadow synthetic local Worker integration', () => {
 
     const d1 = new LocalD1();
     const queuedJobs: FixtureJob[] = [];
-    const fetchStub = vi.fn(async (url: URL | RequestInfo) => {
-      expect(String(url)).toContain('synthetic.invalid/openai/deployments/synthetic-deployment/chat/completions');
+    const fetchStub = vi.fn(async (url: URL | RequestInfo, init?: RequestInit) => {
+      expect(String(url)).toBe(
+        'https://synthetic.invalid/openai/deployments/synthetic-deployment/chat/completions?api-version=2024-02-15-preview',
+      );
+      expect(init?.method).toBe('POST');
+      expect(init?.headers).toMatchObject({ 'api-key': 'synthetic-api-key', 'content-type': 'application/json' });
+      const requestBody = JSON.parse(String(init?.body));
+      expect(requestBody).toMatchObject({
+        model: 'synthetic-deployment',
+        max_completion_tokens: 16000,
+        response_format: { type: 'json_object' },
+      });
+      const prompt = JSON.parse(requestBody.messages[1].content);
+      expect(prompt).toMatchObject({
+        outputContractVersion: 'normalized-output-v2',
+        immutableValues: {
+          schemaVersion: '1.0.0',
+          source: {
+            system: 'synthetic_local_test',
+            nativeId: fixtureId,
+            transcriptSha256,
+            acquisitionMode: 'direct_vtt',
+          },
+          processing: {
+            runtime: 'cloudflare',
+            pipelineVersion: 'synthetic-1',
+            promptVersion: 'synthetic-prompt-1',
+            model: 'synthetic-model',
+            deployment: 'synthetic-deployment',
+            configurationHashes: { taxonomy: 'b'.repeat(64) },
+          },
+        },
+        requiredOutputShape: {
+          publicationIntent: {
+            transcript: 'boolean',
+            legacyCloudflareSync: 'boolean',
+          },
+        },
+      });
       return new Response(JSON.stringify({
         model: 'synthetic-model',
         choices: [{ message: { content: JSON.stringify(cloudflareOutput) } }],
@@ -175,16 +212,19 @@ describe('runtime-shadow synthetic local Worker integration', () => {
     const env = {
       ENVIRONMENT: 'test',
       SHADOW_MODE: 'fixture_parity',
-      AZURE_OPENAI_ENDPOINT: 'https://synthetic.invalid/',
+      AZURE_OPENAI_ENDPOINT: 'https://synthetic.invalid/openai/v1',
       AZURE_OPENAI_DEPLOYMENT: 'synthetic-deployment',
-      AZURE_OPENAI_API_VERSION: '2024-10-21',
-      AZURE_OPENAI_API_KEY: 'synthetic-local-key',
+      AZURE_OPENAI_API_KEY: 'synthetic-api-key',
       SHADOW_SUBMISSION_TOKEN: 'synthetic-submission-token',
       SHADOW_REVIEWER_TOKEN: 'synthetic-review-token',
       SHADOW_DB: d1,
       SHADOW_ARTIFACTS: r2,
       FIXTURE_JOBS: { send: async (job: FixtureJob) => { queuedJobs.push(job); } },
-    } as unknown as Cloudflare.StagingEnv & { AZURE_OPENAI_API_KEY: string; SHADOW_SUBMISSION_TOKEN: string; SHADOW_REVIEWER_TOKEN: string };
+    } as unknown as Cloudflare.StagingEnv & {
+      AZURE_OPENAI_API_KEY: string;
+      SHADOW_SUBMISSION_TOKEN: string;
+      SHADOW_REVIEWER_TOKEN: string;
+    };
 
     try {
       const submission = await worker.fetch(new Request('https://worker.local/v1/fixture-runs', {
@@ -204,6 +244,17 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       }), env);
       expect(rejectedSubmission.status).toBe(401);
 
+      // Preserve a prior-contract, schema-invalid checkpoint as immutable audit
+      // evidence. The versioned checkpoint lookup must not reuse it.
+      r2.objects.set(`runs/${submissionBody.runId}/model-response-checkpoint.json`, JSON.stringify({
+        responseText: JSON.stringify({ request: 'old invalid contract response' }),
+        provider: 'azure_openai',
+        model: 'synthetic-model',
+        deployment: 'synthetic-deployment',
+        requestSha256: 'a'.repeat(64),
+        responseSha256: await sha256(JSON.stringify({ request: 'old invalid contract response' })),
+      }));
+
       // Model a failed attempt followed by a recovery submission racing the
       // delayed original Queue delivery. Whichever caller wins the conditional
       // D1 transition owns processing; the other no-ops/replays.
@@ -222,7 +273,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       ]);
       expect([200, 202]).toContain((await recovery).status);
       expect(delayedDelivery.ack.mock.calls.length + delayedDelivery.retry.mock.calls.length).toBe(1);
-      expect(fetchStub).toHaveBeenCalledOnce();
+      expect(fetchStub).toHaveBeenCalledTimes(1);
 
       // Any recovered queue job and the retry after the synthetic R2 failure
       // reuse the persisted model result rather than call the adapter again.
@@ -230,12 +281,13 @@ describe('runtime-shadow synthetic local Worker integration', () => {
         const delivery = { body: job, ack: vi.fn(), retry: vi.fn() };
         await worker.queue({ messages: [delivery] } as unknown as MessageBatch<FixtureJob>, env);
       }
-      expect(fetchStub).toHaveBeenCalledOnce();
+      expect(fetchStub).toHaveBeenCalledTimes(1);
 
       const run = await d1.prepare('SELECT state, comparison_status FROM fixture_runs WHERE run_id = ?')
         .bind(submissionBody.runId).first<{ state: string; comparison_status: string }>();
       expect(run).toEqual({ state: 'completed', comparison_status: 'pass' });
-      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoint.json`)).toContain('"responseSha256"');
+      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoint.json`)).toContain('old invalid contract response');
+      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoints/normalized-output-v2.json`)).toContain('"outputContractVersion":"normalized-output-v2"');
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-normalized-output.json`)).toBe(JSON.stringify(cloudflareOutput));
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-publication-intent.json`)).toBe(JSON.stringify(publicationIntent));
       expect(r2.objects.get(`runs/${submissionBody.runId}/comparison.json`)).toContain('"status":"pass"');
@@ -245,7 +297,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       await worker.queue({ messages: [delayedDuplicate] } as unknown as MessageBatch<FixtureJob>, env);
       expect(delayedDuplicate.ack).toHaveBeenCalledOnce();
       expect(delayedDuplicate.retry).not.toHaveBeenCalled();
-      expect(fetchStub).toHaveBeenCalledOnce();
+      expect(fetchStub).toHaveBeenCalledTimes(1);
     } finally {
       d1.close();
     }

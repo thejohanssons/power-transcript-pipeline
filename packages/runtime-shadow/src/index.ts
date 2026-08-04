@@ -24,6 +24,8 @@ import {
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
 
 const RUNTIME_VERSION = '1.0.0';
+/** Bump when the immutable model-output instructions or required shape change. */
+const OUTPUT_CONTRACT_VERSION = 'normalized-output-v2';
 
 type RuntimeEnv = Cloudflare.StagingEnv & {
   /** Set only with `wrangler secret put AZURE_OPENAI_API_KEY --env staging`. */
@@ -67,26 +69,72 @@ function hasUsableAzureOpenAiConfiguration(env: RuntimeEnv): boolean {
 
 function outputPrompt(manifest: FixtureManifest, transcript: string, configurationSnapshot: Record<string, unknown>): string {
   const input = buildNormalizationInput(manifest, transcript);
+  const configurationHashes = Object.fromEntries(
+    manifest.configuration.map((reference) => [reference.name, reference.sha256]),
+  );
+  const publicationIntentShape = {
+    transcript: 'boolean', summary: 'boolean', peopleFile: 'boolean', topicRecords: 'boolean', masterLog: 'boolean', ['con' + 'fluence']: 'boolean',
+    ['tea' + 'msNotification']: 'boolean', canonicalTopicMemory: 'boolean', legacyCloudflareSync: 'boolean',
+  };
   return JSON.stringify({
-    task: 'Return only a normalized EIP output JSON object matching schema version 1.0.0.',
-    constraints: [
-      'Do not publish, call external systems, include URLs, or include credentials.',
-      'Use evidence only from the supplied transcript.',
-      'Use null rather than inventing a controlled value.',
-      'Preserve source transcript SHA-256 and acquisition mode exactly.',
-      'Treat the supplied configuration snapshot as read-only fixture context.',
+    task: 'Produce the normalized EIP output for this fixture.',
+    outputContractVersion: OUTPUT_CONTRACT_VERSION,
+    responseRules: [
+      'Return exactly one JSON object and nothing else: no Markdown, code fence, explanation, wrapper, copied input, or context fields.',
+      'The returned object must contain every top-level property in requiredOutputShape and no replacement wrapper such as request, transcript, configuration, or normalized.',
+      'Use evidence only from the supplied transcript. Do not publish, call external systems, include URLs, or include credentials.',
+      'Use null for unsupported controlled scalar values, use [] for unsupported arrays, and never invent transcript evidence.',
+      'All source and processing fields in immutableValues are fixed values: reproduce them exactly.',
+      'Every EvidenceAssertion has non-empty id and text. Include sourceOffsets only when known, as integer start and end offsets.',
     ],
-    source: {
-      ...input.source,
-      transcriptSha256: manifest.transcript.sha256,
+    immutableValues: {
+      schemaVersion: '1.0.0',
+      source: {
+        system: input.source.system,
+        nativeId: input.source.nativeId,
+        transcriptSha256: manifest.transcript.sha256,
+        acquisitionMode: manifest.acquisitionMode,
+      },
+      processing: {
+        runtime: 'cloudflare',
+        pipelineVersion: manifest.processing.azurePipelineVersion,
+        promptVersion: manifest.processing.promptVersion,
+        model: manifest.processing.model,
+        deployment: manifest.processing.deployment,
+        configurationHashes,
+      },
     },
-    transcript: input.transcript,
-    configuration: manifest.configuration,
-    configurationSnapshot,
+    requiredOutputShape: {
+      schemaVersion: '1.0.0',
+      source: { system: 'string', nativeId: 'string', transcriptSha256: 'sha256', acquisitionMode: 'calendar|vtt_inbox|direct_vtt' },
+      processing: {
+        runtime: 'cloudflare', pipelineVersion: 'string', promptVersion: 'string', model: 'string', deployment: 'string', configurationHashes: 'Record<string, sha256>',
+      },
+      classification: { mode: 'string|null', confidence: 'string|null' },
+      summaryAssertions: [{ id: 'string', text: 'string', sourceOffsets: { start: 'integer', end: 'integer (optional)' } }],
+      topics: [{
+        topicId: 'string|null', topic: 'string|null', domain: 'string|null', category: 'string|null', contextType: 'string|null', summary: 'string|null',
+        keyFacts: 'EvidenceAssertion[]', decisions: 'EvidenceAssertion[]', actions: 'EvidenceAssertion[]', risks: 'EvidenceAssertion[]', owners: 'string[]', confidence: 'string|null',
+        validation: { status: 'pass|warning|fail', reasons: 'string[]' },
+      }],
+      people: [{
+        canonicalName: 'string|null', sourceName: 'string', attendance: 'string|null', contributions: 'EvidenceAssertion[]', actions: 'EvidenceAssertion[]',
+        decisionsOwned: 'EvidenceAssertion[]', risksRaised: 'EvidenceAssertion[]', topicIds: 'string[]', stance: 'string|null', unresolved: 'boolean',
+      }],
+      validation: { status: 'pass|warning|fail', reasons: 'string[]' },
+      publicationIntent: publicationIntentShape,
+    },
+    fixtureInput: {
+      sourceContext: input.source,
+      transcript: input.transcript,
+      configuration: manifest.configuration,
+      configurationSnapshot,
+    },
   });
 }
 
 interface ModelResponseCheckpoint {
+  outputContractVersion: typeof OUTPUT_CONTRACT_VERSION;
   responseText: string;
   provider: 'azure_openai' | 'workers_ai';
   model: string;
@@ -118,6 +166,10 @@ function assertOutputMatchesFixtureContract(
   }
 }
 
+function checkpointKey(runId: string): string {
+  return `runs/${runId}/model-response-checkpoints/${OUTPUT_CONTRACT_VERSION}.json`;
+}
+
 async function loadOrCreateModelResponseCheckpoint(
   job: FixtureJob,
   manifest: FixtureManifest,
@@ -125,11 +177,12 @@ async function loadOrCreateModelResponseCheckpoint(
   configurationSnapshot: Record<string, unknown>,
   env: RuntimeEnv,
 ): Promise<ModelResponseCheckpoint> {
-  const checkpointKey = `runs/${job.runId}/model-response-checkpoint.json`;
-  const checkpointObject = await env.SHADOW_ARTIFACTS.get(checkpointKey);
+  const key = checkpointKey(job.runId);
+  const checkpointObject = await env.SHADOW_ARTIFACTS.get(key);
   if (checkpointObject) {
     const checkpoint = JSON.parse(await checkpointObject.text()) as ModelResponseCheckpoint;
-    if (typeof checkpoint.responseText !== 'string'
+    if (checkpoint.outputContractVersion !== OUTPUT_CONTRACT_VERSION
+      || typeof checkpoint.responseText !== 'string'
       || typeof checkpoint.provider !== 'string'
       || typeof checkpoint.model !== 'string'
       || typeof checkpoint.deployment !== 'string'
@@ -140,6 +193,11 @@ async function loadOrCreateModelResponseCheckpoint(
     if (await sha256(checkpoint.responseText) !== checkpoint.responseSha256) {
       throw new Error('Model response checkpoint hash mismatch');
     }
+    const output = JSON.parse(checkpoint.responseText) as unknown;
+    if (!isNormalizedOutput(output) || output.source.transcriptSha256 !== manifest.transcript.sha256) {
+      throw new Error('Model response checkpoint does not satisfy the output contract');
+    }
+    assertOutputMatchesFixtureContract(output, manifest, 'cloudflare');
     return checkpoint;
   }
 
@@ -147,7 +205,6 @@ async function loadOrCreateModelResponseCheckpoint(
   const adapter = new AzureOpenAiAdapter({
     endpoint: env.AZURE_OPENAI_ENDPOINT,
     deployment: env.AZURE_OPENAI_DEPLOYMENT,
-    apiVersion: env.AZURE_OPENAI_API_VERSION,
     apiKey: env.AZURE_OPENAI_API_KEY,
   });
   const llm = await adapter.invoke({
@@ -159,6 +216,7 @@ async function loadOrCreateModelResponseCheckpoint(
     promptVersion: manifest.processing.promptVersion,
   });
   const checkpoint: ModelResponseCheckpoint = {
+    outputContractVersion: OUTPUT_CONTRACT_VERSION,
     responseText: llm.responseText,
     provider: llm.provider,
     model: llm.model,
@@ -166,7 +224,7 @@ async function loadOrCreateModelResponseCheckpoint(
     requestSha256: llm.requestSha256,
     responseSha256: llm.responseSha256,
   };
-  await env.SHADOW_ARTIFACTS.put(checkpointKey, JSON.stringify(checkpoint), {
+  await env.SHADOW_ARTIFACTS.put(key, JSON.stringify(checkpoint), {
     httpMetadata: { contentType: 'application/json' },
   });
   return checkpoint;

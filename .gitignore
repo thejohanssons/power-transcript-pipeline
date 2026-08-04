@@ -30,3 +30,6 @@ node_modules/
 dist/
 .dev.vars
 *.local.vars
+
+# Local-only controlled fixture exercises (never commit)
+.local-fixtures/

@@ -13,15 +13,14 @@
       "vars": {
         "ENVIRONMENT": "staging",
         "SHADOW_MODE": "fixture_parity",
-        "AZURE_OPENAI_ENDPOINT": "",
-        "AZURE_OPENAI_DEPLOYMENT": "",
-        "AZURE_OPENAI_API_VERSION": "2024-10-21"
+        "AZURE_OPENAI_ENDPOINT": "https://atlassian-rovo-forge.openai.azure.com/openai/v1",
+        "AZURE_OPENAI_DEPLOYMENT": "gpt-5.6-terra"
       },
       "d1_databases": [
         {
           "binding": "SHADOW_DB",
           "database_name": "eip-runtime-shadow-staging",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "c7474ecb-ff28-4788-9108-15d29a022c7b",
           "migrations_dir": "migrations"
         }
       ],
