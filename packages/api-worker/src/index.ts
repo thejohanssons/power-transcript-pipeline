@@ -31,6 +31,8 @@ export interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   ENVIRONMENT: string;
+  /** Staging secret for the shadow's read-only Azure artifact endpoint. */
+  SHADOW_ARTIFACT_READ_TOKEN: string;
 }
 
 const CORS_HEADERS = {
@@ -140,6 +142,11 @@ export default {
       // --- Topics PATCH ---
       if (path.match(/^\/topics\/[^/]+$/) && method === 'PATCH') {
         return handlePatchTopic(env, decodeURIComponent(path.split('/')[2]), request);
+      }
+
+      // --- Runtime-shadow artifact reader (staging only; no R2 write path) ---
+      if (path.match(/^\/internal\/runtime-shadow\/azure-artifacts\/.+$/) && method === 'GET') {
+        return handleGetRuntimeShadowAzureArtifact(env, request, path.slice('/internal/runtime-shadow/azure-artifacts/'.length));
       }
 
       // --- Files (R2) ---
@@ -721,6 +728,51 @@ async function handlePostFile(env: Env, request: Request): Promise<Response> {
     content_type: contentType,
     updated_transcript: updatedTranscript,
   }, 201);
+}
+
+const SHADOW_READ_PREFIXES = ['transcripts/', 'summaries/', 'people/', 'topic-records/'];
+
+async function hasMatchingShadowReadToken(request: Request, expectedToken: string): Promise<boolean> {
+  const suppliedToken = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
+  if (!suppliedToken || !expectedToken) return false;
+
+  const encoder = new TextEncoder();
+  const supplied = encoder.encode(suppliedToken);
+  const expected = encoder.encode(expectedToken);
+  if (supplied.byteLength !== expected.byteLength) return false;
+  if (typeof crypto.subtle.timingSafeEqual === 'function') {
+    return crypto.subtle.timingSafeEqual(supplied, expected);
+  }
+
+  let mismatch = 0;
+  for (let index = 0; index < supplied.length; index += 1) mismatch |= supplied[index] ^ expected[index];
+  return mismatch === 0;
+}
+
+/**
+ * Staging-only, authenticated, role-limited reader for the runtime shadow.
+ * This endpoint cannot write, list, or delete operational Azure artifacts.
+ */
+async function handleGetRuntimeShadowAzureArtifact(env: Env, request: Request, key: string): Promise<Response> {
+  if (env.ENVIRONMENT !== 'staging') return errorResponse('Not found', 404);
+  if (!await hasMatchingShadowReadToken(request, env.SHADOW_ARTIFACT_READ_TOKEN)) return errorResponse('Unauthorized', 401);
+
+  const decodedKey = decodeURIComponent(key);
+  if (!SHADOW_READ_PREFIXES.some((prefix) => decodedKey.startsWith(prefix))
+    || decodedKey.startsWith('/') || decodedKey.includes('..') || decodedKey.includes('\\')) {
+    return errorResponse('Artifact key is outside the permitted Azure export hierarchy', 400);
+  }
+
+  const object = await env.STORAGE.get(decodedKey);
+  if (!object) return errorResponse('File not found', 404);
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
+      'Content-Length': String(object.size),
+      'ETag': object.etag,
+      ...CORS_HEADERS,
+    },
+  });
 }
 
 async function handleGetFile(env: Env, key: string): Promise<Response> {

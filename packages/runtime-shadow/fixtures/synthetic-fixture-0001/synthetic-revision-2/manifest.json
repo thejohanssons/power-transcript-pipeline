@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureId": "synthetic-fixture-0001",
+  "revision": "synthetic-revision-2",
+  "acquisitionMode": "direct_vtt",
+  "source": {
+    "system": "synthetic_local_exercise",
+    "nativeId": "synthetic-fixture-0001",
+    "subject": "Synthetic local fixture exercise: evidence-safe action baseline"
+  },
+  "transcript": {
+    "key": "fixtures/synthetic-fixture-0001/synthetic-revision-2/input/transcript.vtt",
+    "sha256": "7b022bfef95c2654254bb4c9e3e5989b71cb6eff14028742a5f736a50f7f85aa",
+    "bytes": 168,
+    "contentType": "text/vtt"
+  },
+  "azureBaseline": {
+    "normalizedOutput": {
+      "key": "fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/azure-normalized-output.json",
+      "sha256": "afc00ba321e4af30cdb8810c9f7bd30b29e126a71156cff1828d4e1f7d2311d1",
+      "bytes": 1008,
+      "contentType": "application/json"
+    },
+    "publicationIntent": {
+      "key": "fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/azure-publication-intent.json",
+      "sha256": "9ada7a99ee67216a8a52ba0b50494e5f7eda492b8aa45216a3c082a817274100",
+      "bytes": 192,
+      "contentType": "application/json"
+    }
+  },
+  "configurationSnapshot": {
+    "key": "fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/config-snapshot.json",
+    "sha256": "31686f9e26555a110efd6af613ad1e14f42356b03f5bcaf39614bdb90c98bc42",
+    "bytes": 400,
+    "contentType": "application/json"
+  },
+  "configuration": [
+    {
+      "name": "taxonomy",
+      "version": "synthetic-1",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "processing": {
+    "azurePipelineVersion": "synthetic-1",
+    "promptVersion": "synthetic-prompt-1",
+    "model": "synthetic-model",
+    "deployment": "synthetic-deployment"
+  },
+  "classification": "internal",
+  "approvedBy": "synthetic-local-exercise",
+  "approvedAt": "2026-08-04T00:00:00.000Z",
+  "expiresAt": "2026-08-30T00:00:00.000Z"
+}

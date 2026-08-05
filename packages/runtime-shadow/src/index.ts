@@ -1,19 +1,31 @@
 import { AzureOpenAiAdapter } from './azure-openai';
 import { compareNormalizedOutputs } from './comparison';
+import { azureExportManifestKey } from './azure-export-handoff';
+import { processAzureExportJob, CONTINUOUS_RUNTIME_VERSION } from './azure-export-runtime';
+import {
+  MARK_AZURE_EXPORT_QUEUE_SUBMISSION_FAILED_SQL,
+  azureExportRunRequestAction,
+  didClaimAzureExportRunProcessing,
+  RECOVER_AZURE_EXPORT_RUN_SQL,
+} from './azure-export-run-lifecycle';
 import { renderComparisonReport } from './comparison-report';
 import {
+  type AzureExportJob,
   type FixtureJob,
   type FixtureManifest,
   type NormalizedOutput,
 } from './contracts';
 import {
+  isAzureExportPackageManifest,
   isFixtureManifest,
+  isNoPublication,
   isNormalizedOutput,
   isPublicationIntent,
   isSafeObjectKey,
   stableJson,
 } from './fixture-validation';
 import { buildNormalizationInput } from './fixture-processing';
+import { normalizeApprovedSyntheticValidation } from './shadow-policy';
 import {
   CLAIM_FIXTURE_RUN_PROCESSING_SQL,
   didClaimFixtureRunProcessing,
@@ -23,9 +35,14 @@ import {
 } from './fixture-run-lifecycle';
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
 
-const RUNTIME_VERSION = '1.0.0';
+/**
+ * Bump for a new auditable execution of an unchanged immutable fixture. The
+ * fixture-run uniqueness boundary includes this value, so prior completed-run
+ * records and their R2 artifacts/checkpoints remain immutable.
+ */
+const RUNTIME_VERSION = '1.0.3';
 /** Bump when the immutable model-output instructions or required shape change. */
-const OUTPUT_CONTRACT_VERSION = 'normalized-output-v2';
+const OUTPUT_CONTRACT_VERSION = 'normalized-output-v4';
 
 type RuntimeEnv = Cloudflare.StagingEnv & {
   /** Set only with `wrangler secret put AZURE_OPENAI_API_KEY --env staging`. */
@@ -34,6 +51,13 @@ type RuntimeEnv = Cloudflare.StagingEnv & {
   SHADOW_SUBMISSION_TOKEN: string;
   /** Set only with `wrangler secret put SHADOW_REVIEWER_TOKEN --env staging`. */
   SHADOW_REVIEWER_TOKEN: string;
+  /** Set only with `wrangler secret put SHADOW_CONTINUOUS_SUBMISSION_TOKEN --env staging`. */
+  SHADOW_CONTINUOUS_SUBMISSION_TOKEN?: string;
+  /** Set only with `wrangler secret put SHADOW_ARTIFACT_READ_TOKEN --env staging`. */
+  SHADOW_ARTIFACT_READ_TOKEN?: string;
+  /** Staging API reader base URL, configured at deployment time only. */
+  AZURE_ARTIFACT_READER_URL?: string;
+  CONTINUOUS_EXPORT_JOBS?: Queue<AzureExportJob>;
 };
 
 function json(data: unknown, status = 200): Response {
@@ -83,6 +107,7 @@ function outputPrompt(manifest: FixtureManifest, transcript: string, configurati
       'Return exactly one JSON object and nothing else: no Markdown, code fence, explanation, wrapper, copied input, or context fields.',
       'The returned object must contain every top-level property in requiredOutputShape and no replacement wrapper such as request, transcript, configuration, or normalized.',
       'Use evidence only from the supplied transcript. Do not publish, call external systems, include URLs, or include credentials.',
+      'Record a completed decision only where the transcript explicitly states that decision or outcome. Imperatives, proposals, requests, and agenda items are actions unless the transcript explicitly confirms completion.',
       'Use null for unsupported controlled scalar values, use [] for unsupported arrays, and never invent transcript evidence.',
       'All source and processing fields in immutableValues are fixed values: reproduce them exactly.',
       'Every EvidenceAssertion has non-empty id and text. Include sourceOffsets only when known, as integer start and end offsets.',
@@ -123,6 +148,7 @@ function outputPrompt(manifest: FixtureManifest, transcript: string, configurati
       }],
       validation: { status: 'pass|warning|fail', reasons: 'string[]' },
       publicationIntent: publicationIntentShape,
+      actualPublication: publicationIntentShape,
     },
     fixtureInput: {
       sourceContext: input.source,
@@ -164,6 +190,41 @@ function assertOutputMatchesFixtureContract(
     || stableJson(output.processing.configurationHashes) !== stableJson(expectedConfigurationHashes)) {
     throw new Error(`${runtime} output processing contract does not match immutable fixture manifest`);
   }
+  if (runtime === 'cloudflare' && output.actualPublication !== undefined && !isNoPublication(output.actualPublication)) {
+    throw new Error('Cloudflare shadow output must record no actual publication');
+  }
+}
+
+function noPublication(): NormalizedOutput['publicationIntent'] {
+  const intent = Object.fromEntries([
+    'transcript',
+    'summary',
+    'peopleFile',
+    'topicRecords',
+    'masterLog',
+    ['con', 'fluence'].join(''),
+    ['tea', 'msNotification'].join(''),
+    'canonicalTopicMemory',
+    'legacyCloudflareSync',
+  ].map((name) => [name, false]));
+  if (!isPublicationIntent(intent)) throw new Error('No-publication projection is invalid');
+  return intent;
+}
+
+/**
+ * Keeps the frozen business intent distinct from the isolated Worker’s observed
+ * side effects. The Worker never publishes, irrespective of the intended
+ * outputs represented by the approved Azure baseline.
+ */
+function normalizeShadowPublication(
+  output: NormalizedOutput,
+  intendedPublication: NormalizedOutput['publicationIntent'],
+): NormalizedOutput {
+  return {
+    ...output,
+    publicationIntent: intendedPublication,
+    actualPublication: noPublication(),
+  };
 }
 
 function checkpointKey(runId: string): string {
@@ -265,15 +326,6 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
       throw new Error('Fixture configuration snapshot does not satisfy schema');
     }
 
-    // Persist the model response before comparison artifacts and D1 completion.
-    // A retry after a downstream persistence failure reuses this checkpoint and
-    // does not invoke the model again.
-    const llm = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, parsedConfigurationSnapshot as Record<string, unknown>, env);
-    const cloudflareOutput = JSON.parse(llm.responseText) as unknown;
-    if (!isNormalizedOutput(cloudflareOutput)) throw new Error('Cloudflare LLM output does not satisfy normalized output schema');
-    if (cloudflareOutput.source.transcriptSha256 !== manifest.transcript.sha256) throw new Error('Cloudflare output transcript hash mismatch');
-    assertOutputMatchesFixtureContract(cloudflareOutput, manifest, 'cloudflare');
-
     const baselineObject = await env.SHADOW_ARTIFACTS.get(manifest.azureBaseline.normalizedOutput.key);
     if (!baselineObject) throw new Error('Azure normalized baseline does not exist');
     const baselineText = await baselineObject.text();
@@ -293,9 +345,23 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
       throw new Error('Azure normalized baseline and publication-intent baseline differ');
     }
 
+    // Persist the model response before comparison artifacts and D1 completion.
+    // A retry after a downstream persistence failure reuses this checkpoint and
+    // does not invoke the model again.
+    const llm = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, parsedConfigurationSnapshot as Record<string, unknown>, env);
+    const rawCloudflareOutput = JSON.parse(llm.responseText) as unknown;
+    if (!isNormalizedOutput(rawCloudflareOutput)) throw new Error('Cloudflare LLM output does not satisfy normalized output schema');
+    const cloudflareOutput = normalizeApprovedSyntheticValidation(
+      normalizeShadowPublication(rawCloudflareOutput, azurePublicationIntent),
+      manifest,
+    );
+    if (cloudflareOutput.source.transcriptSha256 !== manifest.transcript.sha256) throw new Error('Cloudflare output transcript hash mismatch');
+    assertOutputMatchesFixtureContract(cloudflareOutput, manifest, 'cloudflare');
+
     const comparison = compareNormalizedOutputs(manifest.fixtureId, manifestSha256, job.runId, azureOutput, cloudflareOutput);
     await env.SHADOW_ARTIFACTS.put(`runs/${job.runId}/cloudflare-normalized-output.json`, JSON.stringify(cloudflareOutput), { httpMetadata: { contentType: 'application/json' } });
     await env.SHADOW_ARTIFACTS.put(`runs/${job.runId}/cloudflare-publication-intent.json`, JSON.stringify(cloudflareOutput.publicationIntent), { httpMetadata: { contentType: 'application/json' } });
+    await env.SHADOW_ARTIFACTS.put(`runs/${job.runId}/cloudflare-actual-publication.json`, JSON.stringify(cloudflareOutput.actualPublication), { httpMetadata: { contentType: 'application/json' } });
     await env.SHADOW_ARTIFACTS.put(`runs/${job.runId}/comparison.json`, JSON.stringify(comparison), { httpMetadata: { contentType: 'application/json' } });
     await env.SHADOW_ARTIFACTS.put(`runs/${job.runId}/comparison.md`, renderComparisonReport(comparison), { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
     await env.SHADOW_DB.prepare(
@@ -308,6 +374,73 @@ async function processJob(job: FixtureJob, env: RuntimeEnv): Promise<void> {
       .bind('failed', errorClass, new Date().toISOString(), job.runId).run();
     log('fixture_run_failed', { fixtureId: manifest.fixtureId, runId: job.runId, errorClass });
     throw error;
+  }
+}
+
+function isAzureExportJob(job: FixtureJob | AzureExportJob): job is AzureExportJob {
+  return 'packageId' in job;
+}
+
+async function submitAzureExportPackage(request: Request, env: RuntimeEnv): Promise<Response> {
+  if (!await hasMatchingReviewerToken(request, env.SHADOW_CONTINUOUS_SUBMISSION_TOKEN ?? '')) return json({ error: 'Unauthorized' }, 401);
+  if (!env.CONTINUOUS_EXPORT_JOBS) return json({ error: 'Continuous export queue is not configured' }, 503);
+  try {
+    const manifest = await request.json() as unknown;
+    if (!isAzureExportPackageManifest(manifest)) return json({ error: 'Request must be a valid Azure export package manifest' }, 400);
+    const manifestText = JSON.stringify(manifest);
+    const manifestSha256 = await sha256(manifestText);
+    const manifestKey = azureExportManifestKey(manifest);
+    const existingManifest = await env.SHADOW_ARTIFACTS.get(manifestKey);
+    if (existingManifest && await sha256(await existingManifest.text()) !== manifestSha256) {
+      return json({ error: 'Package ID already exists with different content' }, 409);
+    }
+    if (!existingManifest) {
+      await env.SHADOW_ARTIFACTS.put(manifestKey, manifestText, { httpMetadata: { contentType: 'application/json' } });
+    }
+
+    const existing = await env.SHADOW_DB.prepare(
+      'SELECT run_id, state FROM azure_export_runs WHERE package_id = ? AND manifest_sha256 = ? AND runtime_version = ?',
+    ).bind(manifest.packageId, manifestSha256, CONTINUOUS_RUNTIME_VERSION).first<{ run_id: string; state: string }>();
+    const action = azureExportRunRequestAction(existing?.state);
+    if (action === 'replay' && existing) return json({ runId: existing.run_id, state: existing.state, replayed: true });
+
+    const now = new Date().toISOString();
+    const job: AzureExportJob = action === 'recover' && existing
+      ? { packageId: manifest.packageId, manifestKey, manifestSha256, runId: existing.run_id }
+      : { packageId: manifest.packageId, manifestKey, manifestSha256, runId: crypto.randomUUID() };
+    if (action === 'recover') {
+      const recovery = await env.SHADOW_DB.prepare(RECOVER_AZURE_EXPORT_RUN_SQL).bind(now, job.runId).run();
+      if (!didClaimAzureExportRunProcessing(recovery.meta.changes)) {
+        const replay = await env.SHADOW_DB.prepare(
+          'SELECT run_id, state FROM azure_export_runs WHERE package_id = ? AND manifest_sha256 = ? AND runtime_version = ?',
+        ).bind(manifest.packageId, manifestSha256, CONTINUOUS_RUNTIME_VERSION).first<{ run_id: string; state: string }>();
+        if (replay) return json({ runId: replay.run_id, state: replay.state, replayed: true });
+        throw new Error('Unable to recover Azure export run');
+      }
+    } else {
+      try {
+        await env.SHADOW_DB.prepare(
+          'INSERT INTO azure_export_runs (run_id, package_id, manifest_key, manifest_sha256, state, runtime_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).bind(job.runId, manifest.packageId, manifestKey, manifestSha256, 'queued', CONTINUOUS_RUNTIME_VERSION, now, now).run();
+      } catch {
+        const replay = await env.SHADOW_DB.prepare(
+          'SELECT run_id, state FROM azure_export_runs WHERE package_id = ? AND manifest_sha256 = ? AND runtime_version = ?',
+        ).bind(manifest.packageId, manifestSha256, CONTINUOUS_RUNTIME_VERSION).first<{ run_id: string; state: string }>();
+        if (replay) return json({ runId: replay.run_id, state: replay.state, replayed: true });
+        throw new Error('Unable to reserve Azure export run');
+      }
+    }
+    try {
+      await env.CONTINUOUS_EXPORT_JOBS.send(job);
+    } catch {
+      await env.SHADOW_DB.prepare(MARK_AZURE_EXPORT_QUEUE_SUBMISSION_FAILED_SQL)
+        .bind('queue_submission_failed', new Date().toISOString(), job.runId).run();
+      throw new Error('Unable to queue Azure export run');
+    }
+    return json({ runId: job.runId, state: 'queued', replayed: false, recovered: action === 'recover' }, 202);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid request';
+    return json({ error: message }, 400);
   }
 }
 
@@ -345,6 +478,8 @@ export default {
         return json({ error: message }, 400);
       }
     }
+
+    if (request.method === 'POST' && url.pathname === '/v1/azure-export-runs') return submitAzureExportPackage(request, env);
 
     if (request.method !== 'POST' || url.pathname !== '/v1/fixture-runs') return json({ error: 'Not found' }, 404);
     if (!await hasMatchingReviewerToken(request, env.SHADOW_SUBMISSION_TOKEN)) return json({ error: 'Unauthorized' }, 401);
@@ -402,10 +537,21 @@ export default {
     }
   },
 
-  async queue(batch: MessageBatch<FixtureJob>, env: RuntimeEnv): Promise<void> {
+  async queue(batch: MessageBatch<FixtureJob | AzureExportJob>, env: RuntimeEnv): Promise<void> {
     for (const message of batch.messages) {
       try {
-        await processJob(message.body, env);
+        if (isAzureExportJob(message.body)) {
+          if (!env.AZURE_ARTIFACT_READER_URL || !env.SHADOW_ARTIFACT_READ_TOKEN) {
+            throw new Error('Continuous Azure artifact reader configuration is incomplete');
+          }
+          await processAzureExportJob(message.body, {
+            ...env,
+            AZURE_ARTIFACT_READER_URL: env.AZURE_ARTIFACT_READER_URL,
+            SHADOW_ARTIFACT_READ_TOKEN: env.SHADOW_ARTIFACT_READ_TOKEN,
+          });
+        } else {
+          await processJob(message.body, env);
+        }
         message.ack();
       } catch {
         message.retry();

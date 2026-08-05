@@ -2,6 +2,7 @@ import type {
   ComparisonDifference,
   ComparisonResult,
   ComparisonSeverity,
+  ContinuousNormalizedOutput,
   NormalizedOutput,
   PublicationIntent,
 } from './contracts';
@@ -43,8 +44,11 @@ function comparePublicationIntent(
   });
 }
 
-function assertionTexts(output: NormalizedOutput): string[] {
-  return [
+function assertionTexts(output: Pick<ContinuousNormalizedOutput, 'summaryAssertions' | 'topics'>): string[] {
+  // The normalized output presents the same evidence in both the leadership
+  // summary and a topic projection. Compare the distinct semantic assertions,
+  // rather than treating a presentation-level repeat as a second claim.
+  return [...new Set([
     ...output.summaryAssertions.map((item) => item.text),
     ...output.topics.flatMap((topic) => [
       ...topic.keyFacts.map((item) => item.text),
@@ -52,20 +56,21 @@ function assertionTexts(output: NormalizedOutput): string[] {
       ...topic.actions.map((item) => item.text),
       ...topic.risks.map((item) => item.text),
     ]),
-  ].map((value) => value.trim().toLowerCase()).filter(Boolean).sort();
+  ].map((value) => value.trim().toLowerCase()).filter(Boolean))].sort();
 }
 
-export function compareNormalizedOutputs(
+function compareSemanticOutputs(
   fixtureId: string,
   manifestSha256: string,
   runId: string,
-  azure: NormalizedOutput,
-  cloudflare: NormalizedOutput,
+  azure: ContinuousNormalizedOutput,
+  cloudflare: ContinuousNormalizedOutput,
+  options: { comparePublicationIntent?: boolean; publicationIntent?: { azure: PublicationIntent; cloudflare: PublicationIntent } } = {},
 ): ComparisonResult {
   const differences: ComparisonDifference[] = [];
 
   if (!equal(azure.source, cloudflare.source)) {
-    differences.push(difference('source', 'blocking', 'Source identity, mode, or transcript hash differs', azure.source, cloudflare.source));
+    differences.push(difference('source', 'blocking', 'Source identity or transcript hash differs', azure.source, cloudflare.source));
   }
   if (azure.schemaVersion !== cloudflare.schemaVersion) {
     differences.push(difference('schemaVersion', 'blocking', 'Normalized output schema differs', azure.schemaVersion, cloudflare.schemaVersion));
@@ -87,8 +92,8 @@ export function compareNormalizedOutputs(
   if (!equal(azureProcessingContract, cloudflareProcessingContract)) {
     differences.push(difference('processing', 'blocking', 'Pipeline, prompt, model, deployment, or configuration contract differs', azureProcessingContract, cloudflareProcessingContract));
   }
-  if (!equal(azure.publicationIntent, cloudflare.publicationIntent)) {
-    differences.push(...comparePublicationIntent(azure.publicationIntent, cloudflare.publicationIntent));
+  if (options.comparePublicationIntent && options.publicationIntent) {
+    differences.push(...comparePublicationIntent(options.publicationIntent.azure, options.publicationIntent.cloudflare));
   }
   if (!equal(assertionTexts(azure), assertionTexts(cloudflare))) {
     differences.push(difference('assertions', 'blocking', 'Evidence-backed facts, decisions, actions, or risks differ', assertionTexts(azure), assertionTexts(cloudflare)));
@@ -133,4 +138,32 @@ export function compareNormalizedOutputs(
     differences,
     counts,
   };
+}
+
+/** Legacy frozen-fixture comparator: business publication intent remains in scope. */
+export function compareNormalizedOutputs(
+  fixtureId: string,
+  manifestSha256: string,
+  runId: string,
+  azure: NormalizedOutput,
+  cloudflare: NormalizedOutput,
+): ComparisonResult {
+  return compareSemanticOutputs(fixtureId, manifestSha256, runId, azure, cloudflare, {
+    comparePublicationIntent: true,
+    publicationIntent: { azure: azure.publicationIntent, cloudflare: cloudflare.publicationIntent },
+  });
+}
+
+/**
+ * Continuous Azure-export parity deliberately compares semantic processing only.
+ * Azure publication and Cloudflare D1/R2 persistence are separate concerns.
+ */
+export function compareContinuousNormalizedOutputs(
+  packageId: string,
+  manifestSha256: string,
+  runId: string,
+  azure: ContinuousNormalizedOutput,
+  cloudflare: ContinuousNormalizedOutput,
+): ComparisonResult {
+  return compareSemanticOutputs(packageId, manifestSha256, runId, azure, cloudflare);
 }

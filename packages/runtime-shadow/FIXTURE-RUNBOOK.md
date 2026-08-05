@@ -62,7 +62,9 @@ Use lowercase hexadecimal SHA-256 digests with exactly 64 characters. Record a d
 
 ## Baseline and comparison requirements
 
-The Azure baseline must be produced before the Cloudflare fixture run and must remain unchanged for that fixture revision. It must include the normalized output and a publication-intent projection. A runtime-shadow comparison must classify differences as follows:
+The Azure baseline must be produced before the Cloudflare fixture run and must remain unchanged for that fixture revision. It must include the normalized output and a publication-intent projection. `publicationIntent` is the approved business intent—the outputs that the normal approved pipeline is expected to create—not evidence that this shadow Worker wrote anything. A Cloudflare shadow result preserves that intended projection for comparison and records a separate all-false `actualPublication` projection. The Worker has no publisher implementation, so every shadow run must record no actual publication.
+
+A runtime-shadow comparison must classify differences as follows:
 
 - **blocking**: source identity/hash/mode, assertions, validation, or publication-intent changes;
 - **material**: controlled topic fields, ownership/confidence, people, or classification changes;

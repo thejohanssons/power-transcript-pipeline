@@ -1069,6 +1069,102 @@ function Invoke-CloudflareSync {
 }
 
 # ---------------------------------------------------------------
+# Runtime Shadow handoff — submits only references to the artifacts
+# already written through the existing /files path. It never uploads,
+# modifies, or deletes operational artifacts.
+# ---------------------------------------------------------------
+function Get-Sha256Hex {
+    param([string]$Content)
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Content)
+    $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
+    return ([System.BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+}
+
+function New-RuntimeShadowArtifactReference {
+    param(
+        [string]$Key,
+        [string]$Content,
+        [string]$ContentType,
+        [string]$Kind
+    )
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Content)
+    return @{
+        key         = $Key
+        sha256      = Get-Sha256Hex -Content $Content
+        bytes       = $bytes.Length
+        contentType = $ContentType
+        kind        = $Kind
+    }
+}
+
+function Submit-RuntimeShadowAzureExport {
+    param(
+        [string]$PackageId,
+        [string]$MeetingId,
+        [string]$Subject,
+        [datetime]$EventDate,
+        [hashtable]$Transcript,
+        [hashtable]$Summary,
+        [hashtable]$People,
+        [object[]]$TopicRecords
+    )
+
+    $shadowUrl = $null
+    if ($pipelineConfig.eip_cloudflare_sync -eq 'staging') {
+        $shadowUrl = $pipelineConfig.eip_runtime_shadow_url_staging
+    }
+    $submissionToken = $env:RUNTIME_SHADOW_SUBMISSION_TOKEN
+    if (-not $shadowUrl -or -not $submissionToken) {
+        Write-Verbose '  [RUNTIME SHADOW] Handoff not configured; skipping manifest submission.'
+        return
+    }
+    if (-not $Transcript -or -not $Summary -or -not $People -or -not $TopicRecords -or $TopicRecords.Count -eq 0) {
+        Write-Warning '  [RUNTIME SHADOW] Required Azure artifacts are incomplete; skipping manifest submission.'
+        return
+    }
+
+    $manifest = @{
+        schemaVersion = '1.0.0'
+        packageId = $PackageId
+        source = @{
+            system    = 'azure-pipeline'
+            nativeId  = $MeetingId
+            meetingId = $MeetingId
+            subject   = $Subject
+            eventStart = $EventDate.ToUniversalTime().ToString('o')
+        }
+        processing = @{
+            azurePipelineVersion = $PIPELINE_VERSION
+            configuration = @(
+                @{ name = 'taxonomy'; version = $TAXONOMY_VERSION; sha256 = Get-Sha256Hex -Content ($taxonomy | ConvertTo-Json -Depth 32 -Compress) },
+                @{ name = 'mapping_rules'; version = $MAPPING_RULES_VERSION; sha256 = Get-Sha256Hex -Content ($mappingRules | ConvertTo-Json -Depth 32 -Compress) },
+                @{ name = 'roles'; version = $ROLES_CONFIG_VERSION; sha256 = Get-Sha256Hex -Content ($rolesConfig | ConvertTo-Json -Depth 32 -Compress) },
+                @{ name = 'sentiment_rules'; version = $SENTIMENT_RULES_VERSION; sha256 = Get-Sha256Hex -Content ($sentimentRules | ConvertTo-Json -Depth 32 -Compress) }
+            )
+        }
+        artifacts = @{
+            transcript = $Transcript
+            summary = $Summary
+            people = $People
+            topicRecords = @($TopicRecords)
+        }
+    }
+
+    try {
+        $endpoint = "$($shadowUrl.TrimEnd('/'))/v1/azure-export-runs"
+        Invoke-RestMethod -Method Post -Uri $endpoint `
+            -Headers @{ Authorization = "Bearer $submissionToken" } `
+            -Body ($manifest | ConvertTo-Json -Depth 16) `
+            -ContentType 'application/json' -TimeoutSec 10 | Out-Null
+        Write-Host "  [RUNTIME SHADOW] Export manifest submitted: $PackageId" -ForegroundColor Cyan
+    } catch {
+        Write-Warning "  [RUNTIME SHADOW] Manifest submission skipped: $($_.Exception.Message)"
+    }
+}
+
+# ---------------------------------------------------------------
 # Normalize-TopicIds — maps LLM-generated topic IDs to canonical
 # T-codes from mapping_rules.json. Runs after Get-MeetingClassification
 # on all paths so D1 always receives consistent IDs.
@@ -1405,6 +1501,11 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         Write-Host "  [NID] Topic record dedup: $beforeCount → $($topicRecords3D.Count) records (collapsed duplicate labels)"
     }
 
+    $runtimeShadowTopicRecords = @()
+    $runtimeShadowTranscript = $null
+    $runtimeShadowSummary = $null
+    $runtimeShadowPeople = $null
+
     foreach ($tr in $topicRecords3D) {
         $cleanLabel     = if ($tr.Label) { $tr.Label } elseif ($tr.TopicName) { $tr.TopicName } else { $tr.TopicId }
         $sanitizedLabel = $cleanLabel -replace '[^\w\s-]', '' -replace '\s+', '-'
@@ -1422,11 +1523,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
         # [CF/R2] Store topic record in R2
         $r2TopicKey = "topic-records/$($EventDate.ToString('yyyy-MM'))/$MeetingId/$trFileName"
+        $r2TopicContent = Get-Content -Path $trLocalPath -Raw -Encoding utf8
         Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
             key          = $r2TopicKey
-            content      = (Get-Content -Path $trLocalPath -Raw -Encoding utf8)
+            content      = $r2TopicContent
             content_type = "text/markdown; charset=utf-8"
         }
+        $runtimeShadowTopicRecords += New-RuntimeShadowArtifactReference `
+            -Key $r2TopicKey -Content $r2TopicContent -ContentType 'text/markdown' -Kind 'topic_record'
 
         # [CF] Upsert topic to D1
         $safeTopicName  = if ($tr.Topic) { $tr.Topic } elseif ($tr.TopicName) { $tr.TopicName } elseif ($tr.Label) { $tr.Label } else { $tr.TopicId }
@@ -1468,11 +1572,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
         # [CF/R2] Store transcript in R2
         $r2TranscriptKey = "transcripts/$($EventDate.ToString('yyyy-MM'))/$MeetingId.txt"
+        $r2TranscriptContent = Get-Content -Path $localFile -Raw -Encoding utf8
         Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
             key          = $r2TranscriptKey
-            content      = (Get-Content -Path $localFile -Raw -Encoding utf8)
+            content      = $r2TranscriptContent
             content_type = "text/plain; charset=utf-8"
         }
+        $runtimeShadowTranscript = New-RuntimeShadowArtifactReference `
+            -Key $r2TranscriptKey -Content $r2TranscriptContent -ContentType 'text/plain' -Kind 'transcript'
         Write-Host "  [$PathLabel] Transcript stored in R2: $r2TranscriptKey"
 
         # [CF/D1] Register transcript
@@ -1491,11 +1598,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
             # [CF/R2] Store summary in R2
             $r2SummaryKey = "summaries/$($EventDate.ToString('yyyy-MM'))/$MeetingId-summary.txt"
+            $r2SummaryContent = Get-Content -Path $localSummaryFile -Raw -Encoding utf8
             Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
                 key          = $r2SummaryKey
-                content      = (Get-Content -Path $localSummaryFile -Raw -Encoding utf8)
+                content      = $r2SummaryContent
                 content_type = "text/plain; charset=utf-8"
             }
+            $runtimeShadowSummary = New-RuntimeShadowArtifactReference `
+                -Key $r2SummaryKey -Content $r2SummaryContent -ContentType 'text/plain' -Kind 'summary'
             Write-Host "  [$PathLabel] Summary stored in R2: $r2SummaryKey"
         }
     } catch {
@@ -1561,11 +1671,14 @@ BACK-LINK (MASTER LOG): $masterLogUrl
 
                     # [CF/R2] Store people file in R2
                     $r2PeopleKey = "people/$($EventDate.ToString('yyyy-MM'))/$MeetingId-people.txt"
+                    $r2PeopleContent = Get-Content -Path $localPeopleFile -Raw -Encoding utf8
                     Invoke-CloudflareSync -Method "Post" -Endpoint "files" -Body @{
                         key          = $r2PeopleKey
-                        content      = (Get-Content -Path $localPeopleFile -Raw -Encoding utf8)
+                        content      = $r2PeopleContent
                         content_type = "text/plain; charset=utf-8"
                     }
+                    $runtimeShadowPeople = New-RuntimeShadowArtifactReference `
+                        -Key $r2PeopleKey -Content $r2PeopleContent -ContentType 'text/plain' -Kind 'people'
                     Write-Host "  [PEOPLE] People file stored in R2: $r2PeopleKey"
 
                     # [CF] Register participants in D1
@@ -1600,7 +1713,15 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     }
 
-    # ── 13. UPDATE SHAREPOINT COLUMNS ────────────────────────────
+    # ── 13. RUNTIME SHADOW HANDOFF ────────────────────────────────
+    # This is deliberately after all existing Cloudflare artifact writes.
+    Submit-RuntimeShadowAzureExport `
+        -PackageId "azure-$MeetingId" `
+        -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate `
+        -Transcript $runtimeShadowTranscript -Summary $runtimeShadowSummary `
+        -People $runtimeShadowPeople -TopicRecords $runtimeShadowTopicRecords
+
+    # ── 14. UPDATE SHAREPOINT COLUMNS ────────────────────────────
     $authHeaderRef = $null
     if (Get-Variable -Name "authHeader" -ErrorAction SilentlyContinue) { $authHeaderRef = $authHeader }
     if ($authHeaderRef) {
@@ -1614,7 +1735,7 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     }
 
-    # ── 14. BUILD & RETURN LOG ENTRY ──────────────────────────────
+    # ── 15. BUILD & RETURN LOG ENTRY ──────────────────────────────
     $now                 = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
     $effectiveStatus     = if ($uploadedTranscript -and -not $uploadedSummary -and $cls.summary) { "repair_needed" } else { "success" }
     $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { $AgentState }

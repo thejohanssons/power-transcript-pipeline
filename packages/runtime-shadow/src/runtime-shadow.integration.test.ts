@@ -19,6 +19,18 @@ const publicationIntent: PublicationIntent = {
   legacyCloudflareSync: false,
 };
 
+const noPublication: PublicationIntent = {
+  transcript: false,
+  summary: false,
+  peopleFile: false,
+  topicRecords: false,
+  masterLog: false,
+  confluence: false,
+  teamsNotification: false,
+  canonicalTopicMemory: false,
+  legacyCloudflareSync: false,
+};
+
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -47,6 +59,19 @@ function normalizedOutput(transcriptSha256: string, runtime: 'azure' | 'cloudfla
     people: [],
     validation: { status: 'pass', reasons: [] },
     publicationIntent,
+    ...(runtime === 'cloudflare' ? {
+      actualPublication: {
+        transcript: false,
+        summary: false,
+        peopleFile: false,
+        topicRecords: false,
+        masterLog: false,
+        confluence: false,
+        teamsNotification: false,
+        canonicalTopicMemory: false,
+        legacyCloudflareSync: false,
+      },
+    } : {}),
   };
 }
 
@@ -101,6 +126,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
     const transcriptSha256 = await sha256(transcript);
     const azureOutput = normalizedOutput(transcriptSha256, 'azure');
     const cloudflareOutput = normalizedOutput(transcriptSha256, 'cloudflare');
+    const cloudflareModelOutput = { ...cloudflareOutput, publicationIntent: noPublication };
     const baselineText = JSON.stringify(azureOutput);
     const publicationIntentText = JSON.stringify(publicationIntent);
     const configurationSnapshotText = JSON.stringify({
@@ -176,7 +202,7 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       });
       const prompt = JSON.parse(requestBody.messages[1].content);
       expect(prompt).toMatchObject({
-        outputContractVersion: 'normalized-output-v2',
+        outputContractVersion: 'normalized-output-v4',
         immutableValues: {
           schemaVersion: '1.0.0',
           source: {
@@ -199,11 +225,18 @@ describe('runtime-shadow synthetic local Worker integration', () => {
             transcript: 'boolean',
             legacyCloudflareSync: 'boolean',
           },
+          actualPublication: {
+            transcript: 'boolean',
+            legacyCloudflareSync: 'boolean',
+          },
         },
+        responseRules: expect.arrayContaining([
+          expect.stringContaining('completed decision only where the transcript explicitly states that decision or outcome'),
+        ]),
       });
       return new Response(JSON.stringify({
         model: 'synthetic-model',
-        choices: [{ message: { content: JSON.stringify(cloudflareOutput) } }],
+        choices: [{ message: { content: JSON.stringify(cloudflareModelOutput) } }],
         usage: { prompt_tokens: 12, completion_tokens: 6 },
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     });
@@ -227,6 +260,16 @@ describe('runtime-shadow synthetic local Worker integration', () => {
     };
 
     try {
+      // A completed execution under the preceding runtime remains immutable.
+      // The current runtime version must reserve a distinct run for the same
+      // manifest rather than overwrite this record or its R2 artifacts.
+      await d1.prepare(
+        'INSERT INTO fixture_runs (run_id, fixture_id, manifest_key, manifest_sha256, state, runtime_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).bind(
+        '11111111-1111-4111-8111-111111111111', fixtureId, manifestKey, await sha256(manifestText),
+        'completed', '1.0.0', '2026-08-03T00:00:00.000Z', '2026-08-03T00:00:00.000Z',
+      ).run();
+
       const submission = await worker.fetch(new Request('https://worker.local/v1/fixture-runs', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: 'Bearer synthetic-submission-token' },
@@ -283,13 +326,18 @@ describe('runtime-shadow synthetic local Worker integration', () => {
       }
       expect(fetchStub).toHaveBeenCalledTimes(1);
 
-      const run = await d1.prepare('SELECT state, comparison_status FROM fixture_runs WHERE run_id = ?')
-        .bind(submissionBody.runId).first<{ state: string; comparison_status: string }>();
-      expect(run).toEqual({ state: 'completed', comparison_status: 'pass' });
+      const run = await d1.prepare('SELECT state, comparison_status, runtime_version FROM fixture_runs WHERE run_id = ?')
+        .bind(submissionBody.runId).first<{ state: string; comparison_status: string; runtime_version: string }>();
+      expect(run).toEqual({ state: 'completed', comparison_status: 'pass', runtime_version: '1.0.3' });
+      expect(submissionBody.runId).not.toBe('11111111-1111-4111-8111-111111111111');
+      expect(await d1.prepare('SELECT state, runtime_version FROM fixture_runs WHERE run_id = ?')
+        .bind('11111111-1111-4111-8111-111111111111').first<{ state: string; runtime_version: string }>())
+        .toEqual({ state: 'completed', runtime_version: '1.0.0' });
       expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoint.json`)).toContain('old invalid contract response');
-      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoints/normalized-output-v2.json`)).toContain('"outputContractVersion":"normalized-output-v2"');
+      expect(r2.objects.get(`runs/${submissionBody.runId}/model-response-checkpoints/normalized-output-v4.json`)).toContain('"outputContractVersion":"normalized-output-v4"');
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-normalized-output.json`)).toBe(JSON.stringify(cloudflareOutput));
       expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-publication-intent.json`)).toBe(JSON.stringify(publicationIntent));
+      expect(r2.objects.get(`runs/${submissionBody.runId}/cloudflare-actual-publication.json`)).toContain('"transcript":false');
       expect(r2.objects.get(`runs/${submissionBody.runId}/comparison.json`)).toContain('"status":"pass"');
       expect(r2.objects.get(`runs/${submissionBody.runId}/comparison.md`)).toContain('EIP Runtime Shadow Comparison Report');
 

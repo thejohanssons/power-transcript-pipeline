@@ -17,6 +17,45 @@ export interface ObjectReference {
   contentType: string;
 }
 
+/** Azure-produced artifacts supplied for continuous shadow verification. */
+export type AzureExportArtifactKind = 'transcript' | 'summary' | 'people' | 'topic_record';
+
+export interface AzureExportArtifactReference extends ObjectReference {
+  kind: AzureExportArtifactKind;
+}
+
+export const AZURE_EXPORT_PACKAGE_SCHEMA_VERSION = '1.0.0';
+
+/**
+ * The package boundary between Azure processing and the Cloudflare shadow.
+ * It deliberately excludes source acquisition details and publication intent.
+ */
+export interface AzureExportPackageManifest {
+  schemaVersion: typeof AZURE_EXPORT_PACKAGE_SCHEMA_VERSION;
+  packageId: string;
+  source: {
+    system: string;
+    nativeId: string;
+    meetingId?: string;
+    subject?: string;
+    eventStart?: string;
+    eventEnd?: string;
+  };
+  processing: {
+    azurePipelineVersion: string;
+    promptVersion?: string;
+    model?: string;
+    deployment?: string;
+    configuration: VersionReference[];
+  };
+  artifacts: {
+    transcript: AzureExportArtifactReference;
+    summary: AzureExportArtifactReference;
+    people: AzureExportArtifactReference;
+    topicRecords: AzureExportArtifactReference[];
+  };
+}
+
 export interface VersionReference {
   name: string;
   version?: string;
@@ -104,6 +143,32 @@ export interface PublicationIntent {
   legacyCloudflareSync: boolean;
 }
 
+/**
+ * Semantic projection used by continuous Azure-export parity. It intentionally
+ * has no acquisition-mode or publication/persistence fields.
+ */
+export interface ContinuousNormalizedOutput {
+  schemaVersion: typeof NORMALIZED_OUTPUT_SCHEMA_VERSION;
+  source: {
+    system: string;
+    nativeId: string;
+    transcriptSha256: string;
+  };
+  processing: {
+    runtime: 'azure' | 'cloudflare';
+    pipelineVersion: string;
+    promptVersion: string;
+    model: string;
+    deployment: string;
+    configurationHashes: Record<string, string>;
+  };
+  classification: { mode: string | null; confidence: string | null };
+  summaryAssertions: EvidenceAssertion[];
+  topics: NormalizedTopic[];
+  people: NormalizedPerson[];
+  validation: { status: 'pass' | 'warning' | 'fail'; reasons: string[] };
+}
+
 export interface NormalizedOutput {
   schemaVersion: typeof NORMALIZED_OUTPUT_SCHEMA_VERSION;
   source: {
@@ -125,7 +190,13 @@ export interface NormalizedOutput {
   topics: NormalizedTopic[];
   people: NormalizedPerson[];
   validation: { status: 'pass' | 'warning' | 'fail'; reasons: string[] };
+  /** Business outputs expected under the approved pipeline; never proof of a write. */
   publicationIntent: PublicationIntent;
+  /**
+   * Outputs this runtime actually published. Immutable Azure baselines omit this
+   * field because they are intent references, not an observation of a shadow run.
+   */
+  actualPublication?: PublicationIntent;
 }
 
 export interface ComparisonDifference {
@@ -173,6 +244,14 @@ export interface LlmAdapter {
 
 export interface FixtureJob {
   fixtureId: string;
+  manifestKey: string;
+  manifestSha256: string;
+  runId: string;
+}
+
+/** Queue payload for an Azure-produced continuous verification package. */
+export interface AzureExportJob {
+  packageId: string;
   manifestKey: string;
   manifestSha256: string;
   runId: string;

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureId": "synthetic-fixture-0001",
+  "revision": "synthetic-revision-1",
+  "acquisitionMode": "direct_vtt",
+  "source": {
+    "system": "synthetic_local_exercise",
+    "nativeId": "synthetic-fixture-0001",
+    "subject": "Synthetic local fixture exercise"
+  },
+  "transcript": {
+    "key": "fixtures/synthetic-fixture-0001/synthetic-revision-1/input/transcript.vtt",
+    "sha256": "33e905aabbc9db6dcae8d90b68b9092e7df1a78dcbcf2691dfeacf054bd7a18d",
+    "bytes": 174,
+    "contentType": "text/vtt"
+  },
+  "azureBaseline": {
+    "normalizedOutput": {
+      "key": "fixtures/synthetic-fixture-0001/synthetic-revision-1/baseline/azure-normalized-output.json",
+      "sha256": "afb22be4cac664cd8ca415d5fffdcf6fb784cbe7cecd1d3ecdef100f4e72e6a4",
+      "bytes": 1006,
+      "contentType": "application/json"
+    },
+    "publicationIntent": {
+      "key": "fixtures/synthetic-fixture-0001/synthetic-revision-1/baseline/azure-publication-intent.json",
+      "sha256": "84988b12198088d9afa7201046224c0dea5a91ab9f5ea3c36d9a4a9da8605a18",
+      "bytes": 193,
+      "contentType": "application/json"
+    }
+  },
+  "configurationSnapshot": {
+    "key": "fixtures/synthetic-fixture-0001/synthetic-revision-1/baseline/config-snapshot.json",
+    "sha256": "c920b73818869f40fe3464ae2d34f304670a06a2c8a5cdb2ec7bb1b73d6b4eb1",
+    "bytes": 325,
+    "contentType": "application/json"
+  },
+  "configuration": [
+    {
+      "name": "taxonomy",
+      "version": "synthetic-1",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "processing": {
+    "azurePipelineVersion": "synthetic-1",
+    "promptVersion": "synthetic-prompt-1",
+    "model": "synthetic-model",
+    "deployment": "synthetic-deployment"
+  },
+  "classification": "internal",
+  "approvedBy": "synthetic-local-exercise",
+  "approvedAt": "2026-08-04T00:00:00.000Z",
+  "expiresAt": "2026-08-30T00:00:00.000Z"
+}

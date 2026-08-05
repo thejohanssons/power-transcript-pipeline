@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { compareNormalizedOutputs } from './comparison';
@@ -12,6 +13,7 @@ import {
 } from './fixture-run-lifecycle';
 import { hasMatchingReviewerToken, validateReviewerDisposition } from './reviewer-disposition';
 import { buildNormalizationInput, normalizeFixtureSource, parseFixtureTranscript } from './fixture-processing';
+import { normalizeApprovedSyntheticValidation } from './shadow-policy';
 
 const SHA256 = 'a'.repeat(64);
 const publicationIntent = {
@@ -86,6 +88,18 @@ describe('fixture contract and integrity guards', () => {
     delete incomplete.people;
     expect(isNormalizedOutput(incomplete)).toBe(false);
   });
+
+  it('accepts a separate actual-publication projection without treating it as business intent', () => {
+    const shadowOutput = {
+      ...output(),
+      processing: { ...output().processing, runtime: 'cloudflare' as const },
+      actualPublication: {
+        transcript: false, summary: false, peopleFile: false, topicRecords: false, masterLog: false,
+        confluence: false, teamsNotification: false, canonicalTopicMemory: false, legacyCloudflareSync: false,
+      },
+    };
+    expect(isNormalizedOutput(shadowOutput)).toBe(true);
+  });
 });
 
 describe('local fixture processing primitives', () => {
@@ -114,6 +128,92 @@ describe('local fixture processing primitives', () => {
     expect(input).toMatchObject({
       source: { system: 'azure_fixture_export', acquisitionMode: 'calendar' },
       transcript: { format: 'plain_text', text: 'A locally supplied transcript.', cueCount: 0 },
+    });
+  });
+});
+
+describe('approved synthetic-fixture policy', () => {
+  it('passes validation when an approved synthetic fixture only lacks people or owners', () => {
+    const fixture = manifest({ source: { system: 'synthetic_local_exercise', nativeId: 'fixture-1' } });
+    const normalized = normalizeApprovedSyntheticValidation(output({
+      validation: { status: 'warning', reasons: ['The transcript contains no identified participants or action owners.'] },
+      topics: [{
+        ...output().topics[0],
+        validation: { status: 'warning', reasons: ['No owner is identified in the transcript.'] },
+      }],
+    }), fixture);
+
+    expect(normalized.validation).toEqual({ status: 'pass', reasons: [] });
+    expect(normalized.topics[0].validation).toEqual({ status: 'pass', reasons: [] });
+  });
+
+  it('retains substantive validation findings and never exempts non-synthetic fixtures', () => {
+    const warning = { status: 'warning' as const, reasons: ['No participants or owners are identified in the transcript.', 'The requested budget approval is not explicitly confirmed as completed.', 'Transcript content is incomplete.'] };
+    expect(normalizeApprovedSyntheticValidation(output({ validation: warning }), manifest({ source: { system: 'synthetic_local_exercise', nativeId: 'fixture-1' } })).validation)
+      .toEqual({
+        status: 'warning',
+        reasons: [
+          'The requested budget approval is not explicitly confirmed as completed.',
+          'Transcript content is incomplete.',
+        ],
+      });
+    expect(normalizeApprovedSyntheticValidation(output({ validation: warning }), manifest()).validation).toEqual(warning);
+  });
+});
+
+describe('synthetic revision 2 evidence-safe fixture package', () => {
+  const revision2Root = new URL('../fixtures/synthetic-fixture-0001/synthetic-revision-2/', import.meta.url);
+
+  function readRevision2(relativePath: string): Buffer {
+    return readFileSync(new URL(relativePath, revision2Root));
+  }
+
+  function sha256(value: Buffer): string {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
+  it('has a valid manifest whose local object references preserve their recorded bytes and hashes', () => {
+    const fixture = JSON.parse(readRevision2('manifest.json').toString('utf8')) as FixtureManifest;
+    expect(isFixtureManifest(fixture)).toBe(true);
+
+    const references = [
+      fixture.transcript,
+      fixture.azureBaseline.normalizedOutput,
+      fixture.azureBaseline.publicationIntent,
+      fixture.configurationSnapshot,
+    ];
+    for (const reference of references) {
+      const relativePath = reference.key.replace('fixtures/synthetic-fixture-0001/synthetic-revision-2/', '');
+      const content = readRevision2(relativePath);
+      expect(content.byteLength).toBe(reference.bytes);
+      expect(sha256(content)).toBe(reference.sha256);
+    }
+  });
+
+  it('freezes an evidence-safe baseline rather than representing the requested approval as completed', () => {
+    const fixture = JSON.parse(readRevision2('manifest.json').toString('utf8')) as FixtureManifest;
+    const transcript = readRevision2('input/transcript.vtt').toString('utf8');
+    const baseline = JSON.parse(readRevision2('baseline/azure-normalized-output.json').toString('utf8')) as NormalizedOutput;
+    const intent = JSON.parse(readRevision2('baseline/azure-publication-intent.json').toString('utf8'));
+
+    expect(parseFixtureTranscript(transcript)).toEqual({
+      format: 'webvtt',
+      text: 'Action: approve the local validation budget. Decision: the fixture is retained for the approved exercise only.',
+      cueCount: 2,
+    });
+    expect(isNormalizedOutput(baseline)).toBe(true);
+    expect(baseline.source.transcriptSha256).toBe(fixture.transcript.sha256);
+    expect(baseline.summaryAssertions.map((assertion) => assertion.text)).toEqual([
+      'Action: approve the local validation budget.',
+      'The fixture is retained for the approved exercise only.',
+    ]);
+    expect(baseline.summaryAssertions.map((assertion) => assertion.text).join(' ')).not.toMatch(/budget was approved/i);
+    expect(baseline).toMatchObject({
+      classification: { mode: 'internal', confidence: 'high' },
+      topics: [],
+      people: [],
+      validation: { status: 'pass', reasons: [] },
+      publicationIntent: intent,
     });
   });
 });
@@ -154,6 +254,18 @@ describe('normalized comparison and review workflow', () => {
     const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', output(), cloudflare);
     expect(result.status).toBe('blocked');
     expect(result.differences).toContainEqual(expect.objectContaining({ path: 'publicationIntent.confluence', severity: 'blocking' }));
+  });
+
+  it('compares distinct evidence assertions rather than summary/topic presentation repeats', () => {
+    const azure = output();
+    const cloudflare = output({
+      processing: { ...output().processing, runtime: 'cloudflare' },
+      summaryAssertions: [],
+    });
+    const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', azure, cloudflare);
+
+    expect(result.differences).not.toContainEqual(expect.objectContaining({ path: 'assertions' }));
+    expect(result.status).toBe('pass');
   });
 
   it('requires a material difference and non-empty reviewer details', () => {

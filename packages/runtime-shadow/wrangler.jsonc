@@ -13,6 +13,7 @@
       "vars": {
         "ENVIRONMENT": "staging",
         "SHADOW_MODE": "fixture_parity",
+        "AZURE_ARTIFACT_READER_URL": "https://eip-api-worker-staging.homeassistant-8d3.workers.dev/internal/runtime-shadow/azure-artifacts/",
         "AZURE_OPENAI_ENDPOINT": "https://atlassian-rovo-forge.openai.azure.com/openai/v1",
         "AZURE_OPENAI_DEPLOYMENT": "gpt-5.6-terra"
       },
@@ -35,11 +36,21 @@
           {
             "binding": "FIXTURE_JOBS",
             "queue": "eip-runtime-shadow-staging-jobs"
+          },
+          {
+            "binding": "CONTINUOUS_EXPORT_JOBS",
+            "queue": "eip-runtime-shadow-staging-continuous-export-jobs"
           }
         ],
         "consumers": [
           {
             "queue": "eip-runtime-shadow-staging-jobs",
+            "max_batch_size": 1,
+            "max_batch_timeout": 30,
+            "max_retries": 3
+          },
+          {
+            "queue": "eip-runtime-shadow-staging-continuous-export-jobs",
             "max_batch_size": 1,
             "max_batch_timeout": 30,
             "max_retries": 3
