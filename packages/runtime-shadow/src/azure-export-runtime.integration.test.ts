@@ -77,14 +77,9 @@ describe('continuous Azure-export runtime', () => {
         model: 'synthetic-model',
         deployment: 'synthetic-deployment',
         configuration: [{ name: 'taxonomy', version: '1', sha256: 'a'.repeat(64) }],
-        configurationContent: {
-          taxonomy: {
-            Domains: ['Finance', 'Technology'],
-            Topics: { 'Revenue & Commercial Performance': {}, 'AI': {} },
-            Categories: ['Decision', 'Risk', 'Action'],
-            ContextTypes: ['Discussion', 'Agreement'],
-          },
-        },
+        // No configurationContent — this test is focused on checkpoint/retry/persistence
+        // semantics, not vocabulary validation. Vocabulary validation is covered in
+        // azure-export-processing.test.ts and the prompt-injection unit tests.
       },
       artifacts: {
         transcript: await reference('transcript', 'transcripts/2026-08/synthetic.vtt', artifacts.transcript),
@@ -112,12 +107,12 @@ describe('continuous Azure-export runtime', () => {
       classification: { mode: null, confidence: null },
       summaryAssertions: [{ id: 'summary-1', text: 'Approved the test budget.' }],
       topics: [{
-        // 'Test budget' is not in the controlled vocabulary — normalization will null it and
-        // degrade the topic validation to 'warning'. Use null here so the model response
-        // already matches what the normalizer will produce.
-        topicId: null, topic: null, domain: null, category: null, contextType: null, summary: null,
+        // No configurationContent in this manifest, so no vocabulary validation occurs.
+        // The topic name passes through as-is from the model response and matches the
+        // Azure projection from parseAzureTopicRecord — both produce 'Test budget'.
+        topicId: null, topic: 'Test budget', domain: null, category: null, contextType: null, summary: null,
         keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null,
-        validation: { status: 'warning', reasons: [] },
+        validation: { status: 'pass', reasons: [] },
       }],
       people: [{
         canonicalName: 'Test Owner', sourceName: 'Test Owner', attendance: null, contributions: [], actions: [],

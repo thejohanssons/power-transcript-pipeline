@@ -177,12 +177,23 @@ function azureProjection(manifest: AzureExportPackageManifest, contents: { trans
   const projection = projectAzureExportPackage(manifest, contents);
 
   // Derive aggregate validation from the worst per-topic EIP_VALIDATION status.
-  // Azure writes PASS/WARNING/FAIL per topic record; we surface the worst.
-  const topicStatuses = projection.topics.map((t) => t.validation.status);
+  // Azure writes PASS/WARNING/FAIL per topic record; parseAzureTopicRecord puts
+  // that value in topic.confidence (a field collision — the Azure confidence field
+  // carries a validation status string, not a high/medium/low level). We move it to
+  // topic.validation.status and clear topic.confidence to null on the Azure side so
+  // that the comparison uses the correct field semantics on both sides.
+  const topicsWithCorrectedFields = projection.topics.map((t) => {
+    const eipValidation = t.confidence as string | null;
+    const status: 'pass' | 'warning' | 'fail' =
+      eipValidation === 'fail' ? 'fail' :
+      eipValidation === 'warning' ? 'warning' : 'pass';
+    return { ...t, confidence: null as string | null, validation: { status, reasons: t.validation.reasons } };
+  });
+  const topicStatuses = topicsWithCorrectedFields.map((t) => t.validation.status);
   const aggregateValidationStatus: 'pass' | 'warning' | 'fail' =
     topicStatuses.includes('fail') ? 'fail' :
     topicStatuses.includes('warning') ? 'warning' : 'pass';
-  const aggregateValidationReasons = projection.topics
+  const aggregateValidationReasons = topicsWithCorrectedFields
     .filter((t) => t.validation.status !== 'pass')
     .flatMap((t) => t.validation.reasons);
 
@@ -199,7 +210,7 @@ function azureProjection(manifest: AzureExportPackageManifest, contents: { trans
     // never invents a value.
     classification: projection.classification,
     summaryAssertions: projection.summaryAssertions,
-    topics: projection.topics,
+    topics: topicsWithCorrectedFields,
     people: projection.people,
     validation: { status: aggregateValidationStatus, reasons: aggregateValidationReasons },
   };
@@ -238,11 +249,20 @@ function strings(value: unknown): string[] {
  * Validates a model-produced value against a set of allowed strings.
  * Returns the value if valid, null if the value is non-null but not in the set.
  * Passes through null/undefined without flagging a violation.
+ *
+ * Topic names in Azure artifacts carry a version suffix (e.g. "Resource Allocation v1.0").
+ * When matching against the taxonomy, we strip the suffix for comparison but preserve the
+ * original value if the stripped form matches — keeping the output consistent with the
+ * taxonomy canonical name.
  */
 function controlledValue(value: string | null, allowed: Set<string> | string[]): { value: string | null; violation: boolean } {
   if (!value) return { value: null, violation: false };
   const set = allowed instanceof Set ? allowed : new Set(allowed);
-  return set.has(value) ? { value, violation: false } : { value: null, violation: true };
+  if (set.has(value)) return { value, violation: false };
+  // Strip trailing version suffix (e.g. " v1.0", " v2", " V1.0") and retry.
+  const stripped = value.replace(/\s+v\d+(\.\d+)*$/i, '').trim();
+  if (stripped !== value && set.has(stripped)) return { value: stripped, violation: false };
+  return { value: null, violation: true };
 }
 
 function normalizeContinuousModelOutput(

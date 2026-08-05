@@ -3,6 +3,7 @@ import type {
   ComparisonResult,
   ComparisonSeverity,
   ContinuousNormalizedOutput,
+  NormalizedTopic,
   NormalizedOutput,
   PublicationIntent,
 } from './contracts';
@@ -102,35 +103,39 @@ function compareSemanticOutputs(
     differences.push(difference('validation', 'blocking', 'Required validation result differs', azure.validation, cloudflare.validation));
   }
 
-  // Match topics by stable topicId when both sides carry non-null IDs.
+  // Match topics by stable composite key: topicId + category.
+  // Azure topic records can reuse the same topicId across different categories
+  // (e.g. T13/Risk and T13/Dependency are distinct topic entries). Using only
+  // topicId as the key would cause later entries to silently overwrite earlier ones.
   // Positional matching on sorted arrays is unreliable when topic counts or
   // ordering diverge between Azure and Cloudflare outputs.
-  const azureById = new Map(azure.topics.filter((t) => t.topicId !== null).map((t) => [t.topicId!, t]));
-  const cloudflareById = new Map(cloudflare.topics.filter((t) => t.topicId !== null).map((t) => [t.topicId!, t]));
+  const topicKey = (t: NormalizedTopic) => `${t.topicId ?? ''}|${t.category ?? ''}`;
+  const azureById = new Map(azure.topics.filter((t) => t.topicId !== null).map((t) => [topicKey(t), t]));
+  const cloudflareById = new Map(cloudflare.topics.filter((t) => t.topicId !== null).map((t) => [topicKey(t), t]));
 
   // Topics present in Azure but not matched by Cloudflare.
-  for (const [topicId, azureTopic] of azureById) {
-    if (!cloudflareById.has(topicId)) {
-      differences.push(difference(`topics[${topicId}]`, 'material', 'Azure topic not reproduced by Cloudflare', { topicId, topic: azureTopic.topic }, null));
+  for (const [key, azureTopic] of azureById) {
+    if (!cloudflareById.has(key)) {
+      differences.push(difference(`topics[${key}]`, 'material', 'Azure topic not reproduced by Cloudflare', { topicId: azureTopic.topicId, topic: azureTopic.topic, category: azureTopic.category }, null));
     }
   }
   // Topics produced by Cloudflare that Azure did not declare.
-  for (const [topicId, cloudflareTopic] of cloudflareById) {
-    if (!azureById.has(topicId)) {
-      differences.push(difference(`topics[${topicId}]`, 'material', 'Cloudflare produced a topic not declared by Azure', null, { topicId, topic: cloudflareTopic.topic }));
+  for (const [key, cloudflareTopic] of cloudflareById) {
+    if (!azureById.has(key)) {
+      differences.push(difference(`topics[${key}]`, 'material', 'Cloudflare produced a topic not declared by Azure', null, { topicId: cloudflareTopic.topicId, topic: cloudflareTopic.topic, category: cloudflareTopic.category }));
     }
   }
   // Compare matched pairs by controlled fields.
-  for (const [topicId, azureTopic] of azureById) {
-    const cloudflareTopic = cloudflareById.get(topicId);
+  for (const [key, azureTopic] of azureById) {
+    const cloudflareTopic = cloudflareById.get(key);
     if (!cloudflareTopic) continue;
     for (const field of CONTROLLED_TOPIC_FIELDS) {
       if (azureTopic[field] !== cloudflareTopic[field]) {
-        differences.push(difference(`topics[${topicId}].${field}`, 'material', 'Controlled topic classification differs', azureTopic[field], cloudflareTopic[field]));
+        differences.push(difference(`topics[${key}].${field}`, 'material', 'Controlled topic classification differs', azureTopic[field], cloudflareTopic[field]));
       }
     }
     if (!equal(azureTopic.owners, cloudflareTopic.owners) || azureTopic.confidence !== cloudflareTopic.confidence) {
-      differences.push(difference(`topics[${topicId}].ownership`, 'material', 'Owner or confidence differs', { owners: azureTopic.owners, confidence: azureTopic.confidence }, { owners: cloudflareTopic.owners, confidence: cloudflareTopic.confidence }));
+      differences.push(difference(`topics[${key}].ownership`, 'material', 'Owner or confidence differs', { owners: azureTopic.owners, confidence: azureTopic.confidence }, { owners: cloudflareTopic.owners, confidence: cloudflareTopic.confidence }));
     }
   }
 

@@ -221,7 +221,8 @@ describe('continuous Azure-export comparison', () => {
     const azure = continuous({ topics: [azureTopic] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
-    expect(result.differences.some((d) => d.path === 'topics[T15]' && d.severity === 'material')).toBe(true);
+    // Path uses composite key topicId|category.
+    expect(result.differences.some((d) => d.path === 'topics[T15|Strategy]' && d.severity === 'material')).toBe(true);
   });
 
   it('flags Cloudflare topics not in Azure as material differences', () => {
@@ -229,6 +230,7 @@ describe('continuous Azure-export comparison', () => {
     const azure = continuous({ topics: [] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [cloudflareTopic] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
-    expect(result.differences.some((d) => d.path === 'topics[T99]' && d.severity === 'material')).toBe(true);
+    // Path uses composite key topicId|category.
+    expect(result.differences.some((d) => d.path === 'topics[T99|Strategy]' && d.severity === 'material')).toBe(true);
   });
 });
