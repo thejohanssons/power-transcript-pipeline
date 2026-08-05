@@ -13,7 +13,7 @@ The programme gates and boundaries remain in [`cloudflare-runtime-replacement-pa
 
 ## Repository state and safe commit scope
 
-- Current checked-out branch: `main`, at `afa81f6` (`feat(runtime-shadow): add continuous Azure export staging path`), matching `origin/main` at inspection time.
+- Current checked-out branch: `main`, at `d915947` (`fix(runtime-shadow): handle topic name version suffix, duplicate topicId, and confidence field collision`), matching `origin/main` at inspection time.
 - The completed direct-Azure fixture checkpoint work exists at `origin/develop` commit `d75fedd` (`feat(runtime-shadow): verify direct Azure checkpoint flow`). It is not the current local `main` HEAD.
 - Existing uncommitted diagnostics and evidence must remain outside any normal source commit: [`local-pipeline-output.txt`](../local-pipeline-output.txt), [`session-log.txt`](../session-log.txt), [`config/pipeline_Azure_output.txt`](../config/pipeline_Azure_output.txt), [`packages/runtime-shadow/.tmp-*`](../packages/runtime-shadow/), and [`packages/runtime-shadow/runs/`](../packages/runtime-shadow/runs/).
 - Only sanitized synthetic fixtures are eligible for version control. Never force-add the ignored root `classification_rules.json`; obtain it only through the approved configuration channel.
@@ -57,7 +57,7 @@ Continuous lifecycle state is stored in [`0002_azure_export_runs.sql`](../packag
 runs/<run-id>/continuous/azure-normalized-output.json
 runs/<run-id>/continuous/cloudflare-normalized-output.json
 runs/<run-id>/continuous/comparison.json
-runs/<run-id>/continuous/model-response-checkpoints/continuous-normalized-output-v1.json
+runs/<run-id>/continuous/model-response-checkpoints/continuous-normalized-output-v2.json
 ```
 
 ## Provisioned staging-only resources and configuration
@@ -119,16 +119,37 @@ Items 1–5 and 7 from the original required implementation list were completed 
 
 Output contract bumped to `continuous-normalized-output-v2`. Prior `v1` checkpoint keys are preserved.
 
+Three additional defects were discovered by inspecting real Azure staging R2 artifacts and fixed in commit `d915947`:
+
+- **Topic name version suffix**: Azure topic records carry names like `'Resource Allocation v1.0'` while the taxonomy has `'Resource Allocation'`. `controlledValue()` now strips trailing version suffixes (e.g. ` v1.0`) before matching and returns the canonical taxonomy name.
+- **Duplicate `topicId`**: Azure reuses the same `topicId` across different categories (e.g. `T13/Risk` and `T13/Dependency` are distinct entries). Topic matching now uses a composite `topicId+category` key rather than `topicId` alone.
+- **`confidence` field collision**: `parseAzureTopicRecord` puts the `EIP_VALIDATION` status string (`pass`/`warning`/`fail`) into the `confidence` field. `azureProjection()` now moves that value to `topic.validation.status` and clears `confidence` to `null`, so both sides use consistent field semantics.
+
+### Deployment status (as of 2026-08-05 ~18:00 UTC)
+
+- ✅ Runtime Shadow Worker deployed: `eip-runtime-shadow-staging` at Version `287c8343` (commit `d915947`).
+- ✅ Azure pipeline deployed: CI `deploy-pipeline.yml` triggered automatically on push to `main`; `Submit-RuntimeShadowAzureExport` now embeds `configurationContent` (taxonomy, mapping_rules, roles) in every manifest.
+
+### Evidence run status (2026-08-05)
+
+A manual pipeline run was executed locally (`-FromDate 2026-08-05 -ToDate 2026-08-05 -ForceRerun`) after deployment. Two meetings were processed (Sales Call, Mandar-Peter channel meeting). Both submitted manifests to the new Worker but received **`409 Conflict`** — both meetings had already been submitted by the earlier automated run at `13:3x` UTC, and the D1 idempotency guard correctly rejected the duplicate submissions.
+
+**This is correct behaviour.** The first staging evidence run against the fixed Worker with `configurationContent` will occur when new, previously-unsubmitted meetings are processed — expected automatically in the next daily run (~02:00 UTC 2026-08-06).
+
+When the first post-fix run completes, inspect it with:
+```sh
+cd packages/runtime-shadow
+npx wrangler d1 execute eip-runtime-shadow-staging --remote --command "SELECT run_id, package_id, state, comparison_status, blocking_count, material_count, created_at FROM azure_export_runs WHERE created_at > '2026-08-05T20:00:00Z' ORDER BY created_at DESC LIMIT 10"
+npx wrangler r2 object get eip-runtime-shadow-staging-fixtures/runs/<run-id>/continuous/comparison.json --remote
+```
+
+Expect blocking/material counts to change significantly from the `3c0225a3` baseline (2 blocking, 45 material). The `topicId` field is confirmed present in real Azure topic records (verified from R2 artifact inspection) — stable ID matching will work.
+
 ### Remaining open items
 
 6. **Governance decision on assertion matching policy** — decide whether summary assertions require canonical IDs/exact text match or a separately approved semantic-equivalence policy. The comparator currently uses normalized exact text. This has not been changed and requires explicit governance approval before relaxing.
 
-### Required before the next staging evidence run
-
-- Deploy the updated Runtime Shadow Worker (`eip-runtime-shadow-staging`) — the continuous lane changes are not yet deployed.
-- Deploy the updated Azure pipeline — `Submit-RuntimeShadowAzureExport` now embeds `configurationContent`; this requires a pipeline deploy to take effect on hosted runs.
-- The first post-fix continuous staging run will produce a comparison with vocabulary-constrained Cloudflare output and real Azure classification. Expect blocking/material counts to change significantly from the prior `3c0225a3` run (2 blocking, 45 material).
-- If Azure topic records do not consistently carry `TOPIC_ID` fields, all topics will fall into null-topicId positional matching — investigate Azure topic record format and confirm `TOPIC_ID` presence before attributing remaining differences to semantic divergence.
+7. **First post-fix evidence run** — review comparison results from the next daily automated run (expected 2026-08-06 ~02:00 UTC). Record a governance disposition for every remaining material divergence.
 
 ## Operational cautions and known drift
 
