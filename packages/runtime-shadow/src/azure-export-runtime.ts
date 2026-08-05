@@ -16,7 +16,7 @@ import {
 } from './azure-export-run-lifecycle';
 
 export const CONTINUOUS_RUNTIME_VERSION = '1.0.0';
-const CONTINUOUS_OUTPUT_CONTRACT_VERSION = 'continuous-normalized-output-v1';
+const CONTINUOUS_OUTPUT_CONTRACT_VERSION = 'continuous-normalized-output-v2';
 
 export interface AzureExportRuntimeEnv {
   SHADOW_DB: D1Database;
@@ -55,17 +55,69 @@ function checkpointKey(runId: string): string {
   return runKey(runId, `model-response-checkpoints/${CONTINUOUS_OUTPUT_CONTRACT_VERSION}.json`);
 }
 
+/**
+ * Extracts the controlled EIP vocabulary from the manifest's configuration content.
+ * Returns null when no taxonomy content is present — callers must emit a vocabulary-
+ * absent warning rather than silently omitting vocabulary constraints.
+ */
+function extractControlledVocabulary(manifest: AzureExportPackageManifest): ControlledVocabulary | null {
+  const content = manifest.processing.configurationContent;
+  if (!content) return null;
+  const taxonomy = content['taxonomy'];
+  if (!taxonomy || typeof taxonomy !== 'object' || Array.isArray(taxonomy)) return null;
+  const tax = taxonomy as Record<string, unknown>;
+  const domains = Array.isArray(tax['Domains']) ? tax['Domains'].filter((d): d is string => typeof d === 'string') : [];
+  const topicNames = tax['Topics'] && typeof tax['Topics'] === 'object' && !Array.isArray(tax['Topics'])
+    ? Object.keys(tax['Topics'] as object)
+    : [];
+  const categories = Array.isArray(tax['Categories']) ? tax['Categories'].filter((c): c is string => typeof c === 'string') : [];
+  const contextTypes = Array.isArray(tax['ContextTypes']) ? tax['ContextTypes'].filter((ct): ct is string => typeof ct === 'string') : [];
+  if (domains.length === 0 && topicNames.length === 0) return null;
+  return { domains, topicNames, categories, contextTypes };
+}
+
+interface ControlledVocabulary {
+  domains: string[];
+  topicNames: string[];
+  categories: string[];
+  contextTypes: string[];
+}
+
+/** Role codes are fixed — not taxonomy-driven — and represent the only valid owner values. */
+const VALID_OWNER_ROLES = new Set(['CEO', 'CPO', 'COO', 'CFO', 'CTO']);
+
+/** Valid meeting classification confidence values. */
+const VALID_CONFIDENCE_LEVELS = new Set(['high', 'medium', 'low']);
+
 function continuousPrompt(manifest: AzureExportPackageManifest, transcript: string): string {
   const hashes = Object.fromEntries(manifest.processing.configuration.map((reference) => [reference.name, reference.sha256]));
+  const vocab = extractControlledVocabulary(manifest);
+  const vocabularySection = vocab
+    ? {
+        note: 'All controlled values MUST come from these governed lists. Use null if the transcript evidence does not match any listed value.',
+        domains: vocab.domains,
+        topicNames: vocab.topicNames,
+        categories: vocab.categories,
+        contextTypes: vocab.contextTypes,
+        ownerRoles: [...VALID_OWNER_ROLES],
+        classificationConfidence: [...VALID_CONFIDENCE_LEVELS],
+      }
+    : {
+        warning: 'No controlled vocabulary was supplied in this manifest. Use best-effort values and set validation.status to "warning" for every topic.',
+        ownerRoles: [...VALID_OWNER_ROLES],
+      };
   return JSON.stringify({
     task: 'Produce one continuous normalized EIP output from the supplied Azure transcript.',
     outputContractVersion: CONTINUOUS_OUTPUT_CONTRACT_VERSION,
     responseRules: [
       'Return exactly one JSON object and nothing else.',
       'Use evidence only from the supplied transcript; do not publish or call external systems.',
-      'A completed decision requires explicit transcript evidence.',
+      'A completed decision requires explicit transcript evidence of agreement or approval.',
       'Use null or [] where evidence is unavailable; never invent evidence.',
+      'All domain, topicName, category, contextType, and owner values MUST be drawn from the controlledVocabulary lists.',
+      'If a value is not in the controlled vocabulary, use null rather than an invented string.',
     ],
+    controlledVocabulary: vocabularySection,
     immutableValues: {
       schemaVersion: '1.0.0',
       source: { system: manifest.source.system, nativeId: manifest.source.nativeId, transcriptSha256: manifest.artifacts.transcript.sha256 },
@@ -79,12 +131,13 @@ function continuousPrompt(manifest: AzureExportPackageManifest, transcript: stri
       schemaVersion: '1.0.0',
       source: { system: 'string', nativeId: 'string', transcriptSha256: 'sha256' },
       processing: { runtime: 'cloudflare', pipelineVersion: 'string', promptVersion: 'string', model: 'string', deployment: 'string', configurationHashes: 'Record<string, sha256>' },
-      classification: { mode: 'string|null', confidence: 'string|null' },
+      classification: { mode: 'string|null (meeting type e.g. internal)', confidence: 'high|medium|low|null' },
       summaryAssertions: [{ id: 'string', text: 'string' }],
       topics: [{
-        topicId: 'string|null', topic: 'string|null', domain: 'string|null', category: 'string|null', contextType: 'string|null', summary: 'string|null',
+        topicId: 'string|null (e.g. T15)', topic: 'string|null (from controlledVocabulary.topicNames)', domain: 'string|null (from controlledVocabulary.domains)',
+        category: 'string|null (from controlledVocabulary.categories)', contextType: 'string|null (from controlledVocabulary.contextTypes)', summary: 'string|null',
         keyFacts: [{ id: 'string', text: 'string' }], decisions: [{ id: 'string', text: 'string' }], actions: [{ id: 'string', text: 'string' }], risks: [{ id: 'string', text: 'string' }],
-        owners: ['string'], confidence: 'string|null', validation: { status: 'pass|warning|fail', reasons: ['string'] },
+        owners: ['string (from controlledVocabulary.ownerRoles)'], confidence: 'high|medium|low|null', validation: { status: 'pass|warning|fail', reasons: ['string'] },
       }],
       people: [{
         canonicalName: 'string|null', sourceName: 'string', attendance: 'string|null', contributions: [{ id: 'string', text: 'string' }], actions: [{ id: 'string', text: 'string' }],
@@ -122,6 +175,17 @@ async function loadAzureArtifact(env: AzureExportRuntimeEnv, reference: AzureExp
 
 function azureProjection(manifest: AzureExportPackageManifest, contents: { transcript: string; summary: string; people: string; topicRecords: string[] }): ContinuousNormalizedOutput {
   const projection = projectAzureExportPackage(manifest, contents);
+
+  // Derive aggregate validation from the worst per-topic EIP_VALIDATION status.
+  // Azure writes PASS/WARNING/FAIL per topic record; we surface the worst.
+  const topicStatuses = projection.topics.map((t) => t.validation.status);
+  const aggregateValidationStatus: 'pass' | 'warning' | 'fail' =
+    topicStatuses.includes('fail') ? 'fail' :
+    topicStatuses.includes('warning') ? 'warning' : 'pass';
+  const aggregateValidationReasons = projection.topics
+    .filter((t) => t.validation.status !== 'pass')
+    .flatMap((t) => t.validation.reasons);
+
   return {
     schemaVersion: '1.0.0',
     source: { system: manifest.source.system, nativeId: manifest.source.nativeId, transcriptSha256: manifest.artifacts.transcript.sha256 },
@@ -130,8 +194,14 @@ function azureProjection(manifest: AzureExportPackageManifest, contents: { trans
       promptVersion: manifest.processing.promptVersion ?? '', model: manifest.processing.model ?? '', deployment: manifest.processing.deployment ?? '',
       configurationHashes: Object.fromEntries(manifest.processing.configuration.map((reference) => [reference.name, reference.sha256])),
     },
-    classification: { mode: null, confidence: null }, summaryAssertions: projection.summaryAssertions,
-    topics: projection.topics, people: projection.people, validation: { status: 'pass', reasons: [] },
+    // Real meeting classification parsed from the Azure summary artifact header.
+    // Returns null/null when the header does not carry classification metadata —
+    // never invents a value.
+    classification: projection.classification,
+    summaryAssertions: projection.summaryAssertions,
+    topics: projection.topics,
+    people: projection.people,
+    validation: { status: aggregateValidationStatus, reasons: aggregateValidationReasons },
   };
 }
 
@@ -164,35 +234,103 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.flatMap((item) => text(item) ? [text(item)!] : []) : [];
 }
 
+/**
+ * Validates a model-produced value against a set of allowed strings.
+ * Returns the value if valid, null if the value is non-null but not in the set.
+ * Passes through null/undefined without flagging a violation.
+ */
+function controlledValue(value: string | null, allowed: Set<string> | string[]): { value: string | null; violation: boolean } {
+  if (!value) return { value: null, violation: false };
+  const set = allowed instanceof Set ? allowed : new Set(allowed);
+  return set.has(value) ? { value, violation: false } : { value: null, violation: true };
+}
+
 function normalizeContinuousModelOutput(
   value: unknown,
   source: ContinuousNormalizedOutput['source'],
   processing: ContinuousNormalizedOutput['processing'],
+  vocab: ControlledVocabulary | null,
 ): ContinuousNormalizedOutput | null {
   const output = record(value);
   if (!output || output.schemaVersion !== '1.0.0') return null;
+
   const topics: NormalizedTopic[] = Array.isArray(output.topics) ? output.topics.flatMap((value, index): NormalizedTopic[] => {
     const topic = record(value);
     if (!topic) return [];
+
+    const violations: string[] = [];
+
+    // Validate controlled vocabulary fields when vocab is available.
+    const domainResult = vocab ? controlledValue(text(topic.domain), vocab.domains) : { value: text(topic.domain), violation: false };
+    const topicResult = vocab ? controlledValue(text(topic.topic) ?? text(topic.name), vocab.topicNames) : { value: text(topic.topic) ?? text(topic.name), violation: false };
+    const categoryResult = vocab ? controlledValue(text(topic.category), vocab.categories) : { value: text(topic.category), violation: false };
+    const contextTypeResult = vocab ? controlledValue(text(topic.contextType), vocab.contextTypes) : { value: text(topic.contextType), violation: false };
+    const confidenceResult = controlledValue(text(topic.confidence), VALID_CONFIDENCE_LEVELS);
+
+    if (domainResult.violation) violations.push(`domain "${text(topic.domain)}" is not in the controlled vocabulary`);
+    if (topicResult.violation) violations.push(`topic "${text(topic.topic) ?? text(topic.name)}" is not in the controlled vocabulary`);
+    if (categoryResult.violation) violations.push(`category "${text(topic.category)}" is not in the controlled vocabulary`);
+    if (contextTypeResult.violation) violations.push(`contextType "${text(topic.contextType)}" is not in the controlled vocabulary`);
+    if (confidenceResult.violation) violations.push(`confidence "${text(topic.confidence)}" must be high, medium, or low`);
+
+    // Validate and filter owner role codes.
+    const rawOwners = Array.isArray(topic.owners) ? topic.owners.flatMap((owner) => text(owner) ? [text(owner)!] : []) : [];
+    const validOwners = rawOwners.filter((owner) => VALID_OWNER_ROLES.has(owner));
+    if (rawOwners.some((owner) => !VALID_OWNER_ROLES.has(owner))) {
+      violations.push(`owners contain values outside controlled role codes: ${rawOwners.filter((o) => !VALID_OWNER_ROLES.has(o)).join(', ')}`);
+    }
+
+    // A topic with controlled vocabulary violations still appears but its validation
+    // status is degraded to at least "warning" to surface the defect in evidence.
+    const baseValidation = record(topic.validation);
+    const baseStatus = validationStatus(baseValidation?.status);
+    const effectiveStatus = violations.length > 0
+      ? (baseStatus === 'fail' ? 'fail' : 'warning')
+      : baseStatus;
+    const effectiveReasons = [...strings(baseValidation?.reasons), ...violations];
+
     const decisions = assertions(topic.decisions ?? topic.assertions, `topic-${index + 1}-decision`);
     return [{
-      topicId: text(topic.topicId), topic: text(topic.topic) ?? text(topic.name), domain: text(topic.domain), category: text(topic.category),
-      contextType: text(topic.contextType), summary: text(topic.summary), keyFacts: assertions(topic.keyFacts, `topic-${index + 1}-fact`),
-      decisions, actions: assertions(topic.actions, `topic-${index + 1}-action`), risks: assertions(topic.risks, `topic-${index + 1}-risk`),
-      owners: Array.isArray(topic.owners) ? topic.owners.flatMap((owner) => text(owner) ? [text(owner)!] : []) : [], confidence: text(topic.confidence),
-      validation: { status: validationStatus(record(topic.validation)?.status), reasons: strings(record(topic.validation)?.reasons) },
+      topicId: text(topic.topicId),
+      topic: topicResult.value,
+      domain: domainResult.value,
+      category: categoryResult.value,
+      contextType: contextTypeResult.value,
+      summary: text(topic.summary),
+      keyFacts: assertions(topic.keyFacts, `topic-${index + 1}-fact`),
+      decisions,
+      actions: assertions(topic.actions, `topic-${index + 1}-action`),
+      risks: assertions(topic.risks, `topic-${index + 1}-risk`),
+      owners: validOwners,
+      confidence: confidenceResult.value,
+      validation: { status: effectiveStatus, reasons: effectiveReasons },
     }];
   }) : [];
+
   const people: NormalizedPerson[] = Array.isArray(output.people) ? output.people.flatMap((value): NormalizedPerson[] => {
     const person = record(value);
     const sourceName = text(person?.sourceName) ?? text(person?.canonicalName);
     if (!person || !sourceName) return [];
-    return [{ canonicalName: text(person.canonicalName), sourceName, attendance: text(person.attendance), contributions: assertions(person.contributions, 'person-contribution'), actions: assertions(person.actions, 'person-action'), decisionsOwned: assertions(person.decisionsOwned, 'person-decision'), risksRaised: assertions(person.risksRaised, 'person-risk'), topicIds: Array.isArray(person.topicIds) ? person.topicIds.flatMap((topicId) => text(topicId) ? [text(topicId)!] : []) : [], stance: text(person.stance), unresolved: person.unresolved === true }];
+    return [{
+      canonicalName: text(person.canonicalName), sourceName, attendance: text(person.attendance),
+      contributions: assertions(person.contributions, 'person-contribution'), actions: assertions(person.actions, 'person-action'),
+      decisionsOwned: assertions(person.decisionsOwned, 'person-decision'), risksRaised: assertions(person.risksRaised, 'person-risk'),
+      topicIds: Array.isArray(person.topicIds) ? person.topicIds.flatMap((topicId) => text(topicId) ? [text(topicId)!] : []) : [],
+      stance: text(person.stance), unresolved: person.unresolved === true,
+    }];
   }) : [];
+
+  // Validate meeting classification confidence.
+  const classificationRaw = record(output.classification);
+  const classificationConfidenceResult = controlledValue(text(classificationRaw?.confidence), VALID_CONFIDENCE_LEVELS);
+
   const validation = record(output.validation);
   return {
     schemaVersion: '1.0.0', source, processing,
-    classification: { mode: text(record(output.classification)?.mode), confidence: text(record(output.classification)?.confidence) },
+    classification: {
+      mode: text(classificationRaw?.mode),
+      confidence: classificationConfidenceResult.value,
+    },
     summaryAssertions: assertions(output.summaryAssertions, 'summary'), topics, people,
     validation: { status: validationStatus(validation?.status), reasons: strings(validation?.reasons) },
   };
@@ -264,7 +402,8 @@ export async function processAzureExportJob(job: AzureExportJob, env: AzureExpor
     const response = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, env);
     const modelOutput = JSON.parse(response.responseText) as unknown;
     const expectedCloudflareProcessing = { ...azure.processing, runtime: 'cloudflare' as const };
-    const cloudflare = normalizeContinuousModelOutput(modelOutput, azure.source, expectedCloudflareProcessing);
+    const vocab = extractControlledVocabulary(manifest);
+    const cloudflare = normalizeContinuousModelOutput(modelOutput, azure.source, expectedCloudflareProcessing, vocab);
     if (!cloudflare || !isContinuousNormalizedOutput(cloudflare)
       || stableJson(cloudflare.source) !== stableJson(azure.source)
       || stableJson(cloudflare.processing) !== stableJson(expectedCloudflareProcessing)) {

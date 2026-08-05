@@ -1,165 +1,164 @@
 # Runtime Shadow Agent Handover — 2026-08-05
 
-## Purpose and current authority
+## Current decision and authority
 
-This handover covers the in-progress Azure-to-Cloudflare Runtime Shadow path. Azure remains the authoritative processor, publisher, and rollback system. Cloudflare is staging-only, review-only, and must not publish to Graph, SharePoint, Confluence, Teams, or Topic Memory.
+This handover covers two deliberately separate Runtime Shadow lanes:
 
-The intended architecture and gates are defined in [cloudflare-runtime-replacement-parallel-comparison-plan.md](cloudflare-runtime-replacement-parallel-comparison-plan.md). Do not treat a successful remote run as semantic parity or permission to promote Cloudflare authority.
+1. **Frozen-fixture parity** — approved synthetic, immutable fixture packages are processed only by the isolated staging Worker.
+2. **Continuous Azure-export shadow** — after Azure has completed its existing staging artifact writes, Azure submits a reference-only package manifest. The Runtime Shadow Worker reads only the declared staging artifacts and produces comparison evidence.
 
-## Repository and backup scope
+Azure remains the authoritative processor, publisher, and rollback runtime. Cloudflare remains staging-only and review-only. Neither lane may publish to Microsoft Graph, SharePoint, Confluence, Teams, Topic Memory, legacy sync, or any other external system. A completed run demonstrates transport and evidence collection—not semantic parity, approval for production, or a transfer of authority.
 
-- Repository: `https://github.com/thejohanssons/power-transcript-pipeline.git`
-- Working branch at handover: `main`.
-- Before this handover commit, local `main` was one commit ahead of `origin/main` (`d75fedd`).
-- This commit intentionally includes source, tests, migrations, sanitized synthetic fixtures, plans, and this document.
-- This commit intentionally excludes generated local logs, temporary outputs, and run evidence under `packages/runtime-shadow/runs/`.
-- The root `classification_rules.json` is ignored and is not included. Obtain it only through the approved configuration channel.
+The programme gates and boundaries remain in [`cloudflare-runtime-replacement-parallel-comparison-plan.md`](cloudflare-runtime-replacement-parallel-comparison-plan.md). The synthetic-fixture acceptance rules remain in [`FIXTURE-RUNBOOK.md`](../packages/runtime-shadow/FIXTURE-RUNBOOK.md), but its local-only operational wording is now stale for the provisioned staging fixture lane; do not treat that document as authorization for an operational change.
 
-## What has been implemented
+## Repository state and safe commit scope
 
-### Azure pipeline handoff
+- Current checked-out branch: `main`, at `afa81f6` (`feat(runtime-shadow): add continuous Azure export staging path`), matching `origin/main` at inspection time.
+- The completed direct-Azure fixture checkpoint work exists at `origin/develop` commit `d75fedd` (`feat(runtime-shadow): verify direct Azure checkpoint flow`). It is not the current local `main` HEAD.
+- Existing uncommitted diagnostics and evidence must remain outside any normal source commit: [`local-pipeline-output.txt`](../local-pipeline-output.txt), [`session-log.txt`](../session-log.txt), [`config/pipeline_Azure_output.txt`](../config/pipeline_Azure_output.txt), [`packages/runtime-shadow/.tmp-*`](../packages/runtime-shadow/), and [`packages/runtime-shadow/runs/`](../packages/runtime-shadow/runs/).
+- Only sanitized synthetic fixtures are eligible for version control. Never force-add the ignored root `classification_rules.json`; obtain it only through the approved configuration channel.
+- Use explicit allowlisted paths with `git add <paths>`; never use `git add .` in this repository.
 
-The Azure pipeline posts a reference-only manifest after its normal artifact writes in [power-transcript-pipeline.ps1](../packages/pipeline/power-transcript-pipeline.ps1). The callback:
+## Implemented architecture
 
-- uses `RUNTIME_SHADOW_SUBMISSION_TOKEN` only from the process environment;
-- posts to `POST /v1/azure-export-runs` on the staging Runtime Shadow Worker;
-- leaves Azure artifact publication unchanged;
-- catches callback failure so the ordinary Azure pipeline does not fail because the shadow path is unavailable.
+### 1. Immutable frozen-fixture parity lane
 
-The manifest supplies referenced transcript, summary, people, and topic-record artifacts, plus configuration versions and hashes.
+The isolated Worker implementation is rooted at [`packages/runtime-shadow/src/index.ts`](../packages/runtime-shadow/src/index.ts). It accepts an authenticated `POST /v1/fixture-runs` request referencing an approved immutable manifest, queues work, validates every object hash, invokes Azure OpenAI, persists a versioned model checkpoint, compares output with the frozen Azure baseline, and records Cloudflare output plus comparison artifacts.
 
-### Runtime Shadow staging path
+The core fixture contract is in [`contracts.ts`](../packages/runtime-shadow/src/contracts.ts), validation in [`fixture-validation.ts`](../packages/runtime-shadow/src/fixture-validation.ts), source parsing in [`fixture-processing.ts`](../packages/runtime-shadow/src/fixture-processing.ts), lifecycle/idempotency in [`fixture-run-lifecycle.ts`](../packages/runtime-shadow/src/fixture-run-lifecycle.ts), and comparison policy in [`comparison.ts`](../packages/runtime-shadow/src/comparison.ts).
 
-The Runtime Shadow Worker in [index.ts](../packages/runtime-shadow/src/index.ts) provides authenticated continuous ingress, writes a lifecycle entry to D1, and queues continuous processing. The worker configuration is in [wrangler.jsonc](../packages/runtime-shadow/wrangler.jsonc). The staging deployment uses:
+Important fixture-lane controls:
 
-- Worker: `eip-runtime-shadow-staging`
-- D1: `eip-runtime-shadow-staging`
-- R2: `eip-runtime-shadow-staging-fixtures`
-- Queue: `eip-runtime-shadow-staging-continuous-export-jobs`
-- Staging artifact reader: `https://eip-api-worker-staging.homeassistant-8d3.workers.dev/internal/runtime-shadow/azure-artifacts/`
+- Fixture packages are immutable and hash-addressed; a changed transcript, baseline, configuration snapshot, processing contract, or manifest is a new approved revision.
+- The Worker uses output-contract version `normalized-output-v4` in the current [`index.ts`](../packages/runtime-shadow/src/index.ts). New instructions or shape changes require a new versioned checkpoint key; prior checkpoints must not be overwritten.
+- `publicationIntent` is the Azure business intent, not proof of a Cloudflare write. Cloudflare inherits the verified baseline intent solely for comparison and separately emits `actualPublication`, which must be all false. This preserves the no-publisher boundary.
+- Delayed Queue deliveries are no-ops once a reservation has been claimed or completed. Failed runs recover under the original immutable run ID and reuse only a compatible validated checkpoint.
+- Reviewer dispositions are limited to existing **material** differences on completed fixture runs; they do not alter baseline evidence or publish output.
 
-The D1 lifecycle schema is [0002_azure_export_runs.sql](../packages/runtime-shadow/migrations/0002_azure_export_runs.sql). Review completed evidence in R2 using:
+The approved synthetic fixture is versioned under [`synthetic-revision-2`](../packages/runtime-shadow/fixtures/synthetic-fixture-0001/synthetic-revision-2/). Its current manifest, baseline normalized output, publication-intent projection, and configuration snapshot are [`manifest.json`](../packages/runtime-shadow/fixtures/synthetic-fixture-0001/synthetic-revision-2/manifest.json), [`azure-normalized-output.json`](../packages/runtime-shadow/fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/azure-normalized-output.json), [`azure-publication-intent.json`](../packages/runtime-shadow/fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/azure-publication-intent.json), and [`config-snapshot.json`](../packages/runtime-shadow/fixtures/synthetic-fixture-0001/synthetic-revision-2/baseline/config-snapshot.json).
+
+### 2. Continuous Azure-export shadow lane
+
+The current `main` also contains an additional continuous staging path. After Azure's ordinary staging artifacts have already been written, the Azure pipeline emits a **reference-only** package through [`buildExistingAzureExportPackage()`](../packages/runtime-shadow/src/azure-export-handoff.ts:48). It does not upload, mirror, delete, or modify Azure artifact bodies.
+
+The intended Azure pipeline callback is documented by the implementation at [`power-transcript-pipeline.ps1`](../packages/pipeline/power-transcript-pipeline.ps1); it uses `RUNTIME_SHADOW_SUBMISSION_TOKEN` from the process environment, posts to `POST /v1/azure-export-runs`, and must not make normal Azure publication fail when Runtime Shadow is unavailable.
+
+Continuous ingress and processing work as follows:
+
+1. `POST /v1/azure-export-runs` authenticates with `SHADOW_CONTINUOUS_SUBMISSION_TOKEN`, validates the package, stores an immutable manifest in the shadow R2 bucket, reserves an idempotent D1 lifecycle row, and queues an `AzureExportJob`.
+2. The Worker uses the staging-only, bearer-token-protected artifact reader at [`packages/api-worker/src/index.ts`](../packages/api-worker/src/index.ts) to retrieve only manifest-declared keys beneath the established `transcripts/`, `summaries/`, `people/`, and `topic-records/` prefixes.
+3. [`projectAzureExportPackage()`](../packages/runtime-shadow/src/azure-export-processing.ts:146) parses the existing Azure transcript, summary, people, and topic-record artifacts into an Azure semantic projection while excluding external publication links.
+4. [`processAzureExportJob()`](../packages/runtime-shadow/src/azure-export-runtime.ts:246) invokes Azure OpenAI, persists a `continuous-normalized-output-v1` checkpoint before comparison artifacts, writes Azure/Cloudflare projections plus the comparison, and completes the D1 lifecycle state.
+5. [`compareContinuousNormalizedOutputs()`](../packages/runtime-shadow/src/comparison.ts:161) deliberately compares semantic processing only; Azure publishing and Cloudflare persistence are outside this lane's comparison boundary.
+
+Continuous lifecycle state is stored in [`0002_azure_export_runs.sql`](../packages/runtime-shadow/migrations/0002_azure_export_runs.sql). Processing ownership is conditional and idempotent in [`azure-export-run-lifecycle.ts`](../packages/runtime-shadow/src/azure-export-run-lifecycle.ts). Evidence keys are:
 
 ```text
 runs/<run-id>/continuous/azure-normalized-output.json
 runs/<run-id>/continuous/cloudflare-normalized-output.json
 runs/<run-id>/continuous/comparison.json
-runs/<run-id>/continuous/model-response-checkpoints/<contract-version>.json
+runs/<run-id>/continuous/model-response-checkpoints/continuous-normalized-output-v1.json
 ```
 
-### Restricted artifact reader
+## Provisioned staging-only resources and configuration
 
-The API Worker contains a staging-only, bearer-token-protected, prefix-restricted reader in [index.ts](../packages/api-worker/src/index.ts). It only retrieves declared artifact keys. It must remain read-only; do not broaden it into list/write/delete authority for Runtime Shadow.
+The Runtime Shadow staging environment is separate from Phase 1 and production resources:
 
-### Tests and synthetic fixtures
+- Worker: `eip-runtime-shadow-staging` at `https://eip-runtime-shadow-staging.homeassistant-8d3.workers.dev`.
+- D1: `eip-runtime-shadow-staging` (`c7474ecb-ff28-4788-9108-15d29a022c7b`).
+- R2: `eip-runtime-shadow-staging-fixtures`.
+- Fixture Queue: `eip-runtime-shadow-staging-jobs`.
+- Continuous Queue: `eip-runtime-shadow-staging-continuous-export-jobs`.
+- Staging artifact reader base URL: `https://eip-api-worker-staging.homeassistant-8d3.workers.dev/internal/runtime-shadow/azure-artifacts/`.
 
-The source includes focused continuous-export tests and safe synthetic fixtures under [packages/runtime-shadow](../packages/runtime-shadow). The synthetic fixture transcript contains only two intentionally synthetic statements and is safe to version.
+The declarative bindings are in [`wrangler.jsonc`](../packages/runtime-shadow/wrangler.jsonc). Fixture lifecycle tables originate in [`0001_shadow_runs.sql`](../packages/runtime-shadow/migrations/0001_shadow_runs.sql); continuous lifecycle rows originate in [`0002_azure_export_runs.sql`](../packages/runtime-shadow/migrations/0002_azure_export_runs.sql).
 
-## Remote validation performed
+Required secret names—never values—are:
 
-At least one continuous Azure export completed end-to-end:
+| Purpose | Secret or environment variable |
+| --- | --- |
+| Fixture ingress | `SHADOW_SUBMISSION_TOKEN` |
+| Fixture reviewer disposition | `SHADOW_REVIEWER_TOKEN` |
+| Continuous Azure-export ingress | `SHADOW_CONTINUOUS_SUBMISSION_TOKEN` |
+| Staging artifact reader | `SHADOW_ARTIFACT_READ_TOKEN` |
+| Azure OpenAI invocation | `AZURE_OPENAI_API_KEY` |
+| Azure callback process environment | `RUNTIME_SHADOW_SUBMISSION_TOKEN` |
 
-1. Azure/local pipeline wrote its ordinary staging artifacts.
-2. Azure submitted a manifest to Runtime Shadow.
-3. Runtime Shadow authenticated ingress, inserted D1 lifecycle state, queued work, read declared artifacts, invoked the configured model, compared output, and wrote review evidence to R2.
-4. A real comparison was produced for run `3c0225a3-3934-4bcb-aa2e-74ac3575e9f6`.
+Azure OpenAI uses the direct API-key Chat Completions adapter in [`azure-openai.ts`](../packages/runtime-shadow/src/azure-openai.ts). The fixture path has verified the direct Azure deployment route and compatibility API version. Azure endpoint and deployment are non-secret staging variables; API keys and all bearer tokens remain write-only external secrets.
 
-The run was `blocked` with 2 blocking and 45 material differences. That proves the mechanism works. It does **not** prove parity.
+## Evidence obtained to date
 
-## Critical unresolved defect: Azure-reference contract mismatch
+### Frozen synthetic fixture path
 
-Azure is the reference. The current Runtime Shadow contract is not yet a valid measurement of Azure parity.
+The immutable synthetic fixture run `788eb37a-5454-4f13-94b3-7ec29286e396` completed through direct Azure OpenAI. It demonstrated request authentication, hash/schema validation, Queue processing, checkpoint persistence and reuse, comparison artifact writes, and completed D1 state. It remains parity evidence, not a publishing flow.
 
-The root causes are:
+A prior comparison was blocked by publication-intent differences caused by a contract-design defect: a non-publishing shadow run was being compared as if it should have suppressed Azure's business-intent projection. The fixture path corrected that design by preserving verified `publicationIntent` and asserting all-false `actualPublication` separately. This correction introduced versioned checkpoint contracts rather than overwriting earlier evidence.
 
-1. [continuousPrompt()](../packages/runtime-shadow/src/azure-export-runtime.ts) sends configuration hashes rather than the actual Azure taxonomy, mapping rules, role/ownership vocabulary, confidence vocabulary, classification rules, and validation semantics.
-2. The Cloudflare model output schema permits arbitrary strings for controlled fields such as `topicId`, domain, category, owners, and confidence.
-3. The normalizer preserves those arbitrary values instead of validating them against an Azure-provided controlled vocabulary.
-4. [azureProjection()](../packages/runtime-shadow/src/azure-export-runtime.ts) hard-codes Azure classification to null and validation to pass, rather than parsing the actual Azure metadata/validation state.
-5. The comparator in [comparison.ts](../packages/runtime-shadow/src/comparison.ts) uses exact normalized assertion equality and positional topic comparison after sorting. This is strict but invalid when the two outputs are generated under non-equivalent controlled contracts.
+The remaining known fixture semantic findings must be evaluated against the approved evidence policy rather than automatically forcing Cloudflare to reproduce Azure behavior. The local governance record at [`governance-decision.md`](../packages/runtime-shadow/runs/fae20183-13f8-49ed-bd9b-73a2c006d706/governance-decision.md) records:
 
-Do **not** weaken the comparator merely to make the run pass. First make the input contract and semantics equivalent.
+- an unresolved blocking assertion discrepancy where Azure treats an imperative as a completed decision, while the explicit-evidence policy treats it as an action;
+- locally resolved topic-count guidance of zero topic projections for the synthetic text; and
+- locally resolved classification guidance of `internal` / `high`.
 
-### Recommended next implementation
+That record does **not** modify remote comparison evidence, a frozen baseline, the Worker, or approval scope. Its stated remote run remains blocked and no publication occurred.
 
-1. Extend the manifest with immutable, content-bearing Azure configuration snapshot references (or include the content under explicit governance), not only hashes.
-2. Make the prompt require values from Azure’s controlled taxonomy, role/owner, confidence, classification, and validation vocabulary.
-3. Reject unknown controlled values during normalization.
-4. Preserve Azure’s actual classification and validation values in the Azure projection, or remove those fields from the comparison boundary only if Azure has no equivalent recorded artifact.
-5. Match topics with stable Azure-controlled identifiers rather than array position.
-6. Decide explicitly whether assertions require canonical IDs/exact text or an approved semantic-equivalence policy. Do not silently permit missing or fabricated claims.
+### Continuous Azure-export path
 
-## Known operational issues
+At least one continuous Azure-export staging run, `3c0225a3-3934-4bcb-aa2e-74ac3575e9f6`, completed end-to-end: Azure/local staging artifacts existed, Azure submitted a manifest, Runtime Shadow authenticated/reserved/queued the work, retrieved declared artifacts through the restricted reader, invoked the configured model, compared projections, and wrote R2 evidence. Its comparison was `blocked` with **2 blocking** and **45 material** differences. This validates the mechanism only.
 
-### Wrangler environment naming
+## Continuous-parity defect — status after 2026-08-05 session
 
-`wrangler secret put ... --env staging` previously failed with an environment/name resolution error even though [wrangler.jsonc](../packages/runtime-shadow/wrangler.jsonc) defines `env.staging`. The successful operational workaround used the explicit deployed Worker name, but the declarative config and command behavior need reconciliation before relying on it.
+Items 1–5 and 7 from the original required implementation list were completed in commit `feat(runtime-shadow): fix continuous lane controlled vocabulary, classification, and topic matching` (2026-08-05). The following were resolved:
 
-Verify from `packages/runtime-shadow`:
+1. ✅ [`AzureExportPackageManifest`](../packages/runtime-shadow/src/contracts.ts) extended with optional `configurationContent?: Record<string, unknown>` in `processing`. The Azure pipeline now embeds the actual taxonomy, mapping_rules, and roles content at submission time.
+2. ✅ [`continuousPrompt()`](../packages/runtime-shadow/src/azure-export-runtime.ts) now extracts and injects controlled vocabulary (domains, topic names, categories, contextTypes, owner role codes) from `manifest.processing.configurationContent`. Falls back with an explicit `warning` flag when absent.
+3. ✅ [`normalizeContinuousModelOutput()`](../packages/runtime-shadow/src/azure-export-runtime.ts) now validates every controlled field (domain, topic, category, contextType, confidence, owner roles) against the governed vocabulary. Unknown values are nulled and the topic's `validation.status` is degraded to at least `warning` — never silently passes.
+4. ✅ [`azureProjection()`](../packages/runtime-shadow/src/azure-export-runtime.ts) now calls `parseAzureClassification()` to read real `MEETING_TYPE`/`CLASSIFICATION` and `CONFIDENCE` header fields from the Azure summary artifact. Per-topic validation is aggregated from `EIP_VALIDATION` already parsed by `parseAzureTopicRecord`. No invented values.
+5. ✅ [`compareContinuousNormalizedOutputs()`](../packages/runtime-shadow/src/comparison.ts) now matches topics by stable `topicId` (ID-keyed map). Unmatched topics on either side are `material` differences. Null-topicId topics fall back to positional with a note.
+7. ✅ New regression tests added in `azure-export-processing.test.ts` covering classification parsing, vocabulary rejection, and ID-based topic matching. Integration test updated to `continuous-normalized-output-v2`.
+
+Output contract bumped to `continuous-normalized-output-v2`. Prior `v1` checkpoint keys are preserved.
+
+### Remaining open items
+
+6. **Governance decision on assertion matching policy** — decide whether summary assertions require canonical IDs/exact text match or a separately approved semantic-equivalence policy. The comparator currently uses normalized exact text. This has not been changed and requires explicit governance approval before relaxing.
+
+### Required before the next staging evidence run
+
+- Deploy the updated Runtime Shadow Worker (`eip-runtime-shadow-staging`) — the continuous lane changes are not yet deployed.
+- Deploy the updated Azure pipeline — `Submit-RuntimeShadowAzureExport` now embeds `configurationContent`; this requires a pipeline deploy to take effect on hosted runs.
+- The first post-fix continuous staging run will produce a comparison with vocabulary-constrained Cloudflare output and real Azure classification. Expect blocking/material counts to change significantly from the prior `3c0225a3` run (2 blocking, 45 material).
+- If Azure topic records do not consistently carry `TOPIC_ID` fields, all topics will fall into null-topicId positional matching — investigate Azure topic record format and confirm `TOPIC_ID` presence before attributing remaining differences to semantic divergence.
+
+## Operational cautions and known drift
+
+- The staging Worker deployment is real. Do not use the old local-only claims in [`FIXTURE-RUNBOOK.md`](../packages/runtime-shadow/FIXTURE-RUNBOOK.md) as evidence that remote staging resources do not exist.
+- A Wrangler `--env staging` secret command previously had an environment/name resolution problem despite [`wrangler.jsonc`](../packages/runtime-shadow/wrangler.jsonc) defining `env.staging`. The workaround used the explicit deployed Worker name. Reconcile declarative environment naming with the deployed Worker before future secret operations; do not rotate a secret merely to test it.
+- The hosted Azure Function is not reproducible yet: it previously failed because `/home/site/wwwroot/classification_rules.json` was absent, while local runs depend on the ignored root file. Establish a secure approved packaging/runtime-provisioning mechanism before treating a hosted deployment as current.
+- A historical hosted Azure log used the production API Worker URL while local configuration is staging-oriented. Treat the hosted package/configuration as stale until rebuilt and verified from committed source.
+- The Continuous lane reads Azure's existing Cloudflare staging artifacts. Its restricted reader must stay bearer-protected, key-declared, prefix-restricted, and read-only. Do not add listing, write, or delete authority.
+
+## Validation and review procedure
+
+From [`packages/runtime-shadow/`](../packages/runtime-shadow/), source validation is:
 
 ```sh
+npm ci
 npm run typecheck
 npm test
-npx wrangler deploy --env staging --dry-run
+npm run deploy:dry-run
 ```
 
-Do not deploy or rotate secrets without authorization.
-
-### Hosted Azure Function deployment is not reproducible yet
-
-A hosted Azure Function run previously failed because `/home/site/wwwroot/classification_rules.json` was absent. Local runs succeed because the ignored root `classification_rules.json` exists. A new deployment needs a secure, approved packaging or runtime-provisioning method for this file.
-
-A previous hosted log also used the production API Worker URL while the current local configuration is staging-oriented. Treat the hosted Function configuration/package as stale until it is rebuilt and verified from the committed source.
-
-### Runbook drift
-
-[FIXTURE-RUNBOOK.md](../packages/runtime-shadow/FIXTURE-RUNBOOK.md) still describes earlier local-only restrictions, but staging resources and a remote shadow run have now been used. Update the runbook only under appropriate approval, retaining the non-publication and real-data controls.
-
-## Secrets and configuration — never commit values
-
-A fresh clone is source-complete but not executable until an authorized operator configures the following external prerequisites.
-
-| Purpose | Required variable or secret |
-| --- | --- |
-| Microsoft Graph app authentication | `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` |
-| Azure pipeline to Runtime Shadow ingress | `RUNTIME_SHADOW_SUBMISSION_TOKEN` |
-| Runtime Shadow model access | Worker secret `AZURE_OPENAI_API_KEY` |
-| Runtime Shadow continuous ingress | Worker secret `SHADOW_CONTINUOUS_SUBMISSION_TOKEN` |
-| Runtime Shadow artifact reader | Worker secret `SHADOW_ARTIFACT_READ_TOKEN` |
-| Existing fixture/reviewer endpoints, if used | Worker secrets `SHADOW_SUBMISSION_TOKEN`, `SHADOW_REVIEWER_TOKEN` |
-| Azure classification rules | approved non-versioned `classification_rules.json` |
-| Teams notification, if desired | `TEAMS_WEBHOOK_URL` |
-
-The repository configuration no longer contains a Teams webhook value. [power-transcript-pipeline.ps1](../packages/pipeline/power-transcript-pipeline.ps1) reads `TEAMS_WEBHOOK_URL` first and only falls back to the legacy config property if one is supplied locally.
-
-Worker secrets are write-only. Their current plaintext cannot be read back from Cloudflare. Rotate or obtain them through the approved secret owner; do not put them in Git, logs, fixtures, issue comments, or this document.
-
-## Fresh-environment bootstrap
-
-1. Clone the repository and check out the pushed commit/branch.
-2. Install Node dependencies separately:
+The source test suite covers fixture lifecycle and synthetic integration as well as the continuous Azure-export handoff, lifecycle, processing, and artifact-reader behavior. Validate both Worker projects from a fresh environment when practical:
 
 ```sh
-cd packages/runtime-shadow && npm ci
-cd ../api-worker && npm ci
+cd packages/runtime-shadow && npm ci && npm run typecheck && npm test && npm run deploy:dry-run
+cd ../api-worker && npm ci && npm run typecheck && npm test
 ```
 
-3. Ensure macOS tooling includes PowerShell (`pwsh`), Node/npm, Git, and a compatible Wrangler version supplied by the locked project dependencies.
-4. Obtain the approved non-versioned `classification_rules.json` and place it at the repository root for local pipeline execution. Do not commit it.
-5. Set the required secrets only in the shell/process that runs the pipeline. For PowerShell, use `$env:NAME = 'value'`; a zsh `export` does not populate an existing PowerShell process.
-6. Verify the source without remote effects:
+Do not deploy, apply a remote migration, create/rotate a secret, submit a run, upload a real fixture, query remote D1/R2, or alter Azure/publishing configuration as part of basic validation. Each is an operational action requiring explicit authorization.
 
-```sh
-cd packages/runtime-shadow && npm run typecheck && npm test && npm run deploy:dry-run
-cd ../api-worker && npm run typecheck && npm test
-```
-
-7. Before a controlled local pipeline run, confirm `eip_cloudflare_sync` is `staging`, `skip_sharepoint` is `true`, and the Runtime Shadow staging URL is set in [pipeline_config.json](../packages/pipeline/pipeline_config.json).
-8. Do not run with production publishing, real-data export, or secret rotation unless separately authorized.
-
-## Safe review commands
-
-Use the staging D1 and R2 names only after an authorized Cloudflare login:
+For an already-authorized staging evidence review, do not commit downloaded outputs:
 
 ```sh
 cd packages/runtime-shadow
@@ -167,22 +166,14 @@ npx wrangler d1 execute eip-runtime-shadow-staging --remote --command "SELECT ru
 npx wrangler r2 object get eip-runtime-shadow-staging-fixtures/runs/<run-id>/continuous/comparison.json --remote
 ```
 
-Do not commit downloaded real run artifacts. They may contain customer/meeting data.
+## Non-negotiable promotion gates
 
-## Git safety rules for continued work
+No Phase D direct-Graph shadow, publisher readiness, production deployment, authority transfer, or cutover is approved. Before any further phase can be proposed, the applicable approved corpus must demonstrate:
 
-- Use an allowlist with `git add <paths>`; never use `git add .` for this project.
-- Keep generated local output excluded: `local-pipeline-output.txt`, `session-log.txt`, `config/pipeline_Azure_output.txt`, `packages/runtime-shadow/.tmp-*`, and `packages/runtime-shadow/runs/`.
-- Inspect any future fixture before tracking it. Only sanitized synthetic fixtures may be committed.
-- Do not add ignored `classification_rules.json` with force.
-- Keep secrets in environment variables or Cloudflare/Azure secret stores only.
-- Before push, run `git diff --check`, tests, `git diff --cached --check`, and a targeted secret-pattern scan.
+- zero blocking semantic divergences against an equivalent, governed Azure contract;
+- a recorded governance disposition for every material divergence;
+- successful idempotency, duplicate-delivery, retry, recovery, checkpoint, hash, and no-publication evidence;
+- retained review artifacts subject to approved data handling and expiry; and
+- explicit approval of the next phase.
 
-## Immediate next actions
-
-1. Confirm the pushed commit and branch are present on GitHub.
-2. Reproduce local test/typecheck/dry-run validation from a clean checkout if practical.
-3. Reconcile the Wrangler staging environment/deployed Worker naming discrepancy.
-4. Design the Azure-controlled configuration snapshot and schema validation before requesting another parity judgement.
-5. Update the runbook/deployment documentation under approval to distinguish current staging operations from earlier local-only fixture rules.
-6. Keep Azure authoritative until the plan’s parity gates are satisfied and explicitly approved.
+Azure remains authoritative until all gates are met and a separate ownership-switch decision is explicitly approved.

@@ -77,6 +77,14 @@ describe('continuous Azure-export runtime', () => {
         model: 'synthetic-model',
         deployment: 'synthetic-deployment',
         configuration: [{ name: 'taxonomy', version: '1', sha256: 'a'.repeat(64) }],
+        configurationContent: {
+          taxonomy: {
+            Domains: ['Finance', 'Technology'],
+            Topics: { 'Revenue & Commercial Performance': {}, 'AI': {} },
+            Categories: ['Decision', 'Risk', 'Action'],
+            ContextTypes: ['Discussion', 'Agreement'],
+          },
+        },
       },
       artifacts: {
         transcript: await reference('transcript', 'transcripts/2026-08/synthetic.vtt', artifacts.transcript),
@@ -104,7 +112,10 @@ describe('continuous Azure-export runtime', () => {
       classification: { mode: null, confidence: null },
       summaryAssertions: [{ id: 'summary-1', text: 'Approved the test budget.' }],
       topics: [{
-        topicId: null, topic: 'Test budget', domain: null, category: null, contextType: null, summary: null,
+        // 'Test budget' is not in the controlled vocabulary — normalization will null it and
+        // degrade the topic validation to 'warning'. Use null here so the model response
+        // already matches what the normalizer will produce.
+        topicId: null, topic: null, domain: null, category: null, contextType: null, summary: null,
         keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null,
         validation: { status: 'warning', reasons: [] },
       }],
@@ -154,7 +165,7 @@ describe('continuous Azure-export runtime', () => {
       r2.failNextPutFor = `runs/${runId}/continuous/azure-normalized-output.json`;
       await expect(processAzureExportJob(job, env)).rejects.toThrow('Synthetic local R2 failure');
       expect(fetchStub).toHaveBeenCalledTimes(5);
-      expect(r2.objects.get(`runs/${runId}/continuous/model-response-checkpoints/continuous-normalized-output-v1.json`)).toContain('synthetic-model');
+      expect(r2.objects.get(`runs/${runId}/continuous/model-response-checkpoints/continuous-normalized-output-v2.json`)).toContain('synthetic-model');
 
       await d1.prepare("UPDATE azure_export_runs SET state = 'queued' WHERE run_id = ?").bind(runId).run();
       await processAzureExportJob(job, env);

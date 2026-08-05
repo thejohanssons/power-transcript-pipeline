@@ -102,19 +102,53 @@ function compareSemanticOutputs(
     differences.push(difference('validation', 'blocking', 'Required validation result differs', azure.validation, cloudflare.validation));
   }
 
-  const azureTopics = [...azure.topics].sort((a, b) => `${a.topicId}|${a.topic}`.localeCompare(`${b.topicId}|${b.topic}`));
-  const cloudflareTopics = [...cloudflare.topics].sort((a, b) => `${a.topicId}|${a.topic}`.localeCompare(`${b.topicId}|${b.topic}`));
-  if (azureTopics.length !== cloudflareTopics.length) {
-    differences.push(difference('topics.length', 'material', 'Topic count differs', azureTopics.length, cloudflareTopics.length));
+  // Match topics by stable topicId when both sides carry non-null IDs.
+  // Positional matching on sorted arrays is unreliable when topic counts or
+  // ordering diverge between Azure and Cloudflare outputs.
+  const azureById = new Map(azure.topics.filter((t) => t.topicId !== null).map((t) => [t.topicId!, t]));
+  const cloudflareById = new Map(cloudflare.topics.filter((t) => t.topicId !== null).map((t) => [t.topicId!, t]));
+
+  // Topics present in Azure but not matched by Cloudflare.
+  for (const [topicId, azureTopic] of azureById) {
+    if (!cloudflareById.has(topicId)) {
+      differences.push(difference(`topics[${topicId}]`, 'material', 'Azure topic not reproduced by Cloudflare', { topicId, topic: azureTopic.topic }, null));
+    }
   }
-  for (let index = 0; index < Math.min(azureTopics.length, cloudflareTopics.length); index += 1) {
+  // Topics produced by Cloudflare that Azure did not declare.
+  for (const [topicId, cloudflareTopic] of cloudflareById) {
+    if (!azureById.has(topicId)) {
+      differences.push(difference(`topics[${topicId}]`, 'material', 'Cloudflare produced a topic not declared by Azure', null, { topicId, topic: cloudflareTopic.topic }));
+    }
+  }
+  // Compare matched pairs by controlled fields.
+  for (const [topicId, azureTopic] of azureById) {
+    const cloudflareTopic = cloudflareById.get(topicId);
+    if (!cloudflareTopic) continue;
     for (const field of CONTROLLED_TOPIC_FIELDS) {
-      if (azureTopics[index][field] !== cloudflareTopics[index][field]) {
-        differences.push(difference(`topics[${index}].${field}`, 'material', 'Controlled topic classification differs', azureTopics[index][field], cloudflareTopics[index][field]));
+      if (azureTopic[field] !== cloudflareTopic[field]) {
+        differences.push(difference(`topics[${topicId}].${field}`, 'material', 'Controlled topic classification differs', azureTopic[field], cloudflareTopic[field]));
       }
     }
-    if (!equal(azureTopics[index].owners, cloudflareTopics[index].owners) || azureTopics[index].confidence !== cloudflareTopics[index].confidence) {
-      differences.push(difference(`topics[${index}].ownership`, 'material', 'Owner or confidence differs', { owners: azureTopics[index].owners, confidence: azureTopics[index].confidence }, { owners: cloudflareTopics[index].owners, confidence: cloudflareTopics[index].confidence }));
+    if (!equal(azureTopic.owners, cloudflareTopic.owners) || azureTopic.confidence !== cloudflareTopic.confidence) {
+      differences.push(difference(`topics[${topicId}].ownership`, 'material', 'Owner or confidence differs', { owners: azureTopic.owners, confidence: azureTopic.confidence }, { owners: cloudflareTopic.owners, confidence: cloudflareTopic.confidence }));
+    }
+  }
+
+  // Null-topicId topics on either side cannot be matched by ID — compare them
+  // positionally as a fallback, noting the instability.
+  const azureNullId = azure.topics.filter((t) => t.topicId === null);
+  const cloudflareNullId = cloudflare.topics.filter((t) => t.topicId === null);
+  if (azureNullId.length !== cloudflareNullId.length) {
+    differences.push(difference('topics.nullId.length', 'material', 'Count of topics without stable IDs differs (positional matching unreliable)', azureNullId.length, cloudflareNullId.length));
+  }
+  for (let index = 0; index < Math.min(azureNullId.length, cloudflareNullId.length); index += 1) {
+    for (const field of CONTROLLED_TOPIC_FIELDS) {
+      if (azureNullId[index][field] !== cloudflareNullId[index][field]) {
+        differences.push(difference(`topics[null-${index}].${field}`, 'material', 'Controlled topic classification differs (positional, no stable ID)', azureNullId[index][field], cloudflareNullId[index][field]));
+      }
+    }
+    if (!equal(azureNullId[index].owners, cloudflareNullId[index].owners) || azureNullId[index].confidence !== cloudflareNullId[index].confidence) {
+      differences.push(difference(`topics[null-${index}].ownership`, 'material', 'Owner or confidence differs (positional, no stable ID)', { owners: azureNullId[index].owners, confidence: azureNullId[index].confidence }, { owners: cloudflareNullId[index].owners, confidence: cloudflareNullId[index].confidence }));
     }
   }
   if (!equal(azure.people, cloudflare.people)) {

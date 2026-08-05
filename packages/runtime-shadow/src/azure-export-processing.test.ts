@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compareContinuousNormalizedOutputs } from './comparison';
 import type { AzureExportPackageManifest, ContinuousNormalizedOutput } from './contracts';
 import {
+  parseAzureClassification,
   parseAzurePeople,
   parseAzureSummary,
   parseAzureTopicRecord,
@@ -172,10 +173,62 @@ describe('Azure artifact adapters', () => {
   });
 });
 
+describe('Azure classification parsing', () => {
+  it('extracts MEETING_TYPE and CONFIDENCE from summary artifact header', () => {
+    const summaryWithClassification = `MEETING_TYPE: Internal\nCONFIDENCE: High\n---\n- [T15] Decision: Budget approved.`;
+    expect(parseAzureClassification(summaryWithClassification)).toEqual({ mode: 'internal', confidence: 'high' });
+  });
+
+  it('falls back to CLASSIFICATION field when MEETING_TYPE absent', () => {
+    const summaryWithClassification = `CLASSIFICATION: Confidential\n---\nBody content.`;
+    expect(parseAzureClassification(summaryWithClassification)).toEqual({ mode: 'confidential', confidence: null });
+  });
+
+  it('returns null/null when no classification metadata present', () => {
+    expect(parseAzureClassification(summary)).toEqual({ mode: null, confidence: null });
+  });
+
+  it('propagates classification through projectAzureExportPackage', () => {
+    const summaryWithClassification = `MEETING_TYPE: Internal\nCONFIDENCE: High\n---\n- [T15] Decision: The local budget was approved.\n- Action: Finance will record the budget.`;
+    const projection = projectAzureExportPackage(manifest(), { transcript, summary: summaryWithClassification, people, topicRecords: [topic] });
+    expect(projection.classification).toEqual({ mode: 'internal', confidence: 'high' });
+  });
+});
+
 describe('continuous Azure-export comparison', () => {
   it('compares semantic processing while intentionally excluding publication and persistence behavior', () => {
     const azure = continuous();
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' } });
     expect(compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare)).toMatchObject({ status: 'pass', differences: [] });
+  });
+
+  it('matches topics by stable topicId rather than sorted position', () => {
+    const azureTopics = [
+      { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CFO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] } },
+      { topicId: 'T01', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Decision', contextType: 'Decision', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CEO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] } },
+    ];
+    // Cloudflare returns topics in a different order — should still match by ID.
+    const cloudflareTopics = [azureTopics[1], azureTopics[0]];
+    const azure = continuous({ topics: azureTopics });
+    const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: cloudflareTopics });
+    const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
+    expect(result.status).toBe('pass');
+    expect(result.differences).toEqual([]);
+  });
+
+  it('flags Azure topics not reproduced by Cloudflare as material differences', () => {
+    const azureTopic = { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] } };
+    const azure = continuous({ topics: [azureTopic] });
+    const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [] });
+    const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
+    expect(result.differences.some((d) => d.path === 'topics[T15]' && d.severity === 'material')).toBe(true);
+  });
+
+  it('flags Cloudflare topics not in Azure as material differences', () => {
+    const cloudflareTopic = { topicId: 'T99', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] } };
+    const azure = continuous({ topics: [] });
+    const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [cloudflareTopic] });
+    const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
+    expect(result.differences.some((d) => d.path === 'topics[T99]' && d.severity === 'material')).toBe(true);
   });
 });

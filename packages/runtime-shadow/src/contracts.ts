@@ -47,6 +47,15 @@ export interface AzureExportPackageManifest {
     model?: string;
     deployment?: string;
     configuration: VersionReference[];
+    /**
+     * The actual governed configuration content Azure used during processing,
+     * keyed by config name (e.g. "taxonomy", "mapping_rules"). Optional for
+     * backwards-compatibility with v1 submissions that only sent hashes, but
+     * required for a valid continuous parity measurement. When present, the
+     * shadow Worker validates controlled vocabulary values against this content
+     * and injects it into the model prompt.
+     */
+    configurationContent?: Record<string, unknown>;
   };
   artifacts: {
     transcript: AzureExportArtifactReference;

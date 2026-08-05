@@ -1143,6 +1143,14 @@ function Submit-RuntimeShadowAzureExport {
                 @{ name = 'roles'; version = $ROLES_CONFIG_VERSION; sha256 = Get-Sha256Hex -Content ($rolesConfig | ConvertTo-Json -Depth 32 -Compress) },
                 @{ name = 'sentiment_rules'; version = $SENTIMENT_RULES_VERSION; sha256 = Get-Sha256Hex -Content ($sentimentRules | ConvertTo-Json -Depth 32 -Compress) }
             )
+            # Governed configuration content embedded at submission time so the Runtime Shadow
+            # Worker can inject the exact controlled vocabulary Azure used into its model prompt
+            # and validate controlled field values against it. Required for a valid parity measurement.
+            configurationContent = @{
+                taxonomy      = $taxonomy
+                mapping_rules = $mappingRules
+                roles         = $rolesConfig
+            }
         }
         artifacts = @{
             transcript = $Transcript

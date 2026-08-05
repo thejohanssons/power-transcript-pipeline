@@ -142,6 +142,26 @@ export function parseAzureTopicRecord(artifact: string): NormalizedTopic {
   };
 }
 
+/**
+ * Extracts meeting-level classification metadata from the Azure summary artifact header.
+ * Looks for MEETING_TYPE / CLASSIFICATION (mode) and CONFIDENCE fields.
+ * Returns null for both fields when absent — never invents values.
+ */
+export function parseAzureClassification(artifact: string): { mode: string | null; confidence: string | null } {
+  const { metadata } = parseAzureArtifactHeader(artifact);
+  const mode = metadata['MEETING_TYPE'] ?? metadata['CLASSIFICATION'] ?? null;
+  const confidence = metadata['CONFIDENCE'] ?? null;
+  return { mode: mode ? normalizeWhitespace(mode).toLowerCase() : null, confidence: confidence ? normalizeWhitespace(confidence).toLowerCase() : null };
+}
+
+export interface AzureExportBaselineProjection {
+  transcript: ParsedTranscript;
+  summaryAssertions: EvidenceAssertion[];
+  people: NormalizedPerson[];
+  topics: NormalizedTopic[];
+  classification: { mode: string | null; confidence: string | null };
+}
+
 /** Creates the Azure semantic baseline from supplied package contents only. */
 export function projectAzureExportPackage(
   manifest: AzureExportPackageManifest,
@@ -155,5 +175,6 @@ export function projectAzureExportPackage(
     summaryAssertions: parseAzureSummary(contents.summary),
     people: parseAzurePeople(contents.people),
     topics: contents.topicRecords.map(parseAzureTopicRecord),
+    classification: parseAzureClassification(contents.summary),
   };
 }
