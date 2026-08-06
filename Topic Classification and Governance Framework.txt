@@ -1,0 +1,467 @@
+Topic Classification & Governance Framework
+Version 0.2 — Draft for sign-off
+2026-08-06
+
+This document describes the Topic Classification & Governance Framework for the Executive Intelligence Platform. It is deliberately named a framework rather than a taxonomy. The taxonomy is one component of the solution. The framework defines the design principles, classification axes, identity fields, governance metadata, validation rules, and testing criteria that together make Topic Records consistent, durable, and machine-classifiable.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DESIGN PRINCIPLES
+
+Every Topic Record represents a single business topic that can persist over time.
+The topic may appear in many meetings, emails, chats, and documents.
+The topic is updated, not recreated.
+Classification axes use controlled vocabularies.
+Business instances remain free text or reference master data.
+Ownership is governance metadata, not classification.
+Every axis must answer a fundamentally different question.
+Every controlled vocabulary must be stable across 20 years, company changes, product changes, and personnel changes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. PURPOSE
+
+The framework answers three questions:
+
+  What is this topic about?
+  What happened?
+  Who is accountable?
+
+Example statement:
+
+  "Reader 3 September launch is at risk due to delayed firmware approval."
+
+The framework should classify this consistently regardless of who raises it, which meeting it appears in, or how it is worded.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. TOPIC RECORD STRUCTURE
+
+A Topic Record has three sections: Classification, Identity, and Governance.
+
+────────────────────────────────────────
+2A. CLASSIFICATION (Controlled Vocabulary)
+────────────────────────────────────────
+
+Each classification field takes a single value from a predefined list. Values may never be invented during classification.
+
+DOMAIN
+  Question: Which organisational function owns this topic?
+  Nature: Governance axis — organisational accountability.
+  Cardinality: Single value.
+  Design rule: Values are organisational functions, not subject areas or colloquial shorthand.
+               "Human Resources" not "People". "Information Technology" not "Technology".
+               Every value must be a function capable of owning work.
+
+  Values:
+    Product Management
+    Commercial
+    Operations
+    Finance
+    Human Resources
+    Information Technology
+    Supply Chain
+    Legal
+    Marketing
+
+ENTITY TYPE
+  Question: What kind of thing is being discussed?
+  Nature: Business ontology axis — the class of business object.
+  Cardinality: Single value.
+  Design rule: Values are universal business object types, not instances.
+               "Supplier" is an Entity Type. "Hanwang" is an Entity (free text).
+
+  Values:
+    Product
+    Project
+    Initiative
+    Process
+    Customer
+    Supplier
+    Partner
+    Team
+    Technology Platform
+    Revenue Stream
+    Market
+    Compliance Obligation
+    Policy
+    Asset
+    Service
+    Agreement
+    Metric
+
+ASPECT
+  Question: Which management dimension of this Entity is being discussed?
+  Nature: Evaluative axis — the lens through which the Entity is being examined.
+  Cardinality: Single value.
+  Design rule: Every Aspect value must answer the question "How is this thing doing on dimension Y?"
+               Aspect is not a subject area. It is not a domain. It must apply universally
+               to any Entity Type — Schedule applies to a Product, a Supplier, a Team, and a Metric.
+
+  Values:
+    Schedule       — Time, milestones, deadlines. Are we on time?
+    Quality        — Standards, defects, acceptance criteria. Is it good enough?
+    Cost           — Spend, budget, margin, price. Is it affordable?
+    Capacity       — Resources, throughput, volume, scale. Can we handle it?
+    Performance    — KPIs, targets, actuals. Are results meeting expectations?
+    Compliance     — Regulatory, policy, contractual obligations. Are we conforming?
+    Relationship   — Interactions between entities. Are connections healthy?
+    Capability     — Skills, tools, readiness, competence. Do we have the ability?
+
+  Note: "Strategy" is explicitly excluded from Aspect. Strategic significance is expressed
+  via ExecutiveScope (see below), which is orthogonal to the evaluative dimension.
+
+OUTCOME
+  Question: What was discovered or observed?
+  Nature: State axis — what the discussion revealed about the current condition.
+  Cardinality: Single value.
+
+  Values:
+    Progress       — Something moved forward or a milestone was achieved.
+    Delay          — Something slipped or missed a target.
+    Risk           — A threat or vulnerability was identified.
+    Issue          — A problem was surfaced that requires attention.
+    Opportunity    — A positive potential was identified.
+    Dependency     — A blocker or prerequisite was identified.
+    Insight        — New understanding was gained.
+    Completion     — Something concluded or was delivered.
+
+DISPOSITION
+  Question: What commitment or response was made?
+  Nature: Response axis — what the organisation decided to do about the Outcome.
+  Cardinality: Single value.
+
+  Values:
+    Decision       — A choice was made.
+    Action         — A task was assigned to a named owner.
+    Monitoring     — The situation is being watched without immediate action.
+    Escalation     — The topic was elevated to a higher authority.
+    Deferral       — A conscious decision was made to delay response.
+    None           — The topic was discussed but no commitment was made.
+
+EXECUTIVE SCOPE
+  Question: At what level of organisational attention does this topic operate?
+  Nature: Significance axis — orthogonal to all classification axes.
+  Cardinality: Single value.
+  Design rule: This is not a Domain value. It expresses the level of decision-making,
+               not the function responsible. A topic owned by Finance can be Strategic.
+
+  Values:
+    Strategic      — Sets or affects direction, priorities, or objectives.
+    Operational    — Concerns execution within established direction.
+    Tactical       — Concerns a specific near-term action or adjustment.
+
+────────────────────────────────────────
+2B. IDENTITY (Business-Specific, Free Text)
+────────────────────────────────────────
+
+ENTITY
+  The specific instance of the Entity Type being discussed.
+  Free text or master data reference. Not a taxonomy value.
+
+  Examples:
+    Reader 3
+    SuperPen
+    NPI Process
+    UK Education Revenue
+    Hanwang
+    Gross Margin
+    Education Partner Agreement
+
+TOPIC
+  A free text statement describing the enduring business condition.
+  Must be written as a condition that can persist over time and be updated across meetings.
+
+  Good:   "September launch at risk due to firmware approval delays"
+  Good:   "OCR accuracy below acceptance threshold for education market"
+  Good:   "Gross margin below target due to manufacturing cost increases"
+  Poor:   "Discussed firmware approval during weekly meeting"
+  Poor:   "Peter mentioned the Reader 3 issue"
+
+────────────────────────────────────────
+2C. GOVERNANCE
+────────────────────────────────────────
+
+OWNER
+  The single organisational function accountable for this topic.
+  Must be a value from the Domain controlled vocabulary.
+  One owner only. Ownership does not change frequently. Changes require an explicit governance decision.
+
+IMPACTED DOMAINS
+  One or more organisational functions affected by this topic but not accountable for it.
+  Values from the Domain controlled vocabulary.
+  Multi-value. The owning Domain should not appear in Impacted Domains.
+
+STATUS
+  The current lifecycle state of the Topic Record.
+
+  Values:
+    Open           — Active and being tracked.
+    Resolved       — The condition has been addressed.
+    Closed         — No longer relevant or superseded.
+    Watching       — Low-priority monitoring, no active action.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. AXIS SUMMARY
+
+  Axis              Question                          Nature
+  ─────────────────────────────────────────────────────────────────────
+  Domain            Who owns it?                      Governance
+  Entity Type       What kind of thing?               Business ontology
+  Aspect            Which management dimension?       Evaluative
+  Outcome           What was discovered?              State
+  Disposition       What commitment was made?         Response
+  ExecutiveScope    At what organisational level?     Significance
+  ─────────────────────────────────────────────────────────────────────
+  Entity            Which specific thing?             Identity (free text)
+  Topic             What enduring condition exists?   Identity (free text)
+  Owner             Who is accountable?               Governance (single)
+  Impacted Domains  Who else is affected?             Governance (multi)
+  Status            What is the lifecycle state?      Governance
+
+Each axis answers a fundamentally different question. No axis duplicates the function of another.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. CLASSIFICATION EXAMPLES
+
+Example 1
+
+Statement:
+  "Reader 3 September launch is at risk due to delayed firmware approval."
+
+  Domain:           Product Management
+  Entity Type:      Product
+  Entity:           Reader 3
+  Aspect:           Schedule
+  Topic:            September launch at risk due to firmware approval delays
+  Outcome:          Risk
+  Disposition:      Action
+  ExecutiveScope:   Operational
+  Owner:            Product Management
+  Impacted Domains: Commercial, Operations
+
+Example 2
+
+Statement:
+  "Hanwang component lead times increased from 8 weeks to 16 weeks."
+
+  Domain:           Supply Chain
+  Entity Type:      Supplier
+  Entity:           Hanwang
+  Aspect:           Relationship
+  Topic:            Lead time doubled to 16 weeks, threatening delivery schedule
+  Outcome:          Risk
+  Disposition:      Monitoring
+  ExecutiveScope:   Operational
+  Owner:            Supply Chain
+  Impacted Domains: Operations, Product Management
+
+Example 3
+
+Statement:
+  "AI-generated test cases could reduce manual effort significantly."
+
+  Domain:           Information Technology
+  Entity Type:      Process
+  Entity:           Test Case Generation
+  Aspect:           Capability
+  Topic:            AI test case generation could reduce manual QA effort
+  Outcome:          Opportunity
+  Disposition:      Action
+  ExecutiveScope:   Tactical
+  Owner:            Information Technology
+  Impacted Domains: Product Management
+
+Example 4
+
+Statement:
+  "Gross margin is below target due to manufacturing cost increases."
+
+  Domain:           Finance
+  Entity Type:      Metric
+  Entity:           Gross Margin
+  Aspect:           Cost
+  Topic:            Gross margin below target due to manufacturing cost increases
+  Outcome:          Issue
+  Disposition:      Escalation
+  ExecutiveScope:   Strategic
+  Owner:            Finance
+  Impacted Domains: Operations, Commercial
+
+Example 5 — Same Entity, same Aspect, different ExecutiveScope
+
+Statement A (operational):
+  "OCR accuracy is below the acceptance threshold for current shipments."
+
+  Aspect:           Quality
+  ExecutiveScope:   Operational
+  Topic:            OCR accuracy below acceptance threshold
+
+Statement B (strategic):
+  "OCR accuracy limitations are constraining our education market positioning."
+
+  Aspect:           Quality
+  ExecutiveScope:   Strategic
+  Topic:            OCR accuracy limiting future education market positioning
+
+Same Entity (Reader 3), same Aspect (Quality), different level of attention.
+ExecutiveScope is orthogonal — it does not change the management dimension, only its significance.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. DESIGN RULES
+
+Rule 1 — Controlled vocabularies are closed.
+  Classification values must come from predefined lists.
+  Never invent new Domain, Entity Type, Aspect, Outcome, or Disposition values during classification.
+  If a value appears to be missing, flag it for framework review. Do not create it ad hoc.
+
+Rule 2 — Entity values are not taxonomy values.
+  Correct:  Entity Type = Supplier
+  Correct:  Entity = Hanwang
+  Incorrect: Entity Type = Hanwang
+
+Rule 3 — Topics describe enduring conditions, not meeting events.
+  Correct:  "September launch at risk due to firmware approval delays"
+  Incorrect: "Discussed firmware approval in the weekly meeting"
+
+Rule 4 — A topic can appear in many meetings.
+  The system updates the same Topic Record across meetings.
+  It does not create a new Topic Record for each occurrence.
+
+Rule 5 — One owner only.
+  Each Topic Record has one accountable Domain.
+  Many domains may appear in Impacted Domains.
+  Only one owns.
+
+Rule 6 — Ownership is not classification.
+  Owner and Impacted Domains are governance metadata.
+  They describe accountability, not subject matter.
+  Domain (classification) and Owner (governance) will typically match,
+  but they serve different purposes and are maintained separately.
+
+Rule 7 — ExecutiveScope is independent of Domain.
+  A topic owned by Finance can be Strategic, Operational, or Tactical.
+  ExecutiveScope is not a Domain value. Do not conflate organisational level with owning function.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. VALIDATION AND TESTING
+
+Before implementation, the framework must be validated against real Topic Records.
+
+Test Protocol
+
+  Sample: 100 Topic Records drawn from at least five meeting types:
+    Executive committee
+    Product review
+    NPI process meeting
+    Commercial review
+    R&D update
+
+  For each record, ask:
+    1. Can a classifier assign all values without creating a new taxonomy value?
+    2. Would two independent classifiers choose the same values?
+    3. Does the classification support topic matching across meetings?
+    4. Does any axis become a dumping ground for unclassifiable items?
+    5. Does removing any axis leave the Topic Record ambiguous?
+       (If not, that axis may be redundant.)
+
+  Pass criteria:
+    95% of records classified without new vocabulary values.
+    80% inter-classifier agreement on Aspect (predicted hardest axis).
+    No single Outcome or Disposition value used for more than 40% of records
+    (indicates that value is too broad or that a category is missing).
+
+Predicted stability by axis:
+  Domain, Outcome, Disposition — expected to stabilise quickly.
+  Entity Type — expect one or two additions from real data not covered by current list.
+  Aspect — highest risk; eight values may prove insufficient or one value may prove ambiguous.
+           This is where empirical testing should concentrate.
+  ExecutiveScope — expected to stabilise quickly; three values are likely sufficient.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. OPEN QUESTIONS (to be resolved after testing)
+
+OQ-1  Aspect — are eight values sufficient?
+      If a ninth value emerges repeatedly from real data, it should be named and added.
+      Current hypothesis: no ninth value is needed, but Relationship and Capability
+      may behave differently from the six performance dimensions in practice.
+
+OQ-2  Domain naming principle — formal vs vernacular.
+      Current list uses formal function names (Human Resources, Information Technology).
+      This must be applied consistently. Any remaining vernacular names (e.g. "Commercial"
+      vs "Sales & Marketing") should be resolved before implementation.
+
+OQ-3  Impacted Domains cardinality.
+      An open list of impacted domains may become noisy if every topic impacts 3–4 domains.
+      Consider whether a "primary impacted domain" (single value) is more useful
+      than an unconstrained list.
+
+OQ-4  Agreement and Metric in Entity Type.
+      Both are included in the current list. Real-data testing will confirm
+      whether these produce clean, unambiguous classifications.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+8. SIGN-OFF
+
+  Version 0.2 approved as baseline taxonomy and governance model, subject to validation testing.
+  Date: 2026-08-06
+
+  Decision record:
+
+  "Approved as Version 0.2 baseline taxonomy and governance model, subject to validation testing."
+
+  Basis for approval:
+  — Domain is a governance/accountability axis using organisational functions.
+  — Entity Type and Entity are properly separated into taxonomy vs instance data.
+  — Topic is defined as an enduring business condition, not a category.
+  — Risk removed from Aspect and retained only as an Outcome, eliminating circular classification.
+  — Strategy removed from Aspect and replaced by ExecutiveScope, preserving orthogonality.
+  — Disposition is a true response/commitment axis.
+  — All controlled vocabularies are finite and durable.
+
+  Under observation:
+  — Aspect is explicitly marked for empirical monitoring.
+    It is not considered wrong. It is considered the primary discriminator in the Topic Matching
+    Engine and therefore the axis most likely to reveal gaps under real-world data.
+    Any pressure to invent a ninth Aspect value during validation should be recorded and reviewed.
+
+  Promotion criteria (from approved baseline → approved production standard):
+  — 95% of validation records classified without new vocabulary values.
+  — High inter-classifier agreement on Aspect.
+  — Minimal Aspect leakage (no single value used as a catch-all).
+  — Review after 100–200 Topic Record validation exercise across at least five meeting types.
+
+  Next actions:
+  1. Freeze the taxonomy. No further theoretical redesign.
+  2. Run 100–200 Topic Record validation exercise (ExCo, Product review, NPI, Commercial, R&D).
+  3. Measure classifier agreement and Aspect coverage.
+  4. Review results and promote to production standard or adjust Aspect vocabulary only.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+9. VERSION HISTORY
+
+  Version 0.1 — Initial draft (designer)
+  Version 0.2 — Revised following design review session 2026-08-06
+                 Changes from 0.1:
+                 — Domain renamed from colloquial to formal function names
+                   (Product → Product Management, People → Human Resources,
+                    Technology → Information Technology)
+                 — Domain values Education and Executive removed
+                   (Education is a market segment, not an owning function;
+                    Executive is a hierarchy level covered by ExecutiveScope)
+                 — Strategy removed from Aspect; replaced by ExecutiveScope axis
+                 — Risk removed from Aspect (circular with Outcome: Risk)
+                 — Delay and Completion added to Outcome
+                 — ExecutiveScope axis added (Strategic / Operational / Tactical)
+                 — Entity Type expanded: Agreement, Metric added;
+                   Project and Initiative retained (lifecycle objection withdrawn)
+                 — Five classification examples added including ExecutiveScope contrast pair
+                 — Validation test protocol added with pass criteria
+                 — Open questions section added

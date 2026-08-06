@@ -1108,8 +1108,18 @@ function Submit-RuntimeShadowAzureExport {
         [hashtable]$Transcript,
         [hashtable]$Summary,
         [hashtable]$People,
-        [object[]]$TopicRecords
+        [object[]]$TopicRecords,
+        # When set, appends a UTC timestamp suffix to PackageId so the Runtime Shadow Worker
+        # treats this as a new submission, bypassing the D1 idempotency guard. Use with
+        # -ForceRerun to obtain post-fix evidence runs against already-submitted meetings.
+        [switch]$ForceResubmit
     )
+
+    if ($ForceResubmit) {
+        $rerunSuffix = (Get-Date -Format "yyyyMMddTHHmmssfff")
+        $PackageId = "$PackageId-rerun-$rerunSuffix"
+        Write-Host "  [RUNTIME SHADOW] ForceResubmit: using package ID '$PackageId'" -ForegroundColor Yellow
+    }
 
     $shadowUrl = $null
     if ($pipelineConfig.eip_cloudflare_sync -eq 'staging') {
@@ -1267,7 +1277,11 @@ function Invoke-MeetingProcessing {
         [string]   $OutDir,
         [int]      $SegmentCount = 1,
         [string]   $AgentState = "processed",
-        [string]   $RunId = "local"
+        [string]   $RunId = "local",
+        # When set, forwards ForceResubmit to Submit-RuntimeShadowAzureExport so that
+        # already-submitted meetings are re-queued under a new package ID, bypassing
+        # the D1 idempotency guard. Mirrors the top-level -ForceRerun flag.
+        [switch]   $ForceRerun
     )
 
     $timestamp    = $EventDate.ToString("yyyy-MM-dd_HHmm")
@@ -1727,7 +1741,8 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         -PackageId "azure-$MeetingId" `
         -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate `
         -Transcript $runtimeShadowTranscript -Summary $runtimeShadowSummary `
-        -People $runtimeShadowPeople -TopicRecords $runtimeShadowTopicRecords
+        -People $runtimeShadowPeople -TopicRecords $runtimeShadowTopicRecords `
+        -ForceResubmit:$ForceRerun
 
     # ── 14. UPDATE SHAREPOINT COLUMNS ────────────────────────────
     $authHeaderRef = $null
@@ -3231,7 +3246,8 @@ function Process-VttFile {
         -OutDir       $script:outDir `
         -SegmentCount 1 `
         -AgentState   "processed_vtt" `
-        -RunId        "vtt_inbox"
+        -RunId        "vtt_inbox" `
+        -ForceRerun:$ForceRerun
 
     # Update master log
     $existing = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
@@ -3431,7 +3447,8 @@ if ($VttFile) {
         -OutDir       $outDir `
         -SegmentCount 1 `
         -AgentState   "processed_vtt_direct" `
-        -RunId        "vtt_direct"
+        -RunId        "vtt_direct" `
+        -ForceRerun:$ForceRerun
 
     # Update master log
     $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId }
@@ -3862,7 +3879,8 @@ foreach ($calendarEvent in $events) {
             -OutDir       $outDir `
             -SegmentCount $segCnt `
             -AgentState   "pending" `
-            -RunId        $runId
+            -RunId        $runId `
+            -ForceRerun:$ForceRerun
 
         $log += $result.LogEntry
     }

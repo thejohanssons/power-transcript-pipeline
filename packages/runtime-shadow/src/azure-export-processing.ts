@@ -149,8 +149,10 @@ export function parseAzureTopicRecord(artifact: string): NormalizedTopic {
  */
 export function parseAzureClassification(artifact: string): { mode: string | null; confidence: string | null } {
   const { metadata } = parseAzureArtifactHeader(artifact);
-  const mode = metadata['MEETING_TYPE'] ?? metadata['CLASSIFICATION'] ?? null;
-  const confidence = metadata['CONFIDENCE'] ?? null;
+  // The pipeline writes MODE / MODE_CONFIDENCE to the summary header.
+  // MEETING_TYPE and CLASSIFICATION are retained as legacy fallbacks.
+  const mode = metadata['MEETING_TYPE'] ?? metadata['CLASSIFICATION'] ?? metadata['MODE'] ?? null;
+  const confidence = metadata['CONFIDENCE'] ?? metadata['MODE_CONFIDENCE'] ?? null;
   return { mode: mode ? normalizeWhitespace(mode).toLowerCase() : null, confidence: confidence ? normalizeWhitespace(confidence).toLowerCase() : null };
 }
 

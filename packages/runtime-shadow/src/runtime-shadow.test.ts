@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { compareNormalizedOutputs } from './comparison';
+import { compareNormalizedOutputs, compareContinuousNormalizedOutputs } from './comparison';
 import type { FixtureManifest, NormalizedOutput } from './contracts';
 import { isFixtureManifest, isNormalizedOutput, isSafeObjectKey } from './fixture-validation';
 import {
@@ -281,6 +281,89 @@ describe('normalized comparison and review workflow', () => {
     const rejected = new Request('https://local.test/v1/fixture-runs/run/dispositions', { headers: { authorization: 'Bearer wrong-token' } });
     await expect(hasMatchingReviewerToken(authorized, 'review-token')).resolves.toBe(true);
     await expect(hasMatchingReviewerToken(rejected, 'review-token')).resolves.toBe(false);
+  });
+});
+
+describe('continuous-lane permitted-difference policy', () => {
+  const SCHEMA = '2.0.0' as const;
+  const processing = {
+    runtime: 'azure' as const,
+    pipelineVersion: '1.9.1',
+    promptVersion: '1.0.0',
+    model: 'gpt-4o',
+    deployment: 'eip-gpt4o',
+    configurationHashes: {},
+  };
+  const source = { system: 'azure', nativeId: 'meeting-1', transcriptSha256: SHA256 };
+  const validation = { status: 'pass' as const, reasons: [] };
+
+  function continuousOutput(overrides: Partial<import('./contracts').ContinuousNormalizedOutput> = {}): import('./contracts').ContinuousNormalizedOutput {
+    return {
+      schemaVersion: SCHEMA,
+      source,
+      processing,
+      classification: { mode: 'ceo', confidence: 'high' },
+      summaryAssertions: [{ text: 'Revenue was £500k.' }],
+      topics: [],
+      people: [],
+      validation,
+      ...overrides,
+    };
+  }
+
+  it('assertions difference is permitted (not blocking) in the continuous lane', () => {
+    const azure = continuousOutput({ summaryAssertions: [{ text: '"revenue was £500k."' }] });
+    const cloudflare = continuousOutput({ summaryAssertions: [{ text: 'quin reported revenue of approximately 500,000.' }] });
+    const result = compareContinuousNormalizedOutputs('pkg-1', SHA256, 'run-1', azure, cloudflare);
+    const assertionDiff = result.differences.find((d) => d.path === 'assertions');
+    expect(assertionDiff).toBeDefined();
+    expect(assertionDiff?.severity).toBe('permitted');
+    expect(result.status).not.toBe('blocked');
+  });
+
+  it('assertions difference remains blocking in the frozen-fixture lane', () => {
+    // compareNormalizedOutputs does NOT set applyContinuousPolicy
+    const base = {
+      schemaVersion: SCHEMA,
+      source: { ...source, acquisitionMode: 'calendar' as const },
+      processing,
+      classification: { mode: 'ceo', confidence: 'high' },
+      summaryAssertions: [{ text: '"revenue was £500k."' }],
+      topics: [],
+      people: [],
+      validation,
+      publicationIntent: { confluence: false, teams: false, topicMemory: false },
+    } satisfies import('./contracts').NormalizedOutput;
+    const cloudflare = { ...base, summaryAssertions: [{ text: 'different assertion text here.' }] };
+    const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', base, cloudflare);
+    const assertionDiff = result.differences.find((d) => d.path === 'assertions');
+    expect(assertionDiff?.severity).toBe('blocking');
+    expect(result.status).toBe('blocked');
+  });
+
+  it('validation difference is permitted (not blocking) in the continuous lane', () => {
+    const azure = continuousOutput({ validation: { status: 'pass', reasons: [] } });
+    const cloudflare = continuousOutput({ validation: { status: 'warning', reasons: ['Unresolved discussion: Terry compensation.'] } });
+    const result = compareContinuousNormalizedOutputs('pkg-1', SHA256, 'run-1', azure, cloudflare);
+    const validationDiff = result.differences.find((d) => d.path === 'validation');
+    expect(validationDiff).toBeDefined();
+    expect(validationDiff?.severity).toBe('permitted');
+    expect(result.status).not.toBe('blocked');
+  });
+
+  it('both assertions and validation permitted together produce pass status when no other diffs', () => {
+    const azure = continuousOutput({
+      summaryAssertions: [{ text: '"revenue £500k."' }],
+      validation: { status: 'pass', reasons: [] },
+    });
+    const cloudflare = continuousOutput({
+      summaryAssertions: [{ text: 'quin reported revenue of approximately 500,000.' }],
+      validation: { status: 'warning', reasons: ['Unresolved discussion.'] },
+    });
+    const result = compareContinuousNormalizedOutputs('pkg-1', SHA256, 'run-1', azure, cloudflare);
+    expect(result.counts.blocking).toBe(0);
+    expect(result.counts.permitted).toBe(2);
+    expect(result.status).toBe('pass');
   });
 });
 

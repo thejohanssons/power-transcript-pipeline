@@ -184,6 +184,16 @@ describe('Azure classification parsing', () => {
     expect(parseAzureClassification(summaryWithClassification)).toEqual({ mode: 'confidential', confidence: null });
   });
 
+  it('reads MODE and MODE_CONFIDENCE fields written by the pipeline', () => {
+    const summaryWithMode = `MODE: CEO\nMODE_CONFIDENCE: High\n---\nBody content.`;
+    expect(parseAzureClassification(summaryWithMode)).toEqual({ mode: 'ceo', confidence: 'high' });
+  });
+
+  it('prefers MEETING_TYPE over MODE when both present', () => {
+    const summaryWithBoth = `MEETING_TYPE: CPO\nMODE: CEO\nMODE_CONFIDENCE: High\n---\nBody content.`;
+    expect(parseAzureClassification(summaryWithBoth)).toEqual({ mode: 'cpo', confidence: 'high' });
+  });
+
   it('returns null/null when no classification metadata present', () => {
     expect(parseAzureClassification(summary)).toEqual({ mode: null, confidence: null });
   });
@@ -221,8 +231,8 @@ describe('continuous Azure-export comparison', () => {
     const azure = continuous({ topics: [azureTopic] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
-    // Path uses composite key topicId|category.
-    expect(result.differences.some((d) => d.path === 'topics[T15|Strategy]' && d.severity === 'material')).toBe(true);
+    // Path uses normalised name-only key (topicId and category no longer part of match key).
+    expect(result.differences.some((d) => d.path === 'topics[revenue & commercial performance]' && d.severity === 'material')).toBe(true);
   });
 
   it('flags Cloudflare topics not in Azure as material differences', () => {
@@ -230,7 +240,7 @@ describe('continuous Azure-export comparison', () => {
     const azure = continuous({ topics: [] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [cloudflareTopic] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
-    // Path uses composite key topicId|category.
-    expect(result.differences.some((d) => d.path === 'topics[T99|Strategy]' && d.severity === 'material')).toBe(true);
+    // Path uses normalised name-only key (topicId and category no longer part of match key).
+    expect(result.differences.some((d) => d.path === 'topics[strategic direction & alignment]' && d.severity === 'material')).toBe(true);
   });
 });
