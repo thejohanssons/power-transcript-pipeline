@@ -407,6 +407,62 @@ OQ-4  Agreement and Metric in Entity Type.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+7A. ASPECT CANDIDATE REGISTER
+
+This register records proposed additions to the Aspect vocabulary that have been observed
+in real data but do not yet meet the evidence threshold for formal promotion.
+
+Promotion threshold: a candidate must fail to classify cleanly under any existing Aspect
+value in at least 10 independent records across at least 3 different meeting types before
+being considered for addition to the controlled vocabulary.
+
+────────────────────────────────────────
+CANDIDATE: Alignment
+────────────────────────────────────────
+
+First observed: 2026-08-06, validation sample record 11 of 13
+Topic:          "Strategic Direction & Alignment" (Sales Call, Azure pipeline output)
+Proposed meaning: "Are shared understanding and direction coherent across stakeholders?"
+
+Governance decision (2026-08-06): REJECTED — insufficient evidence after 13 records.
+
+Rationale for rejection:
+
+  "Alignment" may not be a management dimension at all. It may be a condition that
+  occurs within existing dimensions. The following test was applied:
+
+  Can every existing Aspect be "aligned"?
+    Schedule alignment ✓
+    Cost alignment ✓
+    Quality alignment ✓
+    Capacity alignment ✓
+    Performance alignment ✓
+    Compliance alignment ✓
+    Relationship alignment ✓
+    Capability alignment ✓
+
+  If Alignment can qualify every existing Aspect, it is a modifier or condition,
+  not an independent management dimension. Compare:
+
+    Can every Aspect be "scheduled"? No — Quality schedule ✗, Relationship schedule ✗.
+    Therefore Schedule is a true Aspect.
+
+  This is the same logic that led to removing Risk from Aspect: Schedule can be at risk,
+  Quality can be at risk — Risk is a condition, not a dimension.
+
+Provisional classification for "Strategic Direction & Alignment":
+  Domain:        Product Management or Commercial (context-dependent)
+  Entity Type:   Initiative
+  Aspect:        Performance
+  Outcome:       Insight or Progress
+  Disposition:   Decision
+  ExecutiveScope: Strategic
+
+Status: Under observation. Reassess after 100–200 Topic Records.
+Instances observed: 1 (threshold: 10 across 3+ meeting types)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 8. SIGN-OFF
 
   Version 0.2 approved as baseline taxonomy and governance model, subject to validation testing.
