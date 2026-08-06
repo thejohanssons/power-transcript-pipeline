@@ -1,6 +1,242 @@
-# EIP Platform — Session State Log
-# Last updated: 2026-07-31 08:18 UTC
-# Branch: main
+# EIP Platform — Developer Handover and Session State Log
+# Last updated: 2026-08-06 UTC
+# Current branch: main — commit d66a3cc (fix(runtime-shadow): continuous-lane comparison fixes and permitted-difference policy)
+# Completed runtime-shadow snapshot: `origin/develop` commit `d75fedd` (`feat(runtime-shadow): verify direct Azure checkpoint flow`)
+# Local checkout: `main`; historical branch notes below are not a current Git-state source.
+
+---
+
+## Session Summary — 2026-08-06
+
+### Context
+The overnight pipeline run (02:08 UTC) processed 8 meetings but submitted no new shadow rows —
+all 8 were idempotency-rejected (already in D1 from the 2026-08-05 afternoon batch). The
+pre-fix batch showed blocking=2, material=39–45 across meetings. Post-fix evidence was needed.
+
+### Pipeline: -ForceRerun now propagates to Runtime Shadow
+
+Added `-ForceResubmit` switch to `Submit-RuntimeShadowAzureExport`. When `-ForceRerun` is
+active at the top level, the shadow PackageId gets a millisecond-precision timestamp suffix
+(e.g. `azure-2026-08-05_0700_sales_call-rerun-20260806T085430879`), bypassing the D1
+idempotency guard. Forwarded through all three `Invoke-MeetingProcessing` call sites (VTT
+inbox, VTT direct, CALENDAR).
+
+### Runtime Shadow: comparison fixes deployed
+
+All fixes committed in d66a3cc and deployed to `eip-runtime-shadow-staging` Worker:
+
+1. **parseAzureClassification** — added `MODE` and `MODE_CONFIDENCE` as fallback fields.
+   The pipeline writes these headers; the Worker was looking for `MEETING_TYPE`/`CLASSIFICATION`
+   which don't exist. Classification now correctly populated.
+
+2. **Topic matching** — changed key from `topicId|category` to normalised name only.
+   Azure uses taxonomy-registered IDs (T10, T17); Cloudflare uses sequential meeting-local IDs
+   (T1, T2). They will never match on ID. Name-only matching with v1.0 suffix stripping now
+   correctly identifies same topics across runtimes.
+
+3. **Per-topic field comparison** — removed `topicId` and `topic` from `CONTROLLED_TOPIC_FIELDS`.
+   topicId is runtime-local; topic name is already encoded in the match key.
+
+4. **Ownership** — separated `owners` from `confidence` in topic comparison. Azure always emits
+   null confidence (structural divergence). Confidence now `permitted` in continuous lane.
+
+5. **People** — excluded `contributions` (format divergence parallel to assertions); normalised
+   `attendance` vocabulary (`attendee` → `present`); stripped post-nominal suffixes (OBE, MBE).
+
+6. **Classification** — normalised `mode` and `confidence` to lowercase before comparing.
+
+7. **Topic key changed to name-only** — category differences now surface as per-topic field diffs
+   rather than misleading "topic not found" pairs.
+
+8. **Attendance vocab** — `attendee` → `present` normalisation in `normalisePerson`.
+
+### Permitted-difference policy (continuous lane)
+
+Two blocking diffs approved as permitted via governance decision record:
+
+- `assertions` → `permitted` under `CONTINUOUS_ASSERTION_FORMAT_DIVERGENCE`
+  Azure: ~90 atomic quoted bullet facts. Cloudflare: ~70 attributed narrative sentences.
+  Same facts, structurally incompatible format. Approved 2026-08-06.
+
+- `validation` → `permitted` under `CONTINUOUS_VALIDATION_STRICTNESS_DIVERGENCE`
+  Azure: unconditional `pass`. Cloudflare: `warning` with correct reasons (unresolved
+  discussions, ownerless actions). Cloudflare is more correct. Approved 2026-08-06.
+
+Governance decision record: `packages/runtime-shadow/runs/694d7908-2869-4b7c-a1fd-d38c456a02a1/governance-decision.md`
+
+### Evidence run results (post-fix, post-policy)
+
+| Run | Blocking | Material | Permitted | Status |
+|---|---|---|---|---|
+| Pre-fix (2026-08-05) | 2 | 39–45 | 0 | blocked |
+| Post-fix, pre-policy | 2 | 16–19 | 0 | blocked |
+| Post-fix + policy | 0 | 11–15 | 2 | review_required |
+| After trivial fixes | 0 | ~11 | 3+ | review_required |
+
+Blocking count = 0. Status = review_required (material diffs require disposition).
+
+### Remaining material diffs (as of end of session)
+
+1. **Topic category disagreement** (~7 diffs) — Azure and Cloudflare assign different categories
+   to the same topic. Topic key changed to name-only to surface as field diffs. Genuine
+   classification divergence — not a bug.
+
+2. **Topic domain disagreement** (~1 diff) — e.g. `Strategy` vs `Marketing` for strategic
+   direction topic. Genuine model judgment difference.
+
+3. **Topic owners** (~1 diff) — Azure attributes `CEO` as owner; Cloudflare finds no explicit
+   evidence. Strictness difference.
+
+These are genuine semantic diffs, not comparison mechanics issues. Next step: governance
+disposition or taxonomy alias map.
+
+### Taxonomy: Topic Classification & Governance Framework v0.2 signed off
+
+Full design session resulted in a signed-off taxonomy framework. Key decisions:
+
+- **6 axes:** Domain (governance), Entity Type (business ontology), Aspect (evaluative),
+  Outcome (state), Disposition (response), ExecutiveScope (significance)
+- **2 identity fields:** Entity (free text), Topic (enduring condition statement)
+- **Domain** uses formal organisational function names (Product Management, Human Resources,
+  Information Technology — not Product, People, Technology)
+- **Aspect** reduced to 8 values: Schedule, Quality, Cost, Capacity, Performance, Compliance,
+  Relationship, Capability. Strategy removed (→ ExecutiveScope). Risk removed (circular with
+  Outcome: Risk).
+- **ExecutiveScope** added: Strategic / Operational / Tactical — orthogonal to all axes
+- **Entity Type** expanded: Agreement, Metric added; Project and Initiative retained
+- **Domain** values Education and Executive removed (not universal organisational functions)
+- Framework document: `Topic Classification and Governance Framework.txt`
+- Status: **Approved as baseline v0.2, frozen, pending 100–200 record validation exercise**
+
+### Next steps (prioritised)
+
+1. **Taxonomy validation exercise** — classify 100–200 real Topic Records from ExCo, Product
+   review, NPI, Commercial review, R&D update meetings against v0.2 taxonomy. Measure coverage
+   and inter-classifier agreement. Focus empirical testing on Aspect axis.
+
+2. **Remaining material diffs disposition** — category/domain disagreement and owners attribution
+   diffs require governance disposition or taxonomy alias map (Azure short names → canonical names).
+
+3. **Full 8-meeting rerun** — only 2 of 8 meetings processed in latest rerun. Run pipeline for
+   full date range to get complete evidence set.
+
+4. **Commit and push to origin** — current branch is 4 commits ahead of origin/main.
+
+---
+
+## Current Developer Handover — Cloudflare Runtime Shadow
+
+### Final objective
+Replace the Azure Function PowerShell runtime with a Cloudflare-native runtime **only after it proves semantic and operational parity**. The eventual cutover must be reversible and preserve evidence handling, governance, and business-output quality. Azure remains the authoritative publisher and rollback runtime until a separately approved ownership switch.
+
+The initial parity lane intentionally continues to use Azure OpenAI. This separates runtime migration from model-provider migration. Workers AI is a later, independent provider evaluation and must not change the accepted Azure OpenAI baseline.
+
+### State of work
+- Phases A–C are implemented and deployed **only** to isolated runtime-shadow staging resources under [`packages/runtime-shadow/`](packages/runtime-shadow/).
+- The completed direct Azure API-key and checkpoint work is saved remotely at `origin/develop` commit `d75fedd`. The local checkout remains `main`, so it may appear ahead of `origin/main`.
+- The staging Worker completed the immutable **synthetic-only** run `788eb37a-5454-4f13-94b3-7ec29286e396` using direct Azure OpenAI Chat Completions.
+- The run is technically `completed`, but comparison status is `blocked`: six blocking and two material differences. This is valid parity evidence, not a transport or infrastructure failure.
+- No real fixture, Microsoft Graph acquisition, Azure Function change, source-system mutation, external publication, production resource, or cutover has occurred under this programme.
+- Do not commit unrelated or diagnostic local files merely to clean the worktree. Raw diagnostic output and unreviewed plan/taxonomy changes remain intentionally outside the completed runtime-shadow snapshot.
+
+### Non-negotiable boundary
+The staging Worker may read approved immutable fixture objects from its dedicated R2 bucket and write only its dedicated D1, R2, and Queue resources. It has no publisher implementation and must not receive SharePoint, Confluence, Teams, Topic Memory, legacy-sync, production, or Graph authority.
+
+Worker secrets are not repository content: `AZURE_OPENAI_API_KEY`, `SHADOW_SUBMISSION_TOKEN`, and `SHADOW_REVIEWER_TOKEN`. Never save their values, raw prompts, raw LLM responses, external publication URLs, or unapproved transcript data in source control, logs, or this document.
+
+### Runtime-shadow file structure
+| Location | Responsibility | Critical handover note |
+|---|---|---|
+| [`packages/runtime-shadow/src/index.ts`](packages/runtime-shadow/src/index.ts) | Worker routes, Queue consumer, fixture/hash checks, checkpointing, artifact writes | `OUTPUT_CONTRACT_VERSION` is `normalized-output-v2`; increment it when output instructions or shape changes. |
+| [`packages/runtime-shadow/src/contracts.ts`](packages/runtime-shadow/src/contracts.ts) | Versioned fixture, normalized-output, comparison, disposition, and LLM contracts | This is the semantic boundary between the Azure baseline and Cloudflare result. |
+| [`packages/runtime-shadow/src/azure-openai.ts`](packages/runtime-shadow/src/azure-openai.ts) | Azure OpenAI adapter | Uses API-key Chat Completions with `api-version=2024-02-15-preview`; no Entra/app-registration flow. |
+| [`packages/runtime-shadow/src/fixture-processing.ts`](packages/runtime-shadow/src/fixture-processing.ts) | WebVTT/text parsing and source normalization | Processes supplied fixtures only; never acquires source data. |
+| [`packages/runtime-shadow/src/fixture-validation.ts`](packages/runtime-shadow/src/fixture-validation.ts) | Manifest/output/publication-intent/key validation | Rejects malformed data and unsafe R2 object keys. |
+| [`packages/runtime-shadow/src/fixture-run-lifecycle.ts`](packages/runtime-shadow/src/fixture-run-lifecycle.ts) | D1 state transitions, idempotency, recovery | Recovery uses the original immutable run ID; delayed duplicates are no-ops. |
+| [`packages/runtime-shadow/src/comparison.ts`](packages/runtime-shadow/src/comparison.ts) | Azure-baseline versus Cloudflare-result comparison | Blocking differences halt parity progression; material differences require review. |
+| [`packages/runtime-shadow/src/reviewer-disposition.ts`](packages/runtime-shadow/src/reviewer-disposition.ts) | Reviewer disposition validation | Only existing material differences on completed runs are eligible. |
+| [`packages/runtime-shadow/src/runtime-shadow.integration.test.ts`](packages/runtime-shadow/src/runtime-shadow.integration.test.ts) | Synthetic end-to-end Worker test | Covers auth, Queue/recovery serialization, checkpoint compatibility, and persistence failure. |
+| [`packages/runtime-shadow/migrations/0001_shadow_runs.sql`](packages/runtime-shadow/migrations/0001_shadow_runs.sql) | Dedicated shadow D1 schema | Defines `fixture_runs` and `comparison_dispositions`; never apply to Phase 1 or production D1. |
+| [`packages/runtime-shadow/wrangler.jsonc`](packages/runtime-shadow/wrangler.jsonc) | Staging-only bindings | Contains non-secret endpoint/deployment and dedicated bindings; secrets remain external. |
+| [`packages/runtime-shadow/FIXTURE-RUNBOOK.md`](packages/runtime-shadow/FIXTURE-RUNBOOK.md) | Fixture approval, package layout, and operating boundary | Required reading before any real-fixture action. |
+| [`plans/cloudflare-runtime-replacement-parallel-comparison-plan.md`](plans/cloudflare-runtime-replacement-parallel-comparison-plan.md) | Programme architecture and phase gates | Its original proposed/no-change label predates the approved A–C staging execution; revise only deliberately. |
+
+### Dedicated staging resources
+- Worker: `eip-runtime-shadow-staging` at `https://eip-runtime-shadow-staging.homeassistant-8d3.workers.dev`.
+- D1: `eip-runtime-shadow-staging` (`c7474ecb-ff28-4788-9108-15d29a022c7b`), isolated from Phase 1 and production.
+- R2: `eip-runtime-shadow-staging-fixtures`, exclusively for approved fixture packages and run artifacts.
+- Queue: `eip-runtime-shadow-staging-jobs`, one job per fixture run with up to three retries.
+
+### Immutable fixture and baseline design
+A fixture is a self-contained, approved, immutable evidence package. It freezes both the exact input and the Azure output that Cloudflare must compare against; comparison never reruns Azure.
+
+```text
+fixtures/{fixture-id}/{manifest-sha256}/manifest.json
+fixtures/{fixture-id}/{manifest-sha256}/input/transcript.vtt
+fixtures/{fixture-id}/{manifest-sha256}/baseline/azure-normalized-output.json
+fixtures/{fixture-id}/{manifest-sha256}/baseline/azure-publication-intent.json
+fixtures/{fixture-id}/{manifest-sha256}/baseline/config-snapshot.json
+
+runs/{run-id}/model-response-checkpoints/normalized-output-v2.json
+runs/{run-id}/cloudflare-normalized-output.json
+runs/{run-id}/cloudflare-publication-intent.json
+runs/{run-id}/comparison.json
+runs/{run-id}/comparison.md
+```
+
+The manifest binds fixture ID/revision, acquisition mode, source identity, every object SHA-256, Azure pipeline/prompt/model/deployment identity, configuration hashes, classification, approver, timestamps, and expiry. Any changed transcript, baseline, configuration snapshot, processing contract, or manifest is a new revision requiring approval. Fixture and run data are intended to expire after 30 days.
+
+The Azure baseline comprises a complete `NormalizedOutput` plus a separate `PublicationIntent`. The Worker verifies that the separate intent equals the intent embedded in Azure normalized output before comparison. This prevents a technically valid result from silently changing what would be published.
+
+Cloudflare must reproduce immutable source and processing fields from the manifest. Comparator severity is:
+- **Blocking:** source/hash/schema/processing-contract drift, assertion drift, validation drift, or publication-intent drift.
+- **Material:** topic count/classification, ownership/confidence, people attribution, or meeting classification drift.
+- **Permitted:** explicitly approved non-semantic formatting or ordering variation only.
+
+### Checkpoint and retry design
+The Worker persists model output before final artifacts and D1 completion. On downstream failure, recovery keeps the same run ID and reuses a checkpoint only when its output-contract version, response hash, normalized schema, transcript hash, and fixture processing contract all validate. The older schema-invalid checkpoint remains immutable audit evidence. `normalized-output-v2` writes a separate versioned checkpoint rather than overwriting it.
+
+### Verified request-to-artifact path
+1. `POST /v1/fixture-runs` authenticates with the submission token and safely reserves or recovers a D1 run.
+2. The Queue consumer claims only the queued reservation and validates the manifest plus all R2 hashes.
+3. The Worker invokes Azure OpenAI through the direct API-key Chat Completions contract and requires exactly one JSON `NormalizedOutput`.
+4. It checkpoints, validates, compares against the frozen Azure baseline, and writes Cloudflare output plus JSON/Markdown comparison artifacts.
+5. A run becomes `completed` even when comparison is `blocked`; blocked is a valid parity finding rather than a processing crash.
+
+### Next phase
+The synthetic run proves the request transport, schema validation, Queue/recovery, and artifact paths. The remaining gap is semantic:
+- Blocking: five publication-intent flags and evidence assertions differ.
+- Material: topic count and meeting classification differ.
+
+The next engineering activity is to inspect the **synthetic** baseline and Cloudflare artifacts, identify the precise semantic causes, change only the relevant normalization/mapping contract, extend tests, and rerun the same immutable synthetic fixture. Do not overwrite baseline or prior run evidence. If model-output instructions change, create a new output-contract checkpoint version.
+
+Before direct Graph shadow can begin, the approved expanded fixture corpus must have zero blocking differences, every material difference dispositioned, and successful duplicate/retry/recovery coverage. Direct Graph shadow (Phase D), publisher readiness/cutover (Phase E), real-fixture handling, and production work each require separate explicit approval.
+
+### Semantic comparison diagnosis — 2026-08-04
+- Read-only inspection of synthetic run `788eb37a-5454-4f13-94b3-7ec29286e396` confirmed the five publication-intent blockers were a **contract-design defect**, not a Cloudflare publishing failure: the immutable fixture declares publication is not permitted, while the Azure baseline describes the business outputs that would normally be created.
+- The Worker has no publisher and must not gain one. `publicationIntent` now means approved business intent; a new `actualPublication` projection records observed side effects and is enforced as all false for every Cloudflare shadow result.
+- The Cloudflare result inherits the immutable Azure business-intent projection only after baseline integrity verification. It still retains the model-generated extraction, topics, classification, assertions, and validation for semantic comparison.
+- The output checkpoint contract is now `normalized-output-v3`; it is written to a new versioned key and does not overwrite `normalized-output-v2` evidence.
+- The new `runs/{run-id}/cloudflare-actual-publication.json` artifact proves the no-publication boundary independently of intended business outputs.
+- Local validation passed after the correction: `npm run typecheck`, `npm test` (18 tests), and `npm run deploy:dry-run`. No deployment, secret change, fixture upload, Queue submission, D1 mutation, Azure model invocation, or publication was performed.
+- Remaining synthetic findings are genuine semantic review items: assertion wording/duplication, topic extraction (Azure zero topics versus Cloudflare one), and classification (`internal/high` versus `synthetic/null`). They must be assessed against the approved canonical semantic contract, not automatically treated as Azure truth. The taxonomy contract remains planned rather than approved, so do not force a Cloudflare regression merely to eliminate these differences.
+
+### Completed validation
+From [`packages/runtime-shadow/`](packages/runtime-shadow/), the saved snapshot passed:
+
+```sh
+npm run typecheck
+npm test
+npx wrangler deploy --env staging --dry-run
+```
+
+Use `--dry-run` for validation. A resource mutation, secret change, deployment, real fixture upload, or run recovery is an operational action and must remain within the explicitly approved boundary.
+
+---
+
+# Historical Session State Log
+# Last historical header: 2026-07-31 08:18 UTC
+# Historical branch: main
 
 ## Current Git State
 - Branch: main (local + remote) — v1.9.3 deployed to production
