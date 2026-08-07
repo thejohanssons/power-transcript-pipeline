@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eip-cloudflare-runtime",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eip-cloudflare-runtime",
+      "database_id": "953bd671-7f96-450c-96da-736ecbfdf19d",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "OUTPUT_BUCKET",
+      "bucket_name": "eip-cloudflare-runtime-output"
+    }
+  ],
+  "env": {
+    "staging": {
+      "vars": {
+        "ENVIRONMENT": "staging"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "eip-cloudflare-runtime-staging",
+          "database_id": "ffca8ee1-eb6c-49ec-810a-050afcc0cb40",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "OUTPUT_BUCKET",
+          "bucket_name": "eip-cloudflare-runtime-staging-output"
+        }
+      ]
+    }
+  }
+}
