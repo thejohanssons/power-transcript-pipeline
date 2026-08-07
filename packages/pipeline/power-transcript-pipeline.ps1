@@ -1124,6 +1124,8 @@ function Submit-RuntimeShadowAzureExport {
     $shadowUrl = $null
     if ($pipelineConfig.eip_cloudflare_sync -eq 'staging') {
         $shadowUrl = $pipelineConfig.eip_runtime_shadow_url_staging
+    } elseif ($pipelineConfig.eip_cloudflare_sync -eq 'production') {
+        $shadowUrl = $pipelineConfig.eip_runtime_shadow_url_production
     }
     $submissionToken = $env:RUNTIME_SHADOW_SUBMISSION_TOKEN
     if (-not $shadowUrl -or -not $submissionToken) {
