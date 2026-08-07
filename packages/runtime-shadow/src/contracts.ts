@@ -1,6 +1,47 @@
 export const FIXTURE_MANIFEST_SCHEMA_VERSION = '1.0.0';
 export const NORMALIZED_OUTPUT_SCHEMA_VERSION = '1.0.0';
 
+/**
+ * Component version constants for the Cloudflare runtime (contract v3).
+ * Taxonomy vocabulary is frozen at v0.2 — it is a system-level constant,
+ * not a per-record field. See plans/versioning-policy.md for bump rules.
+ */
+export const RUNTIME_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '3';
+export const CLASSIFICATION_PROMPT_VERSION = '1';
+export const CLASSIFICATION_ENGINE_VERSION = '1';
+export const TOPIC_MATCHING_VERSION = '1';
+export const NORMALISATION_VERSION = '1';
+
+/**
+ * v0.2 taxonomy controlled vocabularies (Cloudflare runtime only).
+ * Azure pipeline continues to use v4.2 taxonomy. Do not modify without
+ * a formal taxonomy governance decision creating v0.3.
+ */
+export const TAXONOMY_V02 = {
+  domains: [
+    'Product Management', 'Commercial', 'Operations', 'Finance',
+    'Human Resources', 'Information Technology', 'Supply Chain', 'Legal', 'Marketing',
+  ],
+  entityTypes: [
+    'Product', 'Project', 'Initiative', 'Process', 'Customer', 'Supplier',
+    'Partner', 'Team', 'Technology Platform', 'Revenue Stream', 'Market',
+    'Compliance Obligation', 'Policy', 'Asset', 'Service', 'Agreement', 'Metric',
+  ],
+  aspects: [
+    'Schedule', 'Quality', 'Cost', 'Capacity', 'Performance',
+    'Compliance', 'Relationship', 'Capability',
+  ],
+  outcomes: [
+    'Progress', 'Delay', 'Risk', 'Issue', 'Opportunity',
+    'Dependency', 'Insight', 'Completion',
+  ],
+  dispositions: [
+    'Decision', 'Action', 'Monitoring', 'Escalation', 'Deferral', 'None',
+  ],
+  executiveScopes: ['Strategic', 'Operational', 'Tactical'],
+} as const;
+
 export type AcquisitionMode = 'calendar' | 'vtt_inbox' | 'direct_vtt';
 export type ComparisonSeverity = 'blocking' | 'material' | 'permitted';
 export type ComparisonDisposition =
@@ -114,9 +155,17 @@ export interface EvidenceAssertion {
 export interface NormalizedTopic {
   topicId: string | null;
   topic: string | null;
+  // v4.2 taxonomy fields (Azure pipeline — kept for backwards compatibility and comparison)
   domain: string | null;
   category: string | null;
   contextType: string | null;
+  // v0.2 taxonomy fields (Cloudflare runtime — populated when runtime = 'cloudflare')
+  entityType: string | null;
+  aspect: string | null;
+  outcome: string | null;
+  disposition: string | null;
+  executiveScope: string | null;
+  entity: string | null;
   summary: string | null;
   keyFacts: EvidenceAssertion[];
   decisions: EvidenceAssertion[];
@@ -153,8 +202,36 @@ export interface PublicationIntent {
 }
 
 /**
+ * Component version block stored per Topic Record.
+ * See plans/versioning-policy.md for bump rules.
+ *
+ * Azure runtime populates legacy fields (pipelineVersion, promptVersion,
+ * configurationHashes) for backwards compatibility. Cloudflare runtime
+ * populates the explicit versioned fields.
+ */
+export interface ProcessingBlock {
+  runtime: 'azure' | 'cloudflare';
+  // Cloudflare explicit versioning (contract v3+)
+  runtimeVersion?: string;
+  contractVersion?: string;
+  classificationPromptVersion?: string;
+  classificationEngineVersion?: string;
+  topicMatchingVersion?: string;
+  normalisationVersion?: string;
+  // Azure legacy fields (retained for backwards-compatibility and projection)
+  pipelineVersion?: string;
+  promptVersion?: string;
+  model: string;
+  deployment: string;
+  // configurationHashes removed from public contract (v3+); retained in deployment metadata only
+}
+
+/**
  * Semantic projection used by continuous Azure-export parity. It intentionally
  * has no acquisition-mode or publication/persistence fields.
+ *
+ * Contract v3: introduces explicit versioning block, v0.2 taxonomy fields on
+ * NormalizedTopic, and removes configurationHashes from the public contract.
  */
 export interface ContinuousNormalizedOutput {
   schemaVersion: typeof NORMALIZED_OUTPUT_SCHEMA_VERSION;
@@ -163,14 +240,7 @@ export interface ContinuousNormalizedOutput {
     nativeId: string;
     transcriptSha256: string;
   };
-  processing: {
-    runtime: 'azure' | 'cloudflare';
-    pipelineVersion: string;
-    promptVersion: string;
-    model: string;
-    deployment: string;
-    configurationHashes: Record<string, string>;
-  };
+  processing: ProcessingBlock;
   classification: { mode: string | null; confidence: string | null };
   summaryAssertions: EvidenceAssertion[];
   topics: NormalizedTopic[];
@@ -186,14 +256,7 @@ export interface NormalizedOutput {
     transcriptSha256: string;
     acquisitionMode: AcquisitionMode;
   };
-  processing: {
-    runtime: 'azure' | 'cloudflare';
-    pipelineVersion: string;
-    promptVersion: string;
-    model: string;
-    deployment: string;
-    configurationHashes: Record<string, string>;
-  };
+  processing: ProcessingBlock;
   classification: { mode: string | null; confidence: string | null };
   summaryAssertions: EvidenceAssertion[];
   topics: NormalizedTopic[];

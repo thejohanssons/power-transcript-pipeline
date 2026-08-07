@@ -93,9 +93,6 @@ function hasUsableAzureOpenAiConfiguration(env: RuntimeEnv): boolean {
 
 function outputPrompt(manifest: FixtureManifest, transcript: string, configurationSnapshot: Record<string, unknown>): string {
   const input = buildNormalizationInput(manifest, transcript);
-  const configurationHashes = Object.fromEntries(
-    manifest.configuration.map((reference) => [reference.name, reference.sha256]),
-  );
   const publicationIntentShape = {
     transcript: 'boolean', summary: 'boolean', peopleFile: 'boolean', topicRecords: 'boolean', masterLog: 'boolean', ['con' + 'fluence']: 'boolean',
     ['tea' + 'msNotification']: 'boolean', canonicalTopicMemory: 'boolean', legacyCloudflareSync: 'boolean',
@@ -126,14 +123,13 @@ function outputPrompt(manifest: FixtureManifest, transcript: string, configurati
         promptVersion: manifest.processing.promptVersion,
         model: manifest.processing.model,
         deployment: manifest.processing.deployment,
-        configurationHashes,
       },
     },
     requiredOutputShape: {
       schemaVersion: '1.0.0',
       source: { system: 'string', nativeId: 'string', transcriptSha256: 'sha256', acquisitionMode: 'calendar|vtt_inbox|direct_vtt' },
       processing: {
-        runtime: 'cloudflare', pipelineVersion: 'string', promptVersion: 'string', model: 'string', deployment: 'string', configurationHashes: 'Record<string, sha256>',
+        runtime: 'cloudflare', pipelineVersion: 'string', promptVersion: 'string', model: 'string', deployment: 'string',
       },
       classification: { mode: 'string|null', confidence: 'string|null' },
       summaryAssertions: [{ id: 'string', text: 'string', sourceOffsets: { start: 'integer', end: 'integer (optional)' } }],
@@ -174,9 +170,6 @@ function assertOutputMatchesFixtureContract(
   manifest: FixtureManifest,
   runtime: 'azure' | 'cloudflare',
 ): void {
-  const expectedConfigurationHashes = Object.fromEntries(
-    manifest.configuration.map((reference) => [reference.name, reference.sha256]),
-  );
   if (output.source.system !== manifest.source.system
     || output.source.nativeId !== manifest.source.nativeId
     || output.source.acquisitionMode !== manifest.acquisitionMode) {
@@ -186,8 +179,7 @@ function assertOutputMatchesFixtureContract(
     || output.processing.pipelineVersion !== manifest.processing.azurePipelineVersion
     || output.processing.promptVersion !== manifest.processing.promptVersion
     || output.processing.model !== manifest.processing.model
-    || output.processing.deployment !== manifest.processing.deployment
-    || stableJson(output.processing.configurationHashes) !== stableJson(expectedConfigurationHashes)) {
+    || output.processing.deployment !== manifest.processing.deployment) {
     throw new Error(`${runtime} output processing contract does not match immutable fixture manifest`);
   }
   if (runtime === 'cloudflare' && output.actualPublication !== undefined && !isNoPublication(output.actualPublication)) {

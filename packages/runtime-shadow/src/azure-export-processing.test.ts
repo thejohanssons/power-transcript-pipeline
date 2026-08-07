@@ -124,7 +124,7 @@ function continuous(overrides: Partial<ContinuousNormalizedOutput> = {}): Contin
   return {
     schemaVersion: '1.0.0',
     source: { system: 'azure_transcript_export', nativeId: 'payment-strategy', transcriptSha256: SHA256 },
-    processing: { runtime: 'azure', pipelineVersion: '1.7.9', promptVersion: '1', model: 'model', deployment: 'deployment', configurationHashes: {} },
+    processing: { runtime: 'azure', pipelineVersion: '1.7.9', promptVersion: '1', model: 'model', deployment: 'deployment' },
     classification: { mode: 'internal', confidence: 'high' }, summaryAssertions: [], topics: [], people: [],
     validation: { status: 'pass', reasons: [] }, ...overrides,
   };
@@ -140,7 +140,7 @@ describe('Azure export package contract', () => {
   it('accepts callback-declared empty optional processing provenance', () => {
     const output = continuous({
       processing: {
-        runtime: 'cloudflare', pipelineVersion: '1.7.9', promptVersion: '', model: '', deployment: '', configurationHashes: {},
+        runtime: 'cloudflare', pipelineVersion: '1.7.9', promptVersion: '', model: '', deployment: '',
       },
     });
     expect(isContinuousNormalizedOutput(output)).toBe(true);
@@ -214,8 +214,8 @@ describe('continuous Azure-export comparison', () => {
 
   it('matches topics by stable topicId rather than sorted position', () => {
     const azureTopics = [
-      { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CFO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] } },
-      { topicId: 'T01', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Decision', contextType: 'Decision', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CEO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] } },
+      { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CFO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] }, entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null },
+      { topicId: 'T01', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Decision', contextType: 'Decision', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: ['CEO'], confidence: 'high', validation: { status: 'pass' as const, reasons: [] }, entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null },
     ];
     // Cloudflare returns topics in a different order — should still match by ID.
     const cloudflareTopics = [azureTopics[1], azureTopics[0]];
@@ -227,7 +227,7 @@ describe('continuous Azure-export comparison', () => {
   });
 
   it('flags Azure topics not reproduced by Cloudflare as material differences', () => {
-    const azureTopic = { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] } };
+    const azureTopic = { topicId: 'T15', topic: 'Revenue & Commercial Performance', domain: 'Finance', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] }, entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null };
     const azure = continuous({ topics: [azureTopic] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);
@@ -236,7 +236,7 @@ describe('continuous Azure-export comparison', () => {
   });
 
   it('flags Cloudflare topics not in Azure as material differences', () => {
-    const cloudflareTopic = { topicId: 'T99', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] } };
+    const cloudflareTopic = { topicId: 'T99', topic: 'Strategic Direction & Alignment', domain: 'Strategy', category: 'Strategy', contextType: 'Discussion', summary: null, keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null, validation: { status: 'pass' as const, reasons: [] }, entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null };
     const azure = continuous({ topics: [] });
     const cloudflare = continuous({ processing: { ...azure.processing, runtime: 'cloudflare' }, topics: [cloudflareTopic] });
     const result = compareContinuousNormalizedOutputs('package-1', SHA256, 'run-1', azure, cloudflare);

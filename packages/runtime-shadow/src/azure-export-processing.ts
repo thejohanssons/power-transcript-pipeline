@@ -139,6 +139,12 @@ export function parseAzureTopicRecord(artifact: string): NormalizedTopic {
     owners: [metadata('PRIMARY_OWNER'), metadata('SECONDARY_OWNER')].filter((owner): owner is string => owner !== null),
     confidence: metadata('EIP_VALIDATION')?.match(/^(PASS|WARNING|FAIL)/i)?.[1].toLowerCase() ?? null,
     validation: { status: (metadata('EIP_VALIDATION')?.match(/^(PASS|WARNING|FAIL)/i)?.[1].toLowerCase() as 'pass' | 'warning' | 'fail' | undefined) ?? 'warning', reasons: [] },
+   entityType: null,
+   aspect: null,
+   outcome: null,
+   disposition: null,
+   executiveScope: null,
+   entity: null,
   };
 }
 

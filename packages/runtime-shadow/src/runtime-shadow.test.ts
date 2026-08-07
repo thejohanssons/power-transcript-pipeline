@@ -32,11 +32,12 @@ function output(overrides: Partial<NormalizedOutput> = {}): NormalizedOutput {
   return {
     schemaVersion: '1.0.0',
     source: { system: 'azure_fixture_export', nativeId: 'fixture-1', transcriptSha256: SHA256, acquisitionMode: 'calendar' },
-    processing: { runtime: 'azure', pipelineVersion: '1', promptVersion: '1', model: 'model', deployment: 'deployment', configurationHashes: {} },
+    processing: { runtime: 'azure', pipelineVersion: '1', promptVersion: '1', model: 'model', deployment: 'deployment' },
     classification: { mode: 'executive', confidence: 'high' },
     summaryAssertions: [{ id: 'summary-1', text: 'The VAT rate was approved.' }],
     topics: [{
-      topicId: 'T01', topic: 'VAT', domain: 'finance', category: 'decision', contextType: 'strategic', summary: 'Approved',
+      topicId: 'T01', topic: 'VAT', domain: 'Finance', category: 'Decision', contextType: 'Agreement', summary: 'Approved',
+      entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null,
       keyFacts: [], decisions: [{ id: 'decision-1', text: 'The VAT rate was approved.' }], actions: [], risks: [], owners: ['Owner'], confidence: 'high', validation: { status: 'pass', reasons: [] },
     }],
     people: [],
@@ -241,8 +242,9 @@ describe('fixture run idempotency and recovery', () => {
 
 describe('normalized comparison and review workflow', () => {
   it('treats a frozen processing-contract change as blocking', () => {
+    // Processing comparison checks model and deployment — a model change is blocking.
     const cloudflare = output({
-      processing: { ...output().processing, runtime: 'cloudflare', promptVersion: 'unexpected-prompt' },
+      processing: { ...output().processing, runtime: 'cloudflare', model: 'unexpected-model' },
     });
     const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', output(), cloudflare);
     expect(result.status).toBe('blocked');
@@ -285,14 +287,13 @@ describe('normalized comparison and review workflow', () => {
 });
 
 describe('continuous-lane permitted-difference policy', () => {
-  const SCHEMA = '2.0.0' as const;
+  const SCHEMA = '1.0.0' as const;
   const processing = {
     runtime: 'azure' as const,
     pipelineVersion: '1.9.1',
     promptVersion: '1.0.0',
     model: 'gpt-4o',
     deployment: 'eip-gpt4o',
-    configurationHashes: {},
   };
   const source = { system: 'azure', nativeId: 'meeting-1', transcriptSha256: SHA256 };
   const validation = { status: 'pass' as const, reasons: [] };
@@ -303,7 +304,7 @@ describe('continuous-lane permitted-difference policy', () => {
       source,
       processing,
       classification: { mode: 'ceo', confidence: 'high' },
-      summaryAssertions: [{ text: 'Revenue was £500k.' }],
+      summaryAssertions: [{ id: 'a1', text: 'Revenue was £500k.' }],
       topics: [],
       people: [],
       validation,
@@ -312,8 +313,8 @@ describe('continuous-lane permitted-difference policy', () => {
   }
 
   it('assertions difference is permitted (not blocking) in the continuous lane', () => {
-    const azure = continuousOutput({ summaryAssertions: [{ text: '"revenue was £500k."' }] });
-    const cloudflare = continuousOutput({ summaryAssertions: [{ text: 'quin reported revenue of approximately 500,000.' }] });
+    const azure = continuousOutput({ summaryAssertions: [{ id: 'a1', text: '"revenue was £500k."' }] });
+    const cloudflare = continuousOutput({ summaryAssertions: [{ id: 'a1', text: 'quin reported revenue of approximately 500,000.' }] });
     const result = compareContinuousNormalizedOutputs('pkg-1', SHA256, 'run-1', azure, cloudflare);
     const assertionDiff = result.differences.find((d) => d.path === 'assertions');
     expect(assertionDiff).toBeDefined();
@@ -328,13 +329,13 @@ describe('continuous-lane permitted-difference policy', () => {
       source: { ...source, acquisitionMode: 'calendar' as const },
       processing,
       classification: { mode: 'ceo', confidence: 'high' },
-      summaryAssertions: [{ text: '"revenue was £500k."' }],
+      summaryAssertions: [{ id: 'a1', text: '"revenue was £500k."' }],
       topics: [],
       people: [],
       validation,
-      publicationIntent: { confluence: false, teams: false, topicMemory: false },
+      publicationIntent,
     } satisfies import('./contracts').NormalizedOutput;
-    const cloudflare = { ...base, summaryAssertions: [{ text: 'different assertion text here.' }] };
+    const cloudflare = { ...base, summaryAssertions: [{ id: 'a1', text: 'different assertion text here.' }] };
     const result = compareNormalizedOutputs('fixture-1', SHA256, 'run-1', base, cloudflare);
     const assertionDiff = result.differences.find((d) => d.path === 'assertions');
     expect(assertionDiff?.severity).toBe('blocking');
@@ -353,11 +354,11 @@ describe('continuous-lane permitted-difference policy', () => {
 
   it('both assertions and validation permitted together produce pass status when no other diffs', () => {
     const azure = continuousOutput({
-      summaryAssertions: [{ text: '"revenue £500k."' }],
+      summaryAssertions: [{ id: 'a1', text: '"revenue £500k."' }],
       validation: { status: 'pass', reasons: [] },
     });
     const cloudflare = continuousOutput({
-      summaryAssertions: [{ text: 'quin reported revenue of approximately 500,000.' }],
+      summaryAssertions: [{ id: 'a2', text: 'quin reported revenue of approximately 500,000.' }],
       validation: { status: 'warning', reasons: ['Unresolved discussion.'] },
     });
     const result = compareContinuousNormalizedOutputs('pkg-1', SHA256, 'run-1', azure, cloudflare);

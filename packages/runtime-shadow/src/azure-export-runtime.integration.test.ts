@@ -102,7 +102,7 @@ describe('continuous Azure-export runtime', () => {
       source: { system: manifest.source.system, nativeId: manifest.source.nativeId, transcriptSha256: manifest.artifacts.transcript.sha256 },
       processing: {
         runtime: 'cloudflare', pipelineVersion: 'synthetic-1', promptVersion: 'synthetic-prompt-1',
-        model: 'synthetic-model', deployment: 'synthetic-deployment', configurationHashes: { taxonomy: 'a'.repeat(64) },
+        model: 'synthetic-model', deployment: 'synthetic-deployment',
       },
       classification: { mode: null, confidence: null },
       summaryAssertions: [{ id: 'summary-1', text: 'Approved the test budget.' }],
@@ -111,6 +111,7 @@ describe('continuous Azure-export runtime', () => {
         // The topic name passes through as-is from the model response and matches the
         // Azure projection from parseAzureTopicRecord — both produce 'Test budget'.
         topicId: null, topic: 'Test budget', domain: null, category: null, contextType: null, summary: null,
+        entityType: null, aspect: null, outcome: null, disposition: null, executiveScope: null, entity: null,
         keyFacts: [], decisions: [], actions: [], risks: [], owners: [], confidence: null,
         validation: { status: 'pass', reasons: [] },
       }],
@@ -160,7 +161,7 @@ describe('continuous Azure-export runtime', () => {
       r2.failNextPutFor = `runs/${runId}/continuous/azure-normalized-output.json`;
       await expect(processAzureExportJob(job, env)).rejects.toThrow('Synthetic local R2 failure');
       expect(fetchStub).toHaveBeenCalledTimes(5);
-      expect(r2.objects.get(`runs/${runId}/continuous/model-response-checkpoints/continuous-normalized-output-v2.json`)).toContain('synthetic-model');
+      expect(r2.objects.get(`runs/${runId}/continuous/model-response-checkpoints/continuous-normalized-output-v3.json`)).toContain('synthetic-model');
 
       await d1.prepare("UPDATE azure_export_runs SET state = 'queued' WHERE run_id = ?").bind(runId).run();
       await processAzureExportJob(job, env);

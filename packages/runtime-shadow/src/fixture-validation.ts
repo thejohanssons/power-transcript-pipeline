@@ -164,14 +164,12 @@ export function isContinuousNormalizedOutput(value: unknown): value is Continuou
     && isNonEmptyString(output.source?.nativeId)
     && isSha256(output.source?.transcriptSha256)
     && (processing?.runtime === 'azure' || processing?.runtime === 'cloudflare')
-    && isNonEmptyString(processing?.pipelineVersion)
-    // The Azure callback can omit these provenance values while the deployed
-    // adapter records its own model metadata in the immutable checkpoint.
-    // Preserve the callback's declared values exactly, including empty strings.
-    && typeof processing?.promptVersion === 'string'
+    // model and deployment are the stable identity fields across both runtimes.
+    // configurationHashes removed from public contract in v3.
+    // Version fields (runtimeVersion, classificationPromptVersion, etc.) are
+    // Cloudflare-specific and optional; pipelineVersion/promptVersion are Azure legacy.
     && typeof processing?.model === 'string'
     && typeof processing?.deployment === 'string'
-    && !!processing?.configurationHashes
     && Array.isArray(output.summaryAssertions)
     && Array.isArray(output.topics)
     && Array.isArray(output.people)

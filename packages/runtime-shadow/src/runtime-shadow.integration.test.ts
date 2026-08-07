@@ -51,7 +51,6 @@ function normalizedOutput(transcriptSha256: string, runtime: 'azure' | 'cloudfla
       promptVersion: 'synthetic-prompt-1',
       model: 'synthetic-model',
       deployment: 'synthetic-deployment',
-      configurationHashes: { taxonomy: 'b'.repeat(64) },
     },
     classification: { mode: 'internal', confidence: 'high' },
     summaryAssertions: [{ id: 'summary-1', text: 'The test budget was approved.' }],
@@ -217,7 +216,6 @@ describe('runtime-shadow synthetic local Worker integration', () => {
             promptVersion: 'synthetic-prompt-1',
             model: 'synthetic-model',
             deployment: 'synthetic-deployment',
-            configurationHashes: { taxonomy: 'b'.repeat(64) },
           },
         },
         requiredOutputShape: {

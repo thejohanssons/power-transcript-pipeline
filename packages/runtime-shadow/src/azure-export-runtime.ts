@@ -1,4 +1,13 @@
 import { AzureOpenAiAdapter } from './azure-openai';
+import {
+  TAXONOMY_V02,
+  CONTRACT_VERSION,
+  CLASSIFICATION_PROMPT_VERSION,
+  CLASSIFICATION_ENGINE_VERSION,
+  TOPIC_MATCHING_VERSION,
+  NORMALISATION_VERSION,
+  RUNTIME_VERSION,
+} from './contracts';
 import { projectAzureExportPackage } from './azure-export-processing';
 import { compareContinuousNormalizedOutputs } from './comparison';
 import type {
@@ -16,7 +25,7 @@ import {
 } from './azure-export-run-lifecycle';
 
 export const CONTINUOUS_RUNTIME_VERSION = '1.0.0';
-const CONTINUOUS_OUTPUT_CONTRACT_VERSION = 'continuous-normalized-output-v2';
+const CONTINUOUS_OUTPUT_CONTRACT_VERSION = 'continuous-normalized-output-v3';
 
 export interface AzureExportRuntimeEnv {
   SHADOW_DB: D1Database;
@@ -90,58 +99,93 @@ const VALID_OWNER_ROLES = new Set(['CEO', 'CPO', 'COO', 'CFO', 'CTO']);
 const VALID_CONFIDENCE_LEVELS = new Set(['high', 'medium', 'low']);
 
 function continuousPrompt(manifest: AzureExportPackageManifest, transcript: string): string {
-  const hashes = Object.fromEntries(manifest.processing.configuration.map((reference) => [reference.name, reference.sha256]));
-  const vocab = extractControlledVocabulary(manifest);
-  const vocabularySection = vocab
-    ? {
-        note: 'All controlled values MUST come from these governed lists. Use null if the transcript evidence does not match any listed value.',
-        domains: vocab.domains,
-        topicNames: vocab.topicNames,
-        categories: vocab.categories,
-        contextTypes: vocab.contextTypes,
-        ownerRoles: [...VALID_OWNER_ROLES],
-        classificationConfidence: [...VALID_CONFIDENCE_LEVELS],
-      }
-    : {
-        warning: 'No controlled vocabulary was supplied in this manifest. Use best-effort values and set validation.status to "warning" for every topic.',
-        ownerRoles: [...VALID_OWNER_ROLES],
-      };
+  // v0.2 taxonomy vocabulary — always use the frozen Cloudflare controlled vocabulary.
+  // The Azure manifest may contain v4.2 taxonomy content; we deliberately ignore its
+  // domain/category/contextType lists and use v0.2 instead for Cloudflare classification.
+  const azureTopicNames = extractControlledVocabulary(manifest)?.topicNames ?? [];
   return JSON.stringify({
-    task: 'Produce one continuous normalized EIP output from the supplied Azure transcript.',
+    task: 'Produce one continuous normalized EIP output from the supplied Azure transcript, classified using the v0.2 EIP taxonomy.',
     outputContractVersion: CONTINUOUS_OUTPUT_CONTRACT_VERSION,
+    taxonomyVersion: 'v0.2',
     responseRules: [
       'Return exactly one JSON object and nothing else.',
       'Use evidence only from the supplied transcript; do not publish or call external systems.',
       'A completed decision requires explicit transcript evidence of agreement or approval.',
       'Use null or [] where evidence is unavailable; never invent evidence.',
-      'All domain, topicName, category, contextType, and owner values MUST be drawn from the controlledVocabulary lists.',
+      'All controlled vocabulary values MUST be drawn from the v0.2 taxonomy lists below.',
       'If a value is not in the controlled vocabulary, use null rather than an invented string.',
+      'Populate both the v0.2 taxonomy fields (entityType, aspect, outcome, disposition, executiveScope, entity) AND the legacy fields (domain, category, contextType) for backwards compatibility.',
+      'For legacy domain field: map to the nearest v0.2 Domain value. For legacy category: map to the nearest v0.2 Outcome value.',
     ],
-    controlledVocabulary: vocabularySection,
+    controlledVocabulary: {
+      note: 'v0.2 EIP taxonomy — frozen production standard. Do not invent values outside these lists.',
+      // v0.2 axes
+      domains: [...TAXONOMY_V02.domains],
+      entityTypes: [...TAXONOMY_V02.entityTypes],
+      aspects: [...TAXONOMY_V02.aspects],
+      outcomes: [...TAXONOMY_V02.outcomes],
+      dispositions: [...TAXONOMY_V02.dispositions],
+      executiveScopes: [...TAXONOMY_V02.executiveScopes],
+      // From Azure manifest — topic names to match against
+      topicNames: azureTopicNames,
+      ownerRoles: [...VALID_OWNER_ROLES],
+      classificationConfidence: [...VALID_CONFIDENCE_LEVELS],
+    },
     immutableValues: {
       schemaVersion: '1.0.0',
       source: { system: manifest.source.system, nativeId: manifest.source.nativeId, transcriptSha256: manifest.artifacts.transcript.sha256 },
       processing: {
-        runtime: 'cloudflare', pipelineVersion: manifest.processing.azurePipelineVersion,
-        promptVersion: manifest.processing.promptVersion ?? '', model: manifest.processing.model ?? '',
-        deployment: manifest.processing.deployment ?? '', configurationHashes: hashes,
+        runtime: 'cloudflare',
+        runtimeVersion: RUNTIME_VERSION,
+        contractVersion: CONTRACT_VERSION,
+        classificationPromptVersion: CLASSIFICATION_PROMPT_VERSION,
+        classificationEngineVersion: CLASSIFICATION_ENGINE_VERSION,
+        topicMatchingVersion: TOPIC_MATCHING_VERSION,
+        normalisationVersion: NORMALISATION_VERSION,
+        model: manifest.processing.model ?? '',
+        deployment: manifest.processing.deployment ?? '',
       },
     },
     requiredOutputShape: {
       schemaVersion: '1.0.0',
       source: { system: 'string', nativeId: 'string', transcriptSha256: 'sha256' },
-      processing: { runtime: 'cloudflare', pipelineVersion: 'string', promptVersion: 'string', model: 'string', deployment: 'string', configurationHashes: 'Record<string, sha256>' },
+      processing: {
+        runtime: 'cloudflare',
+        runtimeVersion: 'string', contractVersion: 'string',
+        classificationPromptVersion: 'string', classificationEngineVersion: 'string',
+        topicMatchingVersion: 'string', normalisationVersion: 'string',
+        model: 'string', deployment: 'string',
+      },
       classification: { mode: 'string|null (meeting type e.g. internal)', confidence: 'high|medium|low|null' },
       summaryAssertions: [{ id: 'string', text: 'string' }],
       topics: [{
-        topicId: 'string|null (e.g. T15)', topic: 'string|null (from controlledVocabulary.topicNames)', domain: 'string|null (from controlledVocabulary.domains)',
-        category: 'string|null (from controlledVocabulary.categories)', contextType: 'string|null (from controlledVocabulary.contextTypes)', summary: 'string|null',
-        keyFacts: [{ id: 'string', text: 'string' }], decisions: [{ id: 'string', text: 'string' }], actions: [{ id: 'string', text: 'string' }], risks: [{ id: 'string', text: 'string' }],
-        owners: ['string (from controlledVocabulary.ownerRoles)'], confidence: 'high|medium|low|null', validation: { status: 'pass|warning|fail', reasons: ['string'] },
+        topicId: 'string|null',
+        topic: 'string|null (topic name from controlledVocabulary.topicNames)',
+        // v0.2 fields
+        entityType: 'string|null (from controlledVocabulary.entityTypes)',
+        aspect: 'string|null (from controlledVocabulary.aspects)',
+        outcome: 'string|null (from controlledVocabulary.outcomes)',
+        disposition: 'string|null (from controlledVocabulary.dispositions)',
+        executiveScope: 'string|null (from controlledVocabulary.executiveScopes)',
+        entity: 'string|null (the specific instance being discussed — free text)',
+        // legacy fields for backwards compatibility
+        domain: 'string|null (map to nearest v0.2 domain)',
+        category: 'string|null (map to nearest v0.2 outcome)',
+        contextType: 'string|null',
+        summary: 'string|null',
+        keyFacts: [{ id: 'string', text: 'string' }],
+        decisions: [{ id: 'string', text: 'string' }],
+        actions: [{ id: 'string', text: 'string' }],
+        risks: [{ id: 'string', text: 'string' }],
+        owners: ['string (from controlledVocabulary.ownerRoles)'],
+        confidence: 'high|medium|low|null',
+        validation: { status: 'pass|warning|fail', reasons: ['string'] },
       }],
       people: [{
-        canonicalName: 'string|null', sourceName: 'string', attendance: 'string|null', contributions: [{ id: 'string', text: 'string' }], actions: [{ id: 'string', text: 'string' }],
-        decisionsOwned: [{ id: 'string', text: 'string' }], risksRaised: [{ id: 'string', text: 'string' }], topicIds: ['string'], stance: 'string|null', unresolved: 'boolean',
+        canonicalName: 'string|null', sourceName: 'string', attendance: 'string|null',
+        contributions: [{ id: 'string', text: 'string' }], actions: [{ id: 'string', text: 'string' }],
+        decisionsOwned: [{ id: 'string', text: 'string' }], risksRaised: [{ id: 'string', text: 'string' }],
+        topicIds: ['string'], stance: 'string|null', unresolved: 'boolean',
       }],
       validation: { status: 'pass|warning|fail', reasons: ['string'] },
     },
@@ -201,9 +245,11 @@ function azureProjection(manifest: AzureExportPackageManifest, contents: { trans
     schemaVersion: '1.0.0',
     source: { system: manifest.source.system, nativeId: manifest.source.nativeId, transcriptSha256: manifest.artifacts.transcript.sha256 },
     processing: {
-      runtime: 'azure', pipelineVersion: manifest.processing.azurePipelineVersion,
-      promptVersion: manifest.processing.promptVersion ?? '', model: manifest.processing.model ?? '', deployment: manifest.processing.deployment ?? '',
-      configurationHashes: Object.fromEntries(manifest.processing.configuration.map((reference) => [reference.name, reference.sha256])),
+      runtime: 'azure',
+      pipelineVersion: manifest.processing.azurePipelineVersion,
+      promptVersion: manifest.processing.promptVersion ?? '',
+      model: manifest.processing.model ?? '',
+      deployment: manifest.processing.deployment ?? '',
     },
     // Real meeting classification parsed from the Azure summary artifact header.
     // Returns null/null when the header does not carry classification metadata —
@@ -255,7 +301,7 @@ function strings(value: unknown): string[] {
  * original value if the stripped form matches — keeping the output consistent with the
  * taxonomy canonical name.
  */
-function controlledValue(value: string | null, allowed: Set<string> | string[]): { value: string | null; violation: boolean } {
+function controlledValue(value: string | null, allowed: Set<string> | readonly string[] | string[]): { value: string | null; violation: boolean } {
   if (!value) return { value: null, violation: false };
   const set = allowed instanceof Set ? allowed : new Set(allowed);
   if (set.has(value)) return { value, violation: false };
@@ -280,17 +326,24 @@ function normalizeContinuousModelOutput(
 
     const violations: string[] = [];
 
-    // Validate controlled vocabulary fields when vocab is available.
-    const domainResult = vocab ? controlledValue(text(topic.domain), vocab.domains) : { value: text(topic.domain), violation: false };
+    // Validate v0.2 taxonomy controlled vocabulary fields.
+    const domainResult = controlledValue(text(topic.domain), TAXONOMY_V02.domains);
+    const entityTypeResult = controlledValue(text(topic.entityType), TAXONOMY_V02.entityTypes);
+    const aspectResult = controlledValue(text(topic.aspect), TAXONOMY_V02.aspects);
+    const outcomeResult = controlledValue(text(topic.outcome), TAXONOMY_V02.outcomes);
+    const dispositionResult = controlledValue(text(topic.disposition), TAXONOMY_V02.dispositions);
+    const executiveScopeResult = controlledValue(text(topic.executiveScope), TAXONOMY_V02.executiveScopes);
+    // Topic name still validated against Azure manifest topic names (the what, not the how)
     const topicResult = vocab ? controlledValue(text(topic.topic) ?? text(topic.name), vocab.topicNames) : { value: text(topic.topic) ?? text(topic.name), violation: false };
-    const categoryResult = vocab ? controlledValue(text(topic.category), vocab.categories) : { value: text(topic.category), violation: false };
-    const contextTypeResult = vocab ? controlledValue(text(topic.contextType), vocab.contextTypes) : { value: text(topic.contextType), violation: false };
     const confidenceResult = controlledValue(text(topic.confidence), VALID_CONFIDENCE_LEVELS);
 
-    if (domainResult.violation) violations.push(`domain "${text(topic.domain)}" is not in the controlled vocabulary`);
+    if (domainResult.violation) violations.push(`domain "${text(topic.domain)}" is not in v0.2 controlled vocabulary`);
+    if (entityTypeResult.violation) violations.push(`entityType "${text(topic.entityType)}" is not in v0.2 controlled vocabulary`);
+    if (aspectResult.violation) violations.push(`aspect "${text(topic.aspect)}" is not in v0.2 controlled vocabulary`);
+    if (outcomeResult.violation) violations.push(`outcome "${text(topic.outcome)}" is not in v0.2 controlled vocabulary`);
+    if (dispositionResult.violation) violations.push(`disposition "${text(topic.disposition)}" is not in v0.2 controlled vocabulary`);
+    if (executiveScopeResult.violation) violations.push(`executiveScope "${text(topic.executiveScope)}" is not in v0.2 controlled vocabulary`);
     if (topicResult.violation) violations.push(`topic "${text(topic.topic) ?? text(topic.name)}" is not in the controlled vocabulary`);
-    if (categoryResult.violation) violations.push(`category "${text(topic.category)}" is not in the controlled vocabulary`);
-    if (contextTypeResult.violation) violations.push(`contextType "${text(topic.contextType)}" is not in the controlled vocabulary`);
     if (confidenceResult.violation) violations.push(`confidence "${text(topic.confidence)}" must be high, medium, or low`);
 
     // Validate and filter owner role codes.
@@ -313,9 +366,17 @@ function normalizeContinuousModelOutput(
     return [{
       topicId: text(topic.topicId),
       topic: topicResult.value,
+      // v0.2 taxonomy fields
+      entityType: entityTypeResult.value,
+      aspect: aspectResult.value,
+      outcome: outcomeResult.value,
+      disposition: dispositionResult.value,
+      executiveScope: executiveScopeResult.value,
+      entity: text(topic.entity),
+      // legacy fields (populated by LLM for backwards compatibility)
       domain: domainResult.value,
-      category: categoryResult.value,
-      contextType: contextTypeResult.value,
+      category: text(topic.category),
+      contextType: text(topic.contextType),
       summary: text(topic.summary),
       keyFacts: assertions(topic.keyFacts, `topic-${index + 1}-fact`),
       decisions,
@@ -421,7 +482,17 @@ export async function processAzureExportJob(job: AzureExportJob, env: AzureExpor
     // invoke the model a second time for the same immutable package/run.
     const response = await loadOrCreateModelResponseCheckpoint(job, manifest, transcript, env);
     const modelOutput = JSON.parse(response.responseText) as unknown;
-    const expectedCloudflareProcessing = { ...azure.processing, runtime: 'cloudflare' as const };
+    const expectedCloudflareProcessing = {
+      runtime: 'cloudflare' as const,
+      runtimeVersion: RUNTIME_VERSION,
+      contractVersion: CONTRACT_VERSION,
+      classificationPromptVersion: CLASSIFICATION_PROMPT_VERSION,
+      classificationEngineVersion: CLASSIFICATION_ENGINE_VERSION,
+      topicMatchingVersion: TOPIC_MATCHING_VERSION,
+      normalisationVersion: NORMALISATION_VERSION,
+      model: manifest.processing.model ?? '',
+      deployment: manifest.processing.deployment ?? '',
+    };
     const vocab = extractControlledVocabulary(manifest);
     const cloudflare = normalizeContinuousModelOutput(modelOutput, azure.source, expectedCloudflareProcessing, vocab);
     if (!cloudflare || !isContinuousNormalizedOutput(cloudflare)
