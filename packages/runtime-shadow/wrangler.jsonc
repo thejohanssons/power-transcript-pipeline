@@ -8,6 +8,56 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+
+  // Production bindings (no env suffix — default deployment)
+  "vars": {
+    "ENVIRONMENT": "production",
+    "SHADOW_MODE": "fixture_parity",
+    "AZURE_ARTIFACT_READER_URL": "https://eip-api-worker.homeassistant-8d3.workers.dev/internal/runtime-shadow/azure-artifacts/",
+    "AZURE_OPENAI_ENDPOINT": "https://atlassian-rovo-forge.openai.azure.com/openai/v1",
+    "AZURE_OPENAI_DEPLOYMENT": "gpt-5.6-terra"
+  },
+  "d1_databases": [
+    {
+      "binding": "SHADOW_DB",
+      "database_name": "eip-runtime-shadow",
+      "database_id": "61eb4839-fe9e-423b-b634-8e87905e08b3",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SHADOW_ARTIFACTS",
+      "bucket_name": "eip-runtime-shadow-artifacts"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "FIXTURE_JOBS",
+        "queue": "eip-runtime-shadow-jobs"
+      },
+      {
+        "binding": "CONTINUOUS_EXPORT_JOBS",
+        "queue": "eip-runtime-shadow-continuous-export-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "eip-runtime-shadow-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 30,
+        "max_retries": 3
+      },
+      {
+        "queue": "eip-runtime-shadow-continuous-export-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 30,
+        "max_retries": 3
+      }
+    ]
+  },
+
   "env": {
     "staging": {
       "vars": {

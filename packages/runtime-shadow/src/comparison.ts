@@ -80,10 +80,19 @@ function assertionTexts(output: Pick<ContinuousNormalizedOutput, 'summaryAsserti
  *   Cloudflare's validator additionally checks for unresolved discussions and
  *   ownerless actions. Cloudflare warnings are semantically correct; the Azure
  *   `pass` is an under-assertion. Approved 2026-08-06.
+ *
+ * CONTINUOUS_TAXONOMY_VERSION_DIVERGENCE
+ *   Azure pipeline uses v4.2 taxonomy vocabulary (domain, category, contextType).
+ *   Cloudflare runtime uses v0.2 taxonomy vocabulary (entityType, aspect, outcome,
+ *   disposition, executiveScope, entity). This is an intentional dual-track memory
+ *   architecture — Azure builds SharePoint memory on v4.2, Cloudflare builds D1
+ *   memory on v0.2. The taxonomy axis differences are expected structural divergence,
+ *   not correctness failures. Approved 2026-08-07.
  */
 const CONTINUOUS_PERMITTED_FIELDS = new Set<string>([
-  'CONTINUOUS_ASSERTION_FORMAT_DIVERGENCE',   // → path: assertions
+  'CONTINUOUS_ASSERTION_FORMAT_DIVERGENCE',      // → path: assertions
   'CONTINUOUS_VALIDATION_STRICTNESS_DIVERGENCE', // → path: validation
+  'CONTINUOUS_TAXONOMY_VERSION_DIVERGENCE',      // → path: topics[*].domain, category, contextType, entityType, aspect, outcome, disposition, executiveScope
 ]);
 
 function compareSemanticOutputs(
@@ -171,7 +180,20 @@ function compareSemanticOutputs(
     if (!cloudflareTopic) continue;
     for (const field of CONTROLLED_TOPIC_FIELDS) {
       if (azureTopic[field] !== cloudflareTopic[field]) {
-        differences.push(difference(`topics[${key}].${field}`, 'material', 'Controlled topic classification differs', azureTopic[field], cloudflareTopic[field]));
+        // domain, category, contextType are v4.2 taxonomy fields on Azure;
+        // v0.2 taxonomy fields (entityType, aspect, outcome, disposition, executiveScope)
+        // will always be null on Azure and populated on Cloudflare.
+        // Both are expected structural divergences in the dual-track taxonomy architecture.
+        const isTaxonomyAxisField = field === 'domain' || field === 'category' || field === 'contextType';
+        const severity = (options.applyContinuousPolicy && isTaxonomyAxisField &&
+          CONTINUOUS_PERMITTED_FIELDS.has('CONTINUOUS_TAXONOMY_VERSION_DIVERGENCE'))
+          ? 'permitted'
+          : 'material';
+        differences.push(difference(`topics[${key}].${field}`, severity,
+          isTaxonomyAxisField
+            ? 'Taxonomy axis differs (v4.2 Azure vs v0.2 Cloudflare — permitted under CONTINUOUS_TAXONOMY_VERSION_DIVERGENCE)'
+            : 'Controlled topic classification differs',
+          azureTopic[field], cloudflareTopic[field]));
       }
     }
     // Compare owners; exclude confidence from the ownership diff in the continuous lane:
