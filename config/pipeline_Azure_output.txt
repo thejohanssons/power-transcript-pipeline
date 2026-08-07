@@ -1,0 +1,314 @@
+pwsh -NoProfile -File ./power-transcript-pipeline.ps1 -FromDate '2026-08-01' -ToDate '2026-08-05' -ForceRerun -Verbose
+FromDate resolved to: 08/01/2026 00:00:00
+ToDate resolved to: 08/05/2026 23:59:59
+Local working directory: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport
+  [CF] Cloudflare sync enabled → https://eip-api-worker-staging.homeassistant-8d3.workers.dev
+WARNING:   [STAGING] SharePoint writes DISABLED — staging mode active
+People config loaded (33 people) ✅
+Confluence domain mappings loaded ✅
+EIP 1.2 Ownership & Governance config loaded ✅
+VERBOSE: WebRequest: v1.1 POST https://login.microsoftonline.com/f9e144a5-228f-4e5a-86c4-2cc253376402/oauth2/v2.0/token with application/x-www-form-urlencoded payload with body size 188 B (188 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload with body size 2,24 KB (2 291 bytes)
+Microsoft Graph Session Refreshed ✅
+Connected to Microsoft Graph (REST) ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com:/sites/Petersplace
+VERBOSE: WebResponse: 200 OK with application/json payload
+Resolved Primary SharePoint site ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com,c110c9a3-c12e-4333-bf90-e00f9365b5a4,fc9736b6-4c36-4d1b-987a-b79c911223fc/drive
+VERBOSE: WebResponse: 200 OK with application/json payload
+Resolved Primary SharePoint drive ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com:/sites/MeetingIntelligence
+VERBOSE: WebResponse: 200 OK with application/json payload
+Resolved MeetingIntelligence site ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/sites/scanningpens.sharepoint.com,1a30816c-15e1-4d94-a200-02331cb61a6f,6087afc3-67b1-40ad-9155-136855ad926e/drives
+VERBOSE: WebResponse: 200 OK with application/json payload
+Resolved MeetingIntelligence drive ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+Run logs folder ready ✅
+Loading existing Master Log...
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V:/master_log.json
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAKQEW5UCWWIWRHYWAVCAE5F5LAI/content
+VERBOSE: WebResponse: 200 OK with application/json payload
+Master Log loaded (554 meetings) ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V:/master_people_log.json
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESALQ3BD2PM7ZGZFLE4C5TYBJ7R4B/content
+VERBOSE: WebResponse: 200 OK with application/json payload
+Master People Log loaded (164 entries) ✅
+Checking VTT inbox folder (Legacy)...
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/root:/Transcripts:/children with query length 8
+VERBOSE: WebResponse: 200 OK with application/json payload
+VTT inbox (Legacy): no files found.
+Checking MeetingIntelligence Transcripts...
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!bIEwGuEVlE2iAAIzHLYab8Ovh2CxZ61AkVUTaFWtkm7fIkCgbSj7SpQ38wg8DVhv/root/children with query length 8
+VERBOSE: WebResponse: 200 OK with application/json payload
+MeetingIntelligence: 34 file(s) found ✅
+Processing VTT: HoD_20260709_153911.txt → [HoD_20260709_153911_2026-07-09]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260710_100507.txt → [HoD_20260710_100507_2026-07-10]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260710_132530.txt → [HoD_20260710_132530_2026-07-10]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260713_085757.txt → [HoD_20260713_085757_2026-07-13]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260713_124112.txt → [HoD_20260713_124112_2026-07-13]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260714_121540.txt → [HoD_20260714_121540_2026-07-14]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260714_141158.txt → [HoD_20260714_141158_2026-07-14]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260716_092531.txt → [HoD_20260716_092531_2026-07-16]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260716_111832.txt → [HoD_20260716_111832_2026-07-16]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260717_102705.txt → [HoD_20260717_102705_2026-07-17]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260720_124817.txt → [HoD_20260720_124817_2026-07-20]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260721_110145.txt → [HoD_20260721_110145_2026-07-21]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260721_153050.txt → [HoD_20260721_153050_2026-07-21]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260722_113919.txt → [HoD_20260722_113919_2026-07-22]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260722_120114.txt → [HoD_20260722_120114_2026-07-22]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260723_094922.txt → [HoD_20260723_094922_2026-07-23]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260723_124753.txt → [HoD_20260723_124753_2026-07-23]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260727_095425.txt → [HoD_20260727_095425_2026-07-27]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260727_112155.txt → [HoD_20260727_112155_2026-07-27]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260728_115451.txt → [HoD_20260728_115451_2026-07-28]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260728_134723.txt → [HoD_20260728_134723_2026-07-28]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260729_110934.txt → [HoD_20260729_110934_2026-07-29]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260730_115248.txt → [HoD_20260730_115248_2026-07-30]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260731_111518.txt → [HoD_20260731_111518_2026-07-31]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260804_092444.txt → [HoD_20260804_092444_2026-08-04]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260804_111152.txt → [HoD_20260804_111152_2026-08-04]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260804_142802.txt → [HoD_20260804_142802_2026-08-04]
+  [VTT] Already in master log — skipping
+Processing VTT: HoD_20260805_110106.txt → [HoD_20260805_110106_2026-08-05]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call + US Country Manager 25 Mar 26.txt → [Sales_Call_US_Country_Manager_25_Mar_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 11 Mar 26.txt → [Sales_Call_11_Mar_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 13 May 26.txt → [Sales_Call_13_May_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 15 Apr 26.txt → [Sales_Call_15_Apr_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 18 Feb 26.txt → [Sales_Call_18_Feb_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Processing VTT: Sales Call 28 Jan 26.txt → [Sales_Call_28_Jan_26_2026-07-08]
+  [VTT] Already in master log — skipping
+Fetching calendar events from 08/01/2026 00:00:00 to 08/05/2026 23:59:59...
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/peter@empoweringtech.com/calendarView with query length 76
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Found 13 online meetings in calendar (organised + attended).
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/peter@empoweringtech.com/calendarView with query length 112
+VERBOSE: WebResponse: 400 Bad Request with application/json payload
+✅ Total unique online meetings to evaluate: 13                                                                         
+--------------------------------------------------
+Evaluating: Image scanning - catch up 
+  [DIAG] Date: 08/04/2026 09:30:00
+  [DIAG] Organiser: theo@empoweringtech.com
+  [DIAG] Participants found in calendar: Theo Davies, Sachin Sachan, Peter Johansson, Mandar Padwal, Bhavesh Bhadricha, Prajakta Nawale
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Resolving via identity: 75ca422e-2f12-4959-8efe-df2cb9740e3e (Meeting ID: 373192244307)
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/75ca422e-2f12-4959-8efe-df2cb9740e3e/onlineMeetings with query length 51
+VERBOSE: WebResponse: 400 Bad Request with application/json payload
+  [DIAG] Resolving via identity: 75ca422e-2f12-4959-8efe-df2cb9740e3e (Full URL (escaped))                              
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/75ca422e-2f12-4959-8efe-df2cb9740e3e/onlineMeetings with query length 319
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Meeting ID resolved (75ca422e-2f12-4959-8efe-df2cb9740e3e): MSo3NWNhNDIyZS0yZjEyLTQ5NTktOGVmZS1kZjJjYjk3NDBlM2UqMCoqMTk6bWVldGluZ19OalpoTjJRd1lqWXRNelV5TXkwMFlqaGxMV0U1TkRFdFlqTXhaVGRtTmpReVpHRTJAdGhyZWFkLnYy
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/75ca422e-2f12-4959-8efe-df2cb9740e3e/onlineMeetings/MSo3NWNhNDIyZS0yZjEyLTQ5NTktOGVmZS1kZjJjYjk3NDBlM2UqMCoqMTk6bWVldGluZ19OalpoTjJRd1lqWXRNelV5TXkwMFlqaGxMV0U1TkRFdFlqTXhaVGRtTmpReVpHRTJAdGhyZWFkLnYy/transcripts
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Found 0 matching transcript(s) for this date.
+--------------------------------------------------
+Evaluating: Payment Strategy
+  [DIAG] Date: 08/04/2026 13:30:00
+  [DIAG] Organiser: carolynn@empoweringtech.com
+  [DIAG] Participants found in calendar: Carolynn Helps, Penny Taylor, Toby Sutton OBE (Empowering Tech), Jack Churchill, Peter Johansson, Sharmella Kirby, Nick Barnes
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Resolving via identity: 3f737d45-d2e8-4e62-8e47-c2a0c312d041 (Meeting ID: 336506571461)
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/3f737d45-d2e8-4e62-8e47-c2a0c312d041/onlineMeetings with query length 51
+VERBOSE: WebResponse: 400 Bad Request with application/json payload
+  [DIAG] Resolving via identity: 3f737d45-d2e8-4e62-8e47-c2a0c312d041 (Full URL (escaped))                              
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/3f737d45-d2e8-4e62-8e47-c2a0c312d041/onlineMeetings with query length 319
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Meeting ID resolved (3f737d45-d2e8-4e62-8e47-c2a0c312d041): MSozZjczN2Q0NS1kMmU4LTRlNjItOGU0Ny1jMmEwYzMxMmQwNDEqMCoqMTk6bWVldGluZ19OV1UzWmpSaFl6RXRObVpoWmkwME9ERXpMVGxsT1RFdE5ESmtOV000WXpnNU9HTmtAdGhyZWFkLnYy
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/3f737d45-d2e8-4e62-8e47-c2a0c312d041/onlineMeetings/MSozZjczN2Q0NS1kMmU4LTRlNjItOGU0Ny1jMmEwYzMxMmQwNDEqMCoqMTk6bWVldGluZ19OV1UzWmpSaFl6RXRObVpoWmkwME9ERXpMVGxsT1RFdE5ESmtOV000WXpnNU9HTmtAdGhyZWFkLnYy/transcripts
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Found 1 matching transcript(s) for this date.
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/3f737d45-d2e8-4e62-8e47-c2a0c312d041/onlineMeetings/MSozZjczN2Q0NS1kMmU4LTRlNjItOGU0Ny1jMmEwYzMxMmQwNDEqMCoqMTk6bWVldGluZ19OV1UzWmpSaFl6RXRObVpoWmkwME9ERXpMVGxsT1RFdE5ESmtOV000WXpnNU9HTmtAdGhyZWFkLnYy/transcripts/ktVizInGAAAAi_B6lATZRTE5Om1lZXRpbmdfTldVM1pqUmhZekV0Tm1aaFppMDBPREV6TFRsbE9URXROREprTldNNFl6ZzVPR05rQHRocmVhZC52MqEw2TxhYzFjODQxZS1mMzUyLTQ0OTctYjM2Yy00ODlhN2IxNjliY2YtMTc4NTg1MDM2Mi1UcmFuc2NyaXB0VjI=/content
+VERBOSE: WebResponse: 200 OK with text/vtt payload
+  [LLM DIAG] Endpoint: https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions?api-version=2024-02-15-preview
+  [LLM DIAG] Model: gpt-5.6-terra
+  [LLM DIAG] Key source: classification_rules.json
+  [LLM DIAG] Auth mode: api-key
+  [LLM DIAG] Chunks: 1 (chunk size: 400000 chars)
+  [LLM DIAG] Processing chunk 1/1...
+VERBOSE: WebRequest: v1.1 POST https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions with query length 30 with application/json payload with body size 90,34 KB (92 505 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload with body size 5,85 KB (5 989 bytes)
+  [LLM DIAG] Combined summaries: 4999 chars feeding Pass 3
+  [LLM DIAG] Synthesising final Leadership Summary...
+VERBOSE: WebRequest: v1.1 POST https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions with query length 30 with application/json payload with body size 11,93 KB (12 221 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload with body size 11,7 KB (11 977 bytes)
+  [LLM DIAG] Extracting Topic Records (max tokens: 64000)...
+VERBOSE: WebRequest: v1.1 POST https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions with query length 30 with application/json payload with body size 13,84 KB (14 173 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload with body size 26,9 KB (27 545 bytes)
+  [LLM DIAG] Record count OK: 6 record(s) returned (expected >=5)
+  [CTX] Execution context detected: Finance BAU
+  [VALIDATION] Topics detected: 5
+  [VALIDATION] T00 Usage: 0,0%
+  [VALIDATION] Mode Assigned: CEO (config_rule)
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAO7OX6NUWULGVCIIHMSGHOL53EV/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAP6LKO6YFCLNJG2Q6FR2G5C74B6/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T08-August-and-September-cash-runway.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T08-August-and-September-cash-runway.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 3,95 KB (4 047 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 238 B (238 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 685 B (685 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T10-Order-pipeline-and-collection-conversion.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T10-Order-pipeline-and-collection-conversion.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 4,5 KB (4 612 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 246 B (246 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 647 B (647 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T06-Inventory-scarcity-and-fulfilment-exposure.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T06-Inventory-scarcity-and-fulfilment-exposure.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 4,12 KB (4 218 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 248 B (248 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 565 B (565 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T08-Factoring-retention-and-invoice-control.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T08-Factoring-retention-and-invoice-control.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 4,6 KB (4 709 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 245 B (245 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 635 B (635 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T11-Tax-deferrals-and-liability-prioritisation.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T11-Tax-deferrals-and-liability-prioritisation.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 4,72 KB (4 833 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 248 B (248 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 620 B (620 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+  [CALENDAR] Uploading Topic Record: 2026-08-04_1130_payment_strategy-T13-Trade-facility-activation-and-replenishment-funding.md
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1130_payment_strategy-T13-Trade-facility-activation-and-replenishment-funding.md
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 4,63 KB (4 738 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 257 B (257 bytes)
+VERBOSE:   [CF] Post /files ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/topics with application/json payload with body size 713 B (713 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [CF] Post /topics ✅
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1330-Payment_Strategy.txt
+  [CALENDAR] Transcript uploaded to SharePoint
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 90,52 KB (92 690 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 165 B (165 bytes)
+VERBOSE:   [CF] Post /files ✅
+  [CALENDAR] Transcript stored in R2: transcripts/2026-08/2026-08-04_1130_payment_strategy.txt
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/transcripts with application/json payload with body size 208 B (208 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 61 B (61 bytes)
+VERBOSE:   [CF] Post /transcripts ✅
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1330-Payment_Strategy-Summary.txt
+  [CALENDAR] Summary uploaded to SharePoint
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 11,23 KB (11 497 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 171 B (171 bytes)
+VERBOSE:   [CF] Post /files ✅
+  [CALENDAR] Summary stored in R2: summaries/2026-08/2026-08-04_1130_payment_strategy-summary.txt
+  [PEOPLE] Running people intelligence extraction...
+  [PEOPLE] Running people intelligence extraction (6 people)...
+VERBOSE: WebRequest: v1.1 POST https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions with query length 30 with application/json payload with body size 54,44 KB (55 750 bytes)
+VERBOSE: WebResponse: 200 OK with application/json payload with body size 9,63 KB (9 861 bytes)
+VERBOSE:   [STAGING] SharePoint upload skipped: /Users/peter/git-stuff/power-transcript-pipeline/packages/pipeline/TranscriptExport/2026-08-04_1330-Payment_Strategy-People.txt
+  [PEOPLE] People file uploaded: 
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/files with application/json payload with body size 9 KB (9 215 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 166 B (166 bytes)
+VERBOSE:   [CF] Post /files ✅
+  [PEOPLE] People file stored in R2: people/2026-08/2026-08-04_1130_payment_strategy-people.txt
+VERBOSE: WebRequest: v1.1 POST https://eip-api-worker-staging.homeassistant-8d3.workers.dev/participants with application/json payload with body size 1006 B (1 006 bytes)
+VERBOSE: WebResponse: 201 Created with application/json payload with body size 88 B (88 bytes)
+VERBOSE:   [CF] Post /participants ✅
+VERBOSE: WebRequest: v1.1 POST https://eip-runtime-shadow-staging.homeassistant-8d3.workers.dev/v1/azure-export-runs with application/json payload with body size 3,91 KB (4 006 bytes)
+VERBOSE: WebResponse: 401 Unauthorized with application/json payload with body size 24 B (24 bytes)
+WARNING:   [RUNTIME SHADOW] Manifest submission skipped: Response status code does not indicate success: 401 (Unauthorized).
+--------------------------------------------------
+Evaluating: General on compliance
+  [DIAG] Date: 08/04/2026 08:00:00
+  [DIAG] Organiser: peter@empoweringtech.com
+  [DIAG] Participants found in calendar: Nick Barnes, Carolynn Helps, Alison Garbett
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/root/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAPESLC63SMNO5DYH2TOL6NHOFLJ/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/drives/b!o8kQwS7BM0O_kOAPk2W1pLY2l_w2TBtNmHq3nJESI_zgz-mFwPALRJRhT15YEW9Y/items/01ORLESAL2QW7AC3WKANCIOUT646M35D3V/children
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Resolving via identity: 121de1d3-3e4a-48cc-af9f-ef30bd84d034 (Full URL (escaped))
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/121de1d3-3e4a-48cc-af9f-ef30bd84d034/onlineMeetings with query length 319
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Meeting ID resolved (121de1d3-3e4a-48cc-af9f-ef30bd84d034): MSoxMjFkZTFkMy0zZTRhLTQ4Y2MtYWY5Zi1lZjMwYmQ4NGQwMzQqMCoqMTk6bWVldGluZ19OR0l5TVdVNVpXTXRaVE0wWkMwMFpUQTNMV0kzT0RRdE5HSXhPVGcyT0Rrek16WXlAdGhyZWFkLnYy
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/121de1d3-3e4a-48cc-af9f-ef30bd84d034/onlineMeetings/MSoxMjFkZTFkMy0zZTRhLTQ4Y2MtYWY5Zi1lZjMwYmQ4NGQwMzQqMCoqMTk6bWVldGluZ19OR0l5TVdVNVpXTXRaVE0wWkMwMFpUQTNMV0kzT0RRdE5HSXhPVGcyT0Rrek16WXlAdGhyZWFkLnYy/transcripts
+VERBOSE: WebResponse: 200 OK with application/json payload
+  [DIAG] Found 1 matching transcript(s) for this date.
+VERBOSE: WebRequest: v1.1 GET https://graph.microsoft.com/v1.0/users/121de1d3-3e4a-48cc-af9f-ef30bd84d034/onlineMeetings/MSoxMjFkZTFkMy0zZTRhLTQ4Y2MtYWY5Zi1lZjMwYmQ4NGQwMzQqMCoqMTk6bWVldGluZ19OR0l5TVdVNVpXTXRaVE0wWkMwMFpUQTNMV0kzT0RRdE5HSXhPVGcyT0Rrek16WXlAdGhyZWFkLnYy/transcripts/ktVizInGAAAAi_B6lATZRTE5Om1lZXRpbmdfTkdJeU1XVTVaV010WlRNMFpDMDBaVEEzTFdJM09EUXROR0l4T1RnMk9Ea3pNell5QHRocmVhZC52MqEw2TxjY2RlYzAwYS00YjNkLTQzNWYtODJjNS0yMjliYjE0ZjRjZDMtMTc4NTgzMDM5Ny1UcmFuc2NyaXB0VjI=/content
+VERBOSE: WebResponse: 200 OK with text/vtt payload
+  [LLM DIAG] Endpoint: https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions?api-version=2024-02-15-preview
+  [LLM DIAG] Model: gpt-5.6-terra
+  [LLM DIAG] Key source: classification_rules.json
+  [LLM DIAG] Auth mode: api-key
+  [LLM DIAG] Chunks: 1 (chunk size: 400000 chars)
+  [LLM DIAG] Processing chunk 1/1...
+VERBOSE: WebRequest: v1.1 POST https://atlassian-rovo-forge.openai.azure.com/openai/deployments/gpt-5.6-terra/chat/completions with query length 30 with application/json payload with body size 117,15 KB (119 966 bytes)
