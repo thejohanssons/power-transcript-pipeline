@@ -1,0 +1,187 @@
+Topic Classification Framework — Validation Report
+Version 0.1
+2026-08-06
+
+This report records empirical evidence gathered against the Topic Classification &
+Governance Framework v0.2. It is a separate artefact from the normative specification.
+The framework itself is not modified by this report.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. VALIDATION STATUS
+
+  Framework version under test:  v0.2
+  Report version:                 v0.1 (Phase 1 complete, Phase 2 pending)
+  Governance status:              Approved Baseline — proceed to Phase 2 validation
+
+  Governance decision (2026-08-06):
+  "Framework v0.2 remains unchanged. Validation Report updated with 55-record results.
+  Proceed to Phase 2 validation targeting underrepresented domains and aspects."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. PHASE 1 RESULTS — 55 RECORDS, 9 MEETINGS
+
+  Sample composition:
+    Records:       55
+    Meetings:      9
+    Unique topics: 17
+    Meeting types: 5 (ExCo, Product review, NPI process, Sales call, R&D update)
+    Source:        Azure pipeline normalized output, 2026-08-03 to 2026-08-05
+
+  Coverage by axis:
+
+  ─────────────────────────────────────────────────────────────────────
+  Axis              Covered   Total   Coverage   Status
+  ─────────────────────────────────────────────────────────────────────
+  Domain            54        55      98%        ✅ Pass
+  Entity Type       55        55      100%       ✅ Pass
+  Aspect            52        55      95%        ✅ Pass
+  Outcome           53        55      96%        ✅ Pass
+  Disposition       55        55      100%       ✅ Pass
+  ExecutiveScope    55        55      100%       ✅ Pass
+  ─────────────────────────────────────────────────────────────────────
+  All axes meet or exceed the 95% threshold defined in the framework.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. FAILURE ANALYSIS
+
+  All failures (3 Domain, 2 Outcome, 3 Aspect) trace to a single root cause:
+
+  Root cause: Azure pipeline topic "Strategic Direction & Alignment" with
+              domain=Strategy, category=Strategy
+
+  This is a legacy taxonomy artefact from the Azure pipeline, not evidence of
+  a missing v0.2 concept. The v0.2 framework deliberately decomposed the
+  "Strategy" concept into:
+
+    ExecutiveScope = Strategic     (level of organisational attention)
+    Disposition = Decision         (what commitment was made)
+    Domain = accountable function  (who owns it)
+
+  The failure therefore validates the v0.2 design rationale rather than
+  challenging it. "Strategy" as a domain, category, and topic name is the
+  exact ambiguity the framework was designed to eliminate.
+
+  Provisional classification for "Strategic Direction & Alignment":
+    Domain:         Product Management or Commercial (context-dependent)
+    Entity Type:    Initiative
+    Aspect:         Performance
+    Outcome:        Progress or Insight
+    Disposition:    Decision
+    ExecutiveScope: Strategic
+
+  This classification requires no new taxonomy values.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. ASPECT DISTRIBUTION
+
+  Aspect           Records   Percentage   Notes
+  ─────────────────────────────────────────────────────────────────────
+  Schedule         27        49%          Expected — sample skews delivery/NPI
+  Performance      13        23%          Clean
+  Capability        4         7%          Clean
+  Quality           4         7%          Clean
+  Relationship      4         7%          Clean
+  Cost              3         5%          Clean
+  Compliance        0         0%          Not yet exercised — Phase 2 target
+  Capacity          0         0%          Not yet exercised — Phase 2 target
+  ─────────────────────────────────────────────────────────────────────
+
+  Schedule dominance (49%) reflects meeting type skew in the Phase 1 sample
+  (delivery, NPI, and R&D meetings). This is expected and not a taxonomy flaw.
+  Compliance and Capacity have zero instances — both require different meeting
+  types (compliance reviews, capacity planning) to exercise. Phase 2 will
+  deliberately target these.
+
+  Aspect risk assessment: moved from HIGH to LOW-MEDIUM after Phase 1.
+  The Alignment candidate (see Section 6) is the only open item.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. OUTCOME MAPPING FROM AZURE CATEGORIES
+
+  The Azure pipeline uses different category vocabulary from v0.2 Outcome.
+  The following mappings were confirmed clean during Phase 1:
+
+  Azure category      v0.2 Outcome   Mapping type
+  ─────────────────────────────────────────────────────────────
+  Progress            Progress       Exact
+  Risk                Risk           Exact
+  Decision            Decision       Exact
+  Dependency          Dependency     Exact
+  Action              Action         Exact
+  Opportunity         Opportunity    Exact
+  Issue               Issue          Exact
+  Execution           Progress       Semantic — execution = active progress
+  Learning            Insight        Semantic — learning = new understanding
+  Problem             Issue          Semantic — problem = surfaced issue
+  Strategy            —              NO MAPPING (legacy artefact — see Section 3)
+  ─────────────────────────────────────────────────────────────
+
+  No new Outcome values are required. The unmapped "Strategy" category is
+  a legacy artefact handled by reclassification (see Section 3).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. ASPECT CANDIDATE REGISTER — PHASE 1
+
+  See also: Section 7A of the normative framework specification.
+
+  CANDIDATE: Alignment
+  ────────────────────
+  First observed:     2026-08-06, Phase 1 record 11 of 13 (initial sample)
+  Phase 1 instances:  3 records (all "Strategic Direction & Alignment")
+  Threshold:          10 instances across 3+ meeting types
+  Decision:           REJECTED — insufficient evidence
+  Status:             Under observation
+
+  The "Alignment" candidate was tested against the orthogonality criterion:
+  Can every existing Aspect be "aligned"? Answer: yes.
+  Therefore Alignment is a condition, not an independent management dimension.
+  Provisional classification using existing Aspect values is viable (Performance).
+
+  No Aspect additions are warranted after Phase 1.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. PHASE 2 PLAN
+
+  Objective: expand to 100+ records, exercising underrepresented dimensions.
+
+  Target meeting types (minimum one sample each):
+    Finance review or budget meeting       → targets Cost, Performance
+    Commercial forecast or pipeline review → targets Performance, Relationship
+    Customer meeting or account review     → targets Relationship, Performance
+    Supplier review                        → targets Relationship, Compliance
+    Compliance or legal review             → targets Compliance
+    Capacity planning or resource review   → targets Capacity
+    HR or organisational review            → targets Capability
+
+  Target axes to stress-test:
+    Compliance   (0 instances in Phase 1)
+    Capacity     (0 instances in Phase 1)
+    Relationship (4 instances — needs more breadth)
+    Cost         (3 instances — needs more breadth)
+
+  Pass criteria for Phase 2:
+    95%+ coverage on all axes (maintained from Phase 1)
+    At least 5 records exercising Compliance aspect
+    At least 5 records exercising Capacity aspect
+    Inter-classifier agreement test: two independent classifiers on same 20 records
+    No new taxonomy value added without 10+ instance evidence threshold
+
+  Promotion criteria (Approved Baseline → Approved Production Standard):
+    Phase 2 pass criteria met
+    Alignment candidate assessed with 10+ instance evidence
+    Aspect Candidate Register has no open items above threshold
+    No axis is acting as a catch-all (no single value >50% within its axis
+    after Phase 2 breadth correction)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+8. VERSION HISTORY
+
+  v0.1 — 2026-08-06 — Initial report, Phase 1 results (55 records, 9 meetings)
