@@ -106,6 +106,7 @@ export interface TopicRecord {
 // ── People (per-meeting) ──────────────────────────────────
 
 export interface PersonRecord {
+  personId: string;
   canonicalName: string | null;
   sourceName: string;
   attendance: string | null;    // 'present' | 'absent' | 'unknown'

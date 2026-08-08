@@ -1,6 +1,22 @@
 import type { Env, TranscriptSubmission } from './types';
 import { isTranscriptSubmission } from './validation';
-import { buildMeetingRow, insertMeetingSql } from './db';
+import {
+  buildMeetingRow,
+  insertMeetingSql,
+  updateMeetingCompletedSql,
+  updateMeetingFailureSql,
+  updateMeetingStateSql,
+  insertTopicSql,
+  insertPersonSql,
+  insertActionSql,
+  insertDecisionSql,
+  buildTopicRow,
+  buildPersonRow,
+  buildActionRow,
+  buildDecisionRow,
+} from './db';
+import { processMeeting } from './meeting-processing';
+import { matchTopicsToMemory } from './topic-memory';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +51,7 @@ async function enableForeignKeys(db: D1Database): Promise<void> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
@@ -50,7 +66,7 @@ export default {
       }
 
       if (path === '/v1/meetings' && method === 'POST') {
-        return this.handlePostMeeting(request, env);
+        return this.handlePostMeeting(request, env, ctx);
       }
 
       if (path === '/v1/topic-memory' && method === 'GET') {
@@ -69,7 +85,7 @@ export default {
     }
   },
 
-  async handlePostMeeting(request: Request, env: Env): Promise<Response> {
+  async handlePostMeeting(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const auth = request.headers.get('Authorization');
     if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
       return errorResponse('Unauthorised', 401);
@@ -99,9 +115,14 @@ export default {
         env.DB.prepare('DELETE FROM decisions WHERE meeting_id = ?').bind(submission.meetingId),
         env.DB.prepare('DELETE FROM people WHERE meeting_id = ?').bind(submission.meetingId),
         env.DB.prepare('DELETE FROM topics WHERE meeting_id = ?').bind(submission.meetingId),
+        env.DB.prepare('DELETE FROM topic_memory WHERE first_seen_meeting_id = ?').bind(submission.meetingId),
         env.DB.prepare('DELETE FROM meetings WHERE meeting_id = ?').bind(submission.meetingId),
         env.DB.prepare(insert).bind(...buildMeetingRow(submission, transcriptSha256, null)),
       ]);
+
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(this.processAndPersist(submission, transcriptSha256, env));
+      }
 
       return jsonResponse({ meetingId: submission.meetingId, state: 'pending' }, 202);
     }
@@ -111,7 +132,57 @@ export default {
       .bind(...buildMeetingRow(submission, transcriptSha256, null))
       .run();
 
+    if (ctx?.waitUntil) {
+      ctx.waitUntil(this.processAndPersist(submission, transcriptSha256, env));
+    }
+
     return jsonResponse({ meetingId: submission.meetingId, state: 'pending' }, 202);
+  },
+
+  async processAndPersist(submission: TranscriptSubmission, transcriptSha256: string, env: Env): Promise<void> {
+    const meetingId = submission.meetingId;
+
+    try {
+      await env.DB.prepare(updateMeetingStateSql()).bind('processing', meetingId).run();
+
+      const meetingOutput = await processMeeting(submission, transcriptSha256, {
+        AZURE_OPENAI_ENDPOINT: env.AZURE_OPENAI_ENDPOINT,
+        AZURE_OPENAI_DEPLOYMENT: env.AZURE_OPENAI_DEPLOYMENT,
+        AZURE_OPENAI_API_KEY: env.AZURE_OPENAI_API_KEY,
+      });
+
+      const r2Key = `meetings/${meetingId}/meeting-output.json`;
+      await env.OUTPUT_BUCKET.put(r2Key, JSON.stringify(meetingOutput, null, 2), {
+        httpMetadata: { contentType: 'application/json' },
+      });
+
+      const batchStatements = [
+        env.DB.prepare(updateMeetingCompletedSql()).bind('completed', r2Key, meetingId),
+      ];
+
+      for (const topic of meetingOutput.topics) {
+        batchStatements.push(env.DB.prepare(insertTopicSql()).bind(...buildTopicRow(topic, meetingId)));
+      }
+
+      for (const person of meetingOutput.people) {
+        batchStatements.push(env.DB.prepare(insertPersonSql()).bind(...buildPersonRow(person, meetingId)));
+      }
+
+      for (const action of meetingOutput.actions) {
+        batchStatements.push(env.DB.prepare(insertActionSql()).bind(...buildActionRow(action)));
+      }
+
+      for (const decision of meetingOutput.decisions) {
+        batchStatements.push(env.DB.prepare(insertDecisionSql()).bind(...buildDecisionRow(decision)));
+      }
+
+      await env.DB.batch(batchStatements);
+      await matchTopicsToMemory(meetingOutput, env);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await env.DB.prepare(updateMeetingFailureSql()).bind('failed', message, submission.meetingId).run();
+      console.error('Meeting processing failed:', message);
+    }
   },
 
   async handleGetTopicMemory(_env: Env): Promise<Response> {
