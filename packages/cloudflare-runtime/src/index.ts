@@ -1,4 +1,5 @@
 import type { Env, TranscriptSubmission } from './types';
+import { RUNTIME_VERSION } from './types';
 import { isTranscriptSubmission } from './validation';
 import {
   buildMeetingRow,
@@ -62,7 +63,7 @@ export default {
 
     try {
       if (path === '/health' && method === 'GET') {
-        return jsonResponse({ status: 'ok', environment: env.ENVIRONMENT });
+        return jsonResponse({ status: 'ok', version: RUNTIME_VERSION, environment: env.ENVIRONMENT });
       }
 
       if (path === '/v1/meetings' && method === 'POST') {
