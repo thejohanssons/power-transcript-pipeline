@@ -122,7 +122,8 @@ $script:cfApiBase     = if ($pipelineConfig.eip_cloudflare_sync -eq "production"
 } elseif ($pipelineConfig.eip_cloudflare_sync -eq "staging") {
     $pipelineConfig.eip_api_worker_url_staging
 } else { $null }
-if ($script:cfSyncEnabled) { Write-Host "  [CF] Cloudflare sync enabled → $($script:cfApiBase)" -ForegroundColor Cyan }
+$script:cfRuntimeBase = $pipelineConfig.eip_cloudflare_runtime_url
+if ($script:cfSyncEnabled) { Write-Host "  [CF] Cloudflare sync enabled → API $($script:cfApiBase), runtime $($script:cfRuntimeBase)" -ForegroundColor Cyan }
 
 # SharePoint skip flag — set true on develop/staging branch to avoid contaminating Petersplace
 $script:skipSharePoint = ($pipelineConfig.skip_sharepoint -eq $true)
@@ -1069,9 +1070,8 @@ function Invoke-CloudflareSync {
 }
 
 # ---------------------------------------------------------------
-# Runtime Shadow handoff — submits only references to the artifacts
-# already written through the existing /files path. It never uploads,
-# modifies, or deletes operational artifacts.
+# Cloudflare runtime handoff — submits raw transcript + metadata only.
+# This path does not upload Azure-processed artifacts or modify SharePoint.
 # ---------------------------------------------------------------
 function Get-Sha256Hex {
     param([string]$Content)
@@ -1099,88 +1099,56 @@ function New-RuntimeShadowArtifactReference {
     }
 }
 
-function Submit-RuntimeShadowAzureExport {
+function Submit-TranscriptToCloudflare {
     param(
-        [string]$PackageId,
         [string]$MeetingId,
         [string]$Subject,
+        [string]$Organiser,
         [datetime]$EventDate,
-        [hashtable]$Transcript,
-        [hashtable]$Summary,
-        [hashtable]$People,
-        [object[]]$TopicRecords,
-        # When set, appends a UTC timestamp suffix to PackageId so the Runtime Shadow Worker
-        # treats this as a new submission, bypassing the D1 idempotency guard. Use with
-        # -ForceRerun to obtain post-fix evidence runs against already-submitted meetings.
-        [switch]$ForceResubmit
+        [string]$Transcript,
+        [string]$NativeId,
+        [switch]$ForceRerun
     )
 
-    if ($ForceResubmit) {
-        $rerunSuffix = (Get-Date -Format "yyyyMMddTHHmmssfff")
-        $PackageId = "$PackageId-rerun-$rerunSuffix"
-        Write-Host "  [RUNTIME SHADOW] ForceResubmit: using package ID '$PackageId'" -ForegroundColor Yellow
+    $submissionToken = if ($env:CLOUDFLARE_SUBMISSION_TOKEN) {
+        $env:CLOUDFLARE_SUBMISSION_TOKEN
+    } else {
+        $null
     }
 
-    $shadowUrl = $null
-    if ($pipelineConfig.eip_cloudflare_sync -eq 'staging') {
-        $shadowUrl = $pipelineConfig.eip_runtime_shadow_url_staging
-    } elseif ($pipelineConfig.eip_cloudflare_sync -eq 'production') {
-        $shadowUrl = $pipelineConfig.eip_runtime_shadow_url_production
-    }
-    $submissionToken = $env:RUNTIME_SHADOW_SUBMISSION_TOKEN
-    if (-not $shadowUrl -or -not $submissionToken) {
-        Write-Verbose '  [RUNTIME SHADOW] Handoff not configured; skipping manifest submission.'
-        return
-    }
-    if (-not $Transcript -or -not $Summary -or -not $People -or -not $TopicRecords -or $TopicRecords.Count -eq 0) {
-        Write-Warning '  [RUNTIME SHADOW] Required Azure artifacts are incomplete; skipping manifest submission.'
+    if (-not $script:cfSyncEnabled -or -not $script:cfRuntimeBase -or -not $submissionToken) {
+        Write-Verbose '  [CLOUDFLARE] Handoff not configured; skipping transcript submission.'
         return
     }
 
-    $manifest = @{
-        schemaVersion = '1.0.0'
-        packageId = $PackageId
-        source = @{
-            system    = 'azure-pipeline'
-            nativeId  = $MeetingId
-            meetingId = $MeetingId
-            subject   = $Subject
-            eventStart = $EventDate.ToUniversalTime().ToString('o')
-        }
-        processing = @{
-            azurePipelineVersion = $PIPELINE_VERSION
-            configuration = @(
-                @{ name = 'taxonomy'; version = $TAXONOMY_VERSION; sha256 = Get-Sha256Hex -Content ($taxonomy | ConvertTo-Json -Depth 32 -Compress) },
-                @{ name = 'mapping_rules'; version = $MAPPING_RULES_VERSION; sha256 = Get-Sha256Hex -Content ($mappingRules | ConvertTo-Json -Depth 32 -Compress) },
-                @{ name = 'roles'; version = $ROLES_CONFIG_VERSION; sha256 = Get-Sha256Hex -Content ($rolesConfig | ConvertTo-Json -Depth 32 -Compress) },
-                @{ name = 'sentiment_rules'; version = $SENTIMENT_RULES_VERSION; sha256 = Get-Sha256Hex -Content ($sentimentRules | ConvertTo-Json -Depth 32 -Compress) }
-            )
-            # Governed configuration content embedded at submission time so the Runtime Shadow
-            # Worker can inject the exact controlled vocabulary Azure used into its model prompt
-            # and validate controlled field values against it. Required for a valid parity measurement.
-            configurationContent = @{
-                taxonomy      = $taxonomy
-                mapping_rules = $mappingRules
-                roles         = $rolesConfig
-            }
-        }
-        artifacts = @{
-            transcript = $Transcript
-            summary = $Summary
-            people = $People
-            topicRecords = @($TopicRecords)
-        }
+    if (-not $Transcript -or [string]::IsNullOrWhiteSpace($Transcript)) {
+        Write-Warning '  [CLOUDFLARE] Transcript submission skipped: transcript is missing or empty.'
+        return
+    }
+
+    if ($ForceRerun) {
+        Write-Host '  [CLOUDFLARE] ForceRerun requested; payload will be submitted again to the runtime.' -ForegroundColor Yellow
+    }
+
+    $payload = @{
+        meetingId    = $MeetingId
+        sourceSystem = 'azure'
+        nativeId     = if ($NativeId) { $NativeId } else { $MeetingId }
+        subject      = $Subject
+        organiser    = $Organiser
+        eventDate    = $EventDate.ToUniversalTime().ToString('o')
+        transcript   = $Transcript
     }
 
     try {
-        $endpoint = "$($shadowUrl.TrimEnd('/'))/v1/azure-export-runs"
+        $endpoint = "$($script:cfRuntimeBase.TrimEnd('/'))/v1/meetings"
         Invoke-RestMethod -Method Post -Uri $endpoint `
             -Headers @{ Authorization = "Bearer $submissionToken" } `
-            -Body ($manifest | ConvertTo-Json -Depth 16) `
+            -Body ($payload | ConvertTo-Json -Depth 16) `
             -ContentType 'application/json' -TimeoutSec 10 | Out-Null
-        Write-Host "  [RUNTIME SHADOW] Export manifest submitted: $PackageId" -ForegroundColor Cyan
+        Write-Host "  [CLOUDFLARE] Transcript submitted: $MeetingId" -ForegroundColor Cyan
     } catch {
-        Write-Warning "  [RUNTIME SHADOW] Manifest submission skipped: $($_.Exception.Message)"
+        Write-Warning "  [CLOUDFLARE] Transcript submission skipped: $($_.Exception.Message)"
     }
 }
 
@@ -1280,9 +1248,9 @@ function Invoke-MeetingProcessing {
         [int]      $SegmentCount = 1,
         [string]   $AgentState = "processed",
         [string]   $RunId = "local",
-        # When set, forwards ForceResubmit to Submit-RuntimeShadowAzureExport so that
-        # already-submitted meetings are re-queued under a new package ID, bypassing
-        # the D1 idempotency guard. Mirrors the top-level -ForceRerun flag.
+        # When set, forwards ForceRerun to Submit-TranscriptToCloudflare so that
+        # already-submitted meetings are resubmitted to the runtime. Mirrors the
+        # top-level -ForceRerun flag.
         [switch]   $ForceRerun
     )
 
@@ -1737,14 +1705,19 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         }
     }
 
-    # ── 13. RUNTIME SHADOW HANDOFF ────────────────────────────────
+    # ── 13. CLOUDFLARE RUNTIME HANDOFF ──────────────────────────
     # This is deliberately after all existing Cloudflare artifact writes.
-    Submit-RuntimeShadowAzureExport `
-        -PackageId "azure-$MeetingId" `
-        -MeetingId $MeetingId -Subject $Subject -EventDate $EventDate `
-        -Transcript $runtimeShadowTranscript -Summary $runtimeShadowSummary `
-        -People $runtimeShadowPeople -TopicRecords $runtimeShadowTopicRecords `
-        -ForceResubmit:$ForceRerun
+    $cloudflareNativeId = if (Get-Variable -Name 'NativeId' -Scope Local -ErrorAction SilentlyContinue) {
+        (Get-Variable -Name 'NativeId' -Scope Local).Value
+    } else {
+        $MeetingId
+    }
+
+    Submit-TranscriptToCloudflare `
+        -MeetingId $MeetingId -Subject $Subject -Organiser $Organiser -EventDate $EventDate `
+        -Transcript $PlainText `
+        -NativeId $cloudflareNativeId `
+        -ForceRerun:$ForceRerun
 
     # ── 14. UPDATE SHAREPOINT COLUMNS ────────────────────────────
     $authHeaderRef = $null
