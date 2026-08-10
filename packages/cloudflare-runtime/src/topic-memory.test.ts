@@ -79,6 +79,7 @@ function createEnv(options?: { webhookUrl?: string }): Env {
   return {
     DB: createMockDb() as unknown as D1Database,
     OUTPUT_BUCKET: {} as unknown as R2Bucket,
+    PROCESSING_QUEUE: { send: vi.fn().mockResolvedValue(undefined) } as unknown as Queue,
     ENVIRONMENT: 'test',
     AZURE_OPENAI_ENDPOINT: 'https://example.com',
     AZURE_OPENAI_DEPLOYMENT: 'test-deployment',

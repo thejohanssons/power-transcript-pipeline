@@ -27,6 +27,23 @@
       "bucket_name": "eip-cloudflare-runtime-output"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "PROCESSING_QUEUE",
+        "queue": "eip-cloudflare-runtime-processing"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "eip-cloudflare-runtime-processing",
+        "max_batch_size": 1,
+        "max_batch_timeout": 30,
+        "max_retries": 2,
+        "dead_letter_queue": "eip-cloudflare-runtime-processing-dlq"
+      }
+    ]
+  },
   "env": {
     "staging": {
       "vars": {
