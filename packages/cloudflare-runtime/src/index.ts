@@ -22,7 +22,7 @@ import { matchTopicsToMemory } from './topic-memory';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -76,8 +76,8 @@ export default {
       }
 
       const matchPath = path.match(/^\/v1\/topic-memory\/([^/]+)\/match$/);
-      if (matchPath && method === 'POST') {
-        return this.handlePostTopicMemoryMatch(matchPath[1], request, env);
+      if (matchPath && method === 'PATCH') {
+        return this.handlePatchTopicMemoryMatch(decodeURIComponent(matchPath[1]), request, env);
       }
 
       return errorResponse('Not found', 404);
@@ -263,7 +263,34 @@ export default {
     return jsonResponse({ topicMemory: [] });
   },
 
-  async handlePostTopicMemoryMatch(id: string, _request: Request, _env: Env): Promise<Response> {
-    return jsonResponse({ message: `Match review endpoint — implementation pending (id: ${id})` });
+  async handlePatchTopicMemoryMatch(id: string, request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+      return errorResponse('Unauthorised', 401);
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || !('decision' in body) || (body.decision !== 'accept' && body.decision !== 'reject')) {
+      return errorResponse('Request body must contain decision: "accept" or "reject"', 400);
+    }
+
+    if (body.decision === 'accept') {
+      return errorResponse('Accept merge not yet implemented', 501);
+    }
+
+    const result = await env.DB.prepare(`UPDATE topic_memory
+      SET match_status = 'confirmed',
+          proposed_match_memory_id = NULL,
+          proposed_match_reason = NULL,
+          updated_at = datetime('now')
+      WHERE memory_id = ? AND match_status = 'pending_review'`)
+      .bind(id)
+      .run();
+
+    if (!result.meta.changes) {
+      return errorResponse('Not found', 404);
+    }
+
+    return jsonResponse({ memoryId: id, decision: 'reject', matchStatus: 'confirmed' });
   },
 };

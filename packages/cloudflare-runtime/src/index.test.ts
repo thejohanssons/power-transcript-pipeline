@@ -9,6 +9,11 @@ function createMockDb() {
   const people: Array<{ meeting_id: string }> = [];
   const actions: Array<{ meeting_id: string }> = [];
   const decisions: Array<{ meeting_id: string }> = [];
+  const topicMemory = new Map<string, {
+    match_status: 'confirmed' | 'pending_review' | 'rejected';
+    proposed_match_memory_id: string | null;
+    proposed_match_reason: string | null;
+  }>();
 
   return {
     meetings,
@@ -16,6 +21,7 @@ function createMockDb() {
     people,
     actions,
     decisions,
+    topicMemory,
     prepare(query: string) {
       return {
         _query: query,
@@ -33,6 +39,17 @@ function createMockDb() {
           return undefined;
         },
         async run() {
+          if (query.startsWith('UPDATE topic_memory')) {
+            const memoryId = this._bound[0] as string;
+            const memory = topicMemory.get(memoryId);
+            if (!memory || memory.match_status !== 'pending_review') {
+              return { success: true, meta: { changes: 0 } };
+            }
+            memory.match_status = 'confirmed';
+            memory.proposed_match_memory_id = null;
+            memory.proposed_match_reason = null;
+            return { success: true, meta: { changes: 1 } };
+          }
           if (query.startsWith('INSERT INTO meetings')) {
             const meetingId = this._bound[0] as string;
             meetings.set(meetingId, {
@@ -391,5 +408,69 @@ describe('POST /v1/meetings', () => {
 
     const realDb = env.DB as unknown as ReturnType<typeof createMockDb>;
     expect(realDb.meetings.get(validSubmission.meetingId)?.state).toBe('pending');
+  });
+});
+
+describe('PATCH /v1/topic-memory/:id/match', () => {
+  const memoryId = 'memory-pending-review';
+
+  function createPendingReviewEnv(): Env {
+    const env = createEnv();
+    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
+    db.topicMemory.set(memoryId, {
+      match_status: 'pending_review',
+      proposed_match_memory_id: 'existing-memory',
+      proposed_match_reason: 'Same entity and overlapping statement',
+    });
+    return env;
+  }
+
+  function makeRequest(decision: 'accept' | 'reject', token = 'test-token'): Request {
+    return new Request(`http://localhost/v1/topic-memory/${memoryId}/match`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ decision, reviewerNote: 'Reviewed by test' }),
+    });
+  }
+
+  test('reject confirms a pending review and clears its proposed match', async () => {
+    const env = createPendingReviewEnv();
+
+    const res = await dispatch(makeRequest('reject'), env);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ memoryId, decision: 'reject', matchStatus: 'confirmed' });
+    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
+    expect(db.topicMemory.get(memoryId)).toEqual({
+      match_status: 'confirmed',
+      proposed_match_memory_id: null,
+      proposed_match_reason: null,
+    });
+  });
+
+  test('accept returns 501 until merge support is implemented', async () => {
+    const res = await dispatch(makeRequest('accept'), createPendingReviewEnv());
+
+    expect(res.status).toBe(501);
+    expect(await res.json()).toEqual({ error: 'Accept merge not yet implemented' });
+  });
+
+  test('returns 401 when the bearer token is incorrect', async () => {
+    const res = await dispatch(makeRequest('reject', 'wrong-token'), createPendingReviewEnv());
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorised' });
+  });
+
+  test('returns 404 when the record does not exist or is not pending review', async () => {
+    const env = createEnv();
+
+    const res = await dispatch(makeRequest('reject'), env);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Not found' });
   });
 });
