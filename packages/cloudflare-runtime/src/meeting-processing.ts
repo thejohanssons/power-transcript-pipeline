@@ -182,12 +182,28 @@ For every topic, populate entityType from the controlled EntityTypes vocabulary 
 REQUIRED: populate entity with the specific named thing being discussed (for example, "Reader 3", "M12 milestone", "Firmware 6.10", or "UK Education market"). Never leave entity null if a specific named entity is mentioned in the transcript.
 
 REQUIRED: topicStatement must be a single complete sentence describing an enduring business condition. It must be specific, not generic. Good: "M12 integration testing is at risk due to Firmware 6.10 approval delays." Bad: "project risk". Never leave topicStatement empty.
+REQUIRED: Every action item must have a non-empty text field describing exactly what needs to be done. Owner alone is not sufficient.
+REQUIRED: Every decision must have a non-empty text field describing what was decided. Never leave text empty.
 
 Use these topic field examples as a pattern. The classification values must be present in the taxonomy vocabulary above, while entity remains the exact named instance from the transcript:
 - entityType: "Project", entity: "M12 milestone", aspect: "Schedule", outcome: "Risk", topicStatement: "M12 integration testing is at risk due to Firmware 6.10 approval delays."
 - entityType: "Product", entity: "Reader 3", aspect: "Quality", outcome: "Issue", topicStatement: "Reader 3 quality validation remains blocked by unresolved defects."
 - entityType: "Technology Platform", entity: "Firmware 6.10", aspect: "Compliance", outcome: "Delay", topicStatement: "Firmware 6.10 approval is delayed pending compliance sign-off."
 - entityType: "Market", entity: "UK Education market", aspect: "Performance", outcome: "Opportunity", topicStatement: "The UK Education market presents a growth opportunity following increased customer demand."
+
+Use these required shapes for top-level actions and decisions:
+actions: [{
+  id: 'string (e.g. ${submission.meetingId}-action-1)',
+  text: 'REQUIRED non-empty string — what specifically needs to be done (e.g. "Confirm with Han Wang whether the cost increase can be reduced by negotiating volume commitments")',
+  owner: 'string|null — canonical name of the person responsible',
+  topicId: 'string|null',
+}],
+decisions: [{
+  id: 'string (e.g. ${submission.meetingId}-decision-1)',
+  text: 'REQUIRED non-empty string — what was decided (e.g. "Reader 3 price will increase by £20 in September to recover Han Wang cost increase")',
+  owner: 'string|null — canonical name of the decision owner',
+  topicId: 'string|null',
+}],
 
 The IDs for topics, people, actions, decisions, and evidence assertions must be deterministic and based on meetingId and the position index. Example: ${submission.meetingId}-topic-1, ${submission.meetingId}-action-1.
 
@@ -215,6 +231,20 @@ function buildMeetingOutput(parsed: unknown, submission: TranscriptSubmission, t
   const actions = ensureArray<unknown>(raw.actions).map((action, index) => normalizeAction(action, meetingId, index));
   const decisions = ensureArray<unknown>(raw.decisions).map((decision, index) => normalizeDecision(decision, meetingId, index));
   const summaryAssertions = buildEvidenceAssertions(raw.summaryAssertions ?? [], `${meetingId}-summary`);
+  const actionWarnings = actions
+    .filter((action) => !action.text)
+    .map((action) => `action ${action.actionId} has empty text — required field`);
+  const decisionWarnings = decisions
+    .filter((decision) => !decision.text)
+    .map((decision) => `decision ${decision.decisionId} has empty text — required field`);
+  const validationReasons = [
+    ...ensureArray<string>(raw.validation?.reasons).map((reason) => normalizeString(reason) ?? '').filter(Boolean),
+    ...actionWarnings,
+    ...decisionWarnings,
+  ];
+  const validationStatus = validationReasons.length > 0
+    ? 'warning'
+    : (normalizeString(raw.validation?.status) as 'pass' | 'warning' | 'fail' | null) ?? 'pass';
 
   return {
     meetingId,
@@ -245,8 +275,8 @@ function buildMeetingOutput(parsed: unknown, submission: TranscriptSubmission, t
     actions,
     decisions,
     validation: {
-      status: normalizeString(raw.validation?.status) as 'pass' | 'warning' | 'fail' ?? 'pass',
-      reasons: ensureArray<string>(raw.validation?.reasons).map((reason) => normalizeString(reason) ?? '').filter(Boolean),
+      status: validationStatus,
+      reasons: validationReasons,
     },
   };
 }

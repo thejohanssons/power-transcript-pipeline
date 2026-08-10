@@ -25,7 +25,7 @@ export interface ProcessingQueueMessage {
 
 export const CONTRACT_VERSION = '1';
 export const RUNTIME_VERSION = '1.0.0';
-export const CLASSIFICATION_PROMPT_VERSION = '2';
+export const CLASSIFICATION_PROMPT_VERSION = '3';
 export const CLASSIFICATION_ENGINE_VERSION = '1';
 export const TOPIC_MATCHING_VERSION = '1';
 export const NORMALISATION_VERSION = '1';

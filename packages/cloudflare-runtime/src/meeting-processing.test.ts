@@ -77,6 +77,10 @@ describe('processMeeting', () => {
     const prompt = JSON.parse(request.body as string).messages[1].content as string;
     expect(prompt).toContain('Never leave entity null if a specific named entity is mentioned in the transcript.');
     expect(prompt).toContain('Never leave topicStatement empty.');
+    expect(prompt).toContain('REQUIRED: Every action item must have a non-empty text field describing exactly what needs to be done. Owner alone is not sufficient.');
+    expect(prompt).toContain('REQUIRED: Every decision must have a non-empty text field describing what was decided. Never leave text empty.');
+    expect(prompt).toContain('REQUIRED non-empty string — what specifically needs to be done');
+    expect(prompt).toContain('REQUIRED non-empty string — what was decided');
     expect(prompt).toContain('entity: "Reader 3"');
     expect(prompt).toContain('M12 integration testing is at risk due to Firmware 6.10 approval delays.');
   });
@@ -121,6 +125,28 @@ describe('processMeeting', () => {
     expect(output.topics[0].topicStatement).toBe('');
     expect(output.topics[0].validation.status).toBe('warning');
     expect(output.topics[0].validation.reasons).toContain('topicStatement is empty — required field');
+  });
+
+  test('empty action and decision text produce meeting validation warnings', async () => {
+    const message = JSON.stringify({
+      topics: [],
+      people: [],
+      actions: [{ actionId: `${submission.meetingId}-action-1`, owner: 'Alice', text: '' }],
+      decisions: [{ decisionId: `${submission.meetingId}-decision-1`, owner: 'Bob', text: '  ' }],
+      summaryAssertions: [],
+      validation: { status: 'pass', reasons: [] },
+    });
+    stubFetch(makeOpenAIResponse(message));
+
+    const output = await processMeeting(submission, 'abc123', env);
+
+    expect(output.actions[0].text).toBe('');
+    expect(output.decisions[0].text).toBe('');
+    expect(output.validation.status).toBe('warning');
+    expect(output.validation.reasons).toEqual([
+      `action ${submission.meetingId}-action-1 has empty text — required field`,
+      `decision ${submission.meetingId}-decision-1 has empty text — required field`,
+    ]);
   });
 
   test('AC3 fenced JSON response is extracted correctly', async () => {
