@@ -1,8 +1,91 @@
 # EIP Platform — Developer Handover and Session State Log
-# Last updated: 2026-08-06 UTC
-# Current branch: main — commit d66a3cc (fix(runtime-shadow): continuous-lane comparison fixes and permitted-difference policy)
-# Completed runtime-shadow snapshot: `origin/develop` commit `d75fedd` (`feat(runtime-shadow): verify direct Azure checkpoint flow`)
+# Last updated: 2026-08-10 UTC
+# Current branch: main — fully pushed, clean working tree
 # Local checkout: `main`; historical branch notes below are not a current Git-state source.
+
+---
+
+## Session Summary — 2026-08-07 to 2026-08-10
+
+### Taxonomy — v0.2 approved and validated
+
+Full taxonomy design session. Topic Classification & Governance Framework v0.2 signed off.
+- 6 axes: Domain (org function), EntityType (business ontology), Aspect (evaluative dimension),
+  Outcome (state), Disposition (response), ExecutiveScope (significance)
+- 2 identity fields: Entity (free text), Topic (enduring business condition)
+- Validation Report v0.2: 175 records, 29 meetings, 8 meeting types — 95%+ coverage all axes
+- Taxonomy promoted to Approved Production Standard
+- Files: `Topic Classification and Governance Framework.txt`,
+  `Topic Classification Framework — Validation Report v0.2.txt`
+- Versioning policy: `plans/versioning-policy.md`
+
+### Decision: abandon shadow lane — build real Cloudflare runtime
+
+Shadow lane (comparison with Azure) abandoned. Decision: build production Cloudflare runtime that
+receives raw transcripts, classifies with v0.2 taxonomy, builds Topic Memory in D1/R2 independently.
+SharePoint/Azure pipeline continues unchanged in parallel.
+
+Implementation plan: `plans/cloudflare-real-runtime-implementation-proposal.md`
+Handover doc: `plans/cloudflare-real-runtime-handover.md`
+
+### Cloudflare Runtime — all 5 phases complete
+
+**Package:** `packages/cloudflare-runtime/`
+**Production Worker:** `https://eip-cloudflare-runtime.homeassistant-8d3.workers.dev`
+**Production D1:** `eip-cloudflare-runtime` (6 tables: meetings, topics, topic_memory, people, actions, decisions)
+**Production R2:** `eip-cloudflare-runtime-output`
+**Queues:** `eip-cloudflare-runtime-processing` (consumer: max_batch_size=1, max_retries=2),
+           `eip-cloudflare-runtime-processing-dlq`
+
+Phase 1 — Submission, validation, D1 persistence, idempotency ✅
+Phase 2 — LLM processing (meeting-processing.ts), topic memory matching (topic-memory.ts),
+           Teams Adaptive Card notifications ✅
+Phase 3 — Pipeline Submit-TranscriptToCloudflare (raw transcript + metadata only) ✅
+Phase 4 — Worker deployed, secrets set (SUBMISSION_TOKEN, AZURE_OPENAI_API_KEY, TEAMS_WEBHOOK_URL) ✅
+Phase 5 — First real meeting completed with meaningful v0.2 output ✅
+
+Key technical fixes during deployment:
+- Azure OpenAI endpoint: strip /openai/v1 suffix, correct path pattern
+- API version: 2024-02-15-preview (not 2023-03-15-preview)
+- max_completion_tokens (not max_tokens) for gpt-5.6-terra
+- Remove temperature parameter (not supported by model)
+- topics table: add outcome, disposition, executive_scope columns to INSERT
+- Queue-based processing: ctx.waitUntil insufficient for full transcripts → moved to Queue consumer
+- Prompt v2: strengthen entity extraction and topicStatement instructions + few-shot examples
+  (CLASSIFICATION_PROMPT_VERSION bumped 1→2)
+
+### First real meeting verified (2026-08-10)
+
+Meeting: `2026-08-07_0600_weekly_progress__pilot_readiness`
+- state: completed ✅
+- classificationPromptVersion: "2" ✅
+- 13 topics with non-empty entity and topic_statement ✅
+- 13 topic_memory records: 12 confirmed, 1 pending_review (M13 match) ✅
+- Matching engine working — Teams notification sent for M13 match
+
+### Next steps (prioritised)
+
+1. Review M13 pending_review match — accept or reject via PATCH /v1/topic-memory/:id/match
+2. Backfill historical meetings — submit TranscriptExport files to build Topic Memory depth
+3. Update Azure Function App CLOUDFLARE_SUBMISSION_TOKEN for overnight automated runs
+4. Monitor overnight run (02:00 UTC 2026-08-11) — confirm meetings appear as completed in D1
+5. Prompt quality review after 10+ real meetings — assess entity/topic_statement consistency
+6. Phase 6 planning — GET /v1/topic-memory and /v1/meetings query endpoints for dashboard
+
+### Role structure
+
+- Peter (product owner): directs, sets objectives, runs pipeline from authenticated terminal
+- Rovo Dev: System Architect / Orchestrator / Reviewer — designs, specifies, reviews code
+- Developer: implements code against specifications, submits for review before merge/deploy
+
+### Runtime Shadow (legacy — staging only)
+
+eip-runtime-shadow-staging: still running, no longer receiving new submissions.
+eip-runtime-shadow (production): still running, receives submissions from old pipeline config
+  but will be superseded by eip-cloudflare-runtime.
+Status: to be deprecated once eip-cloudflare-runtime is proven at scale.
+
+---
 
 ---
 
