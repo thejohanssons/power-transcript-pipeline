@@ -9,7 +9,7 @@ import {
   TAXONOMY_V02,
 } from './types';
 
-const OPENAI_API_VERSION = '2023-03-15-preview';
+const OPENAI_API_VERSION = '2024-02-15-preview';
 
 function extractJsonBlock(text: string): string {
   const trimmed = text.trim();
@@ -244,7 +244,8 @@ export async function processMeeting(
   env: Pick<Env, 'AZURE_OPENAI_ENDPOINT' | 'AZURE_OPENAI_DEPLOYMENT' | 'AZURE_OPENAI_API_KEY'>,
 ): Promise<MeetingOutput> {
   const prompt = buildPrompt(submission, transcriptSha256);
-  const url = `${env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${OPENAI_API_VERSION}`;
+  const resourceRoot = env.AZURE_OPENAI_ENDPOINT.replace(/\/openai(?:\/v\d+)?$/i, '');
+  const url = `${resourceRoot}/openai/deployments/${encodeURIComponent(env.AZURE_OPENAI_DEPLOYMENT)}/chat/completions?api-version=${OPENAI_API_VERSION}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
