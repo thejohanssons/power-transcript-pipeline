@@ -13,7 +13,7 @@ export function buildMeetingRow(
   string,
   string,
   string,
-  string,
+  string | null,
   string | null,
 ] {
   return [
@@ -25,7 +25,7 @@ export function buildMeetingRow(
     submission.eventDate,
     transcriptSha256,
     'pending',
-    '',
+    null,
     outputKey,
   ];
 }
@@ -60,10 +60,11 @@ export function updateMeetingCompletedSql(): string {
 export function insertTopicSql(): string {
   return `INSERT INTO topics (
     topic_id, meeting_id, domain, entity_type, entity, aspect,
+    outcome, disposition, executive_scope,
     topic_statement, summary, key_facts_json, decisions_json,
     actions_json, risks_json, owners_json, confidence,
     validation_status, validation_reasons_json, memory_id
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 }
 
 export function buildTopicRow(topic: TopicRecord, meetingId: string): [
@@ -73,9 +74,11 @@ export function buildTopicRow(topic: TopicRecord, meetingId: string): [
   string | null,
   string | null,
   string | null,
-  string,
+  string | null,
+  string | null,
   string | null,
   string,
+  string | null,
   string,
   string,
   string,
@@ -92,6 +95,9 @@ export function buildTopicRow(topic: TopicRecord, meetingId: string): [
     topic.entityType,
     topic.entity,
     topic.aspect,
+    topic.outcome,
+    topic.disposition,
+    topic.executiveScope,
     topic.topicStatement,
     topic.summary,
     JSON.stringify(topic.keyFacts),
