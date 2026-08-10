@@ -72,6 +72,13 @@ describe('processMeeting', () => {
     expect(output.processing.normalisationVersion).toBe(NORMALISATION_VERSION);
     expect(output.processing.model).toBe(env.AZURE_OPENAI_DEPLOYMENT);
     expect(output.processing.deployment).toBe(env.AZURE_OPENAI_DEPLOYMENT);
+
+    const request = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    const prompt = JSON.parse(request.body as string).messages[1].content as string;
+    expect(prompt).toContain('Never leave entity null if a specific named entity is mentioned in the transcript.');
+    expect(prompt).toContain('Never leave topicStatement empty.');
+    expect(prompt).toContain('entity: "Reader 3"');
+    expect(prompt).toContain('M12 integration testing is at risk due to Firmware 6.10 approval delays.');
   });
 
   test('AC2 invalid vocabulary values are null and warning is added', async () => {
@@ -101,6 +108,19 @@ describe('processMeeting', () => {
     expect(output.topics[0].entityType).toBeNull();
     expect(output.topics[0].validation.status).toBe('warning');
     expect(output.topics[0].validation.reasons.some((reason) => reason.includes('Invalid entityType'))).toBe(true);
+  });
+
+  test('empty topicStatement produces a validation warning', async () => {
+    const message = JSON.stringify({
+      topics: [{ entityType: 'Project', entity: 'M12 milestone', topicStatement: '', keyFacts: [], decisions: [], actions: [], risks: [], owners: [], validation: { status: 'pass', reasons: [] } }],
+      people: [], actions: [], decisions: [], summaryAssertions: [], validation: { status: 'pass', reasons: [] },
+    });
+    stubFetch(makeOpenAIResponse(message));
+
+    const output = await processMeeting(submission, 'abc123', env);
+    expect(output.topics[0].topicStatement).toBe('');
+    expect(output.topics[0].validation.status).toBe('warning');
+    expect(output.topics[0].validation.reasons).toContain('topicStatement is empty — required field');
   });
 
   test('AC3 fenced JSON response is extracted correctly', async () => {

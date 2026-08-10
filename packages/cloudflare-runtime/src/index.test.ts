@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import * as meetingProcessing from './meeting-processing';
 import runtime from './index';
-import type { Env, MeetingOutput, TranscriptSubmission } from './types';
+import type { Env, MeetingOutput, ProcessingQueueMessage, TranscriptSubmission } from './types';
 
 function createMockDb() {
   const meetings = new Map<string, { state: string; error_message?: string; r2_output_key?: string }>();
@@ -140,7 +140,11 @@ function createEnv(state?: string): Env {
     DB: db as unknown as D1Database,
     OUTPUT_BUCKET: {
       put: vi.fn().mockResolvedValue(undefined),
+      get: vi.fn().mockResolvedValue(undefined),
     } as unknown as R2Bucket,
+    PROCESSING_QUEUE: {
+      send: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Queue,
     ENVIRONMENT: 'test',
     AZURE_OPENAI_ENDPOINT: 'https://example.com',
     AZURE_OPENAI_DEPLOYMENT: 'test-deployment',
@@ -257,9 +261,8 @@ describe('POST /v1/meetings', () => {
     expect(env.DB.prepare('').bind().run).toBeDefined();
   });
 
-  test('schedules async processing with waitUntil', async () => {
+  test('sends a queue message after submission', async () => {
     const env = createEnv();
-    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
     const request = new Request('http://localhost/v1/meetings', {
       method: 'POST',
       headers: {
@@ -269,13 +272,12 @@ describe('POST /v1/meetings', () => {
       body: JSON.stringify(validSubmission),
     });
 
-    const res = await runtime.fetch(request, env, ctx);
+    const res = await runtime.fetch(request, env, undefined as any);
     expect(res.status).toBe(202);
-    expect(ctx.waitUntil).toHaveBeenCalled();
-    expect((ctx.waitUntil as any).mock.calls[0][0]).toBeInstanceOf(Promise);
+    expect(env.PROCESSING_QUEUE.send).toHaveBeenCalledWith({ meetingId: validSubmission.meetingId });
   });
 
-  test('AC13 valid submission with successful processing updates meeting to completed', async () => {
+  test('AC13 valid submission creates a pending row and enqueues processing', async () => {
     const env = createEnv();
     const request = new Request('http://localhost/v1/meetings', {
       method: 'POST',
@@ -286,74 +288,55 @@ describe('POST /v1/meetings', () => {
       body: JSON.stringify(validSubmission),
     });
 
-    const processSpy = vi.spyOn(meetingProcessing, 'processMeeting').mockResolvedValue(makeMeetingOutput(0));
-    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
-
-    const res = await runtime.fetch(request, env, ctx);
+    const res = await runtime.fetch(request, env, undefined as any);
     expect(res.status).toBe(202);
-    expect(ctx.waitUntil).toHaveBeenCalled();
-
-    const promised = (ctx.waitUntil as any).mock.calls[0][0] as Promise<unknown>;
-    await promised;
-
     const db = env.DB as unknown as ReturnType<typeof createMockDb>;
-    expect(db.meetings.get(validSubmission.meetingId)?.state).toBe('completed');
-    expect(db.meetings.get(validSubmission.meetingId)?.r2_output_key).toBe(`meetings/${validSubmission.meetingId}/meeting-output.json`);
-    expect(processSpy).toHaveBeenCalled();
+    expect(db.meetings.get(validSubmission.meetingId)?.state).toBe('pending');
+    expect(env.PROCESSING_QUEUE.send).toHaveBeenCalled();
   });
 
-  test('AC14 valid submission with failed processing updates meeting to failed', async () => {
+  test('AC14 valid submission enqueues failed processing if LLM fails in queue handler', async () => {
     const env = createEnv();
-    const request = new Request('http://localhost/v1/meetings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer test-token',
-      },
-      body: JSON.stringify(validSubmission),
-    });
+    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
+    db.meetings.set(validSubmission.meetingId, {
+      state: 'pending',
+      source_system: validSubmission.sourceSystem,
+      native_id: validSubmission.nativeId,
+      subject: validSubmission.subject,
+      organiser: validSubmission.organiser,
+      event_date: validSubmission.eventDate,
+      transcript_sha256: 'abc123',
+    } as any);
+    (env.OUTPUT_BUCKET.get as any).mockResolvedValue({ text: vi.fn().mockResolvedValue(validSubmission.transcript) });
 
     const processSpy = vi.spyOn(meetingProcessing, 'processMeeting').mockRejectedValue(new Error('LLM failed'));
-    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+    await runtime.queue({ messages: [{ body: { meetingId: validSubmission.meetingId }, id: '1', timestamp: new Date(), attempts: 1, ack: () => {}, retry: () => {} }] } as unknown as QueueEvent<ProcessingQueueMessage>, env);
 
-    const res = await runtime.fetch(request, env, ctx);
-    expect(res.status).toBe(202);
-    expect(ctx.waitUntil).toHaveBeenCalled();
-
-    const promised = (ctx.waitUntil as any).mock.calls[0][0] as Promise<unknown>;
-    await promised;
-
-    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
-    const row = db.meetings.get(validSubmission.meetingId);
-    expect(row?.state).toBe('failed');
-    expect(row?.error_message).toContain('LLM failed');
     expect(processSpy).toHaveBeenCalled();
+    expect(db.meetings.get(validSubmission.meetingId)?.state).toBe('failed');
+    expect(db.meetings.get(validSubmission.meetingId)?.error_message).toContain('LLM failed');
   });
 
-  test('AC15 valid submission persists topic rows when processMeeting returns topics', async () => {
+  test('AC15 valid queue processing persists topic rows when processMeeting returns topics', async () => {
     const env = createEnv();
-    const request = new Request('http://localhost/v1/meetings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer test-token',
-      },
-      body: JSON.stringify(validSubmission),
-    });
+    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
+    db.meetings.set(validSubmission.meetingId, {
+      state: 'pending',
+      source_system: validSubmission.sourceSystem,
+      native_id: validSubmission.nativeId,
+      subject: validSubmission.subject,
+      organiser: validSubmission.organiser,
+      event_date: validSubmission.eventDate,
+      transcript_sha256: 'abc123',
+    } as any);
+    (env.OUTPUT_BUCKET.get as any).mockResolvedValue({ text: vi.fn().mockResolvedValue(validSubmission.transcript) });
 
     const outputWithTopics = makeMeetingOutput(2);
-    const processSpy = vi.spyOn(meetingProcessing, 'processMeeting').mockResolvedValue(outputWithTopics);
-    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+    vi.spyOn(meetingProcessing, 'processMeeting').mockResolvedValue(outputWithTopics);
 
-    const res = await runtime.fetch(request, env, ctx);
-    expect(res.status).toBe(202);
+    await runtime.queue({ messages: [{ body: { meetingId: validSubmission.meetingId }, id: '1', timestamp: new Date(), attempts: 1, ack: () => {}, retry: () => {} }] } as unknown as QueueEvent<ProcessingQueueMessage>, env);
 
-    const promised = (ctx.waitUntil as any).mock.calls[0][0] as Promise<unknown>;
-    await promised;
-
-    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
     expect(db.topics.filter((row) => row.meeting_id === validSubmission.meetingId)).toHaveLength(2);
-    expect(processSpy).toHaveBeenCalled();
   });
 
   test('returns 200 already_exists for completed meeting', async () => {

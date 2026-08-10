@@ -84,6 +84,8 @@ function normalizeTopic(
   if (topic.executiveScope && executiveScope === null) warnings.push('Invalid executiveScope');
 
   const topicId = normalizeString(topic.topicId) ?? `${meetingId}-topic-${index + 1}`;
+  const topicStatement = normalizeString(topic.topicStatement) ?? '';
+  if (!topicStatement) warnings.push('topicStatement is empty — required field');
 
   const keyFacts = buildEvidenceAssertions(topic.keyFacts, `${meetingId}-topic-${index + 1}-keyfact`);
   const decisions = buildEvidenceAssertions(topic.decisions, `${meetingId}-topic-${index + 1}-decision`);
@@ -99,7 +101,7 @@ function normalizeTopic(
     outcome,
     disposition,
     executiveScope,
-    topicStatement: normalizeString(topic.topicStatement) ?? '',
+    topicStatement,
     summary: normalizeString(topic.summary),
     keyFacts,
     decisions,
@@ -175,6 +177,17 @@ ${TAXONOMY_V02.executiveScopes.map((item) => `- ${item}`).join('\n')}
 
 Return a single JSON object with these top-level fields:
 meetingId, sourceSystem, nativeId, subject, organiser, eventDate, transcriptSha256, processing, classification, summaryAssertions, topics, people, actions, decisions, validation.
+
+For every topic, populate entityType from the controlled EntityTypes vocabulary and entity as the free-text, specific named instance being discussed.
+REQUIRED: populate entity with the specific named thing being discussed (for example, "Reader 3", "M12 milestone", "Firmware 6.10", or "UK Education market"). Never leave entity null if a specific named entity is mentioned in the transcript.
+
+REQUIRED: topicStatement must be a single complete sentence describing an enduring business condition. It must be specific, not generic. Good: "M12 integration testing is at risk due to Firmware 6.10 approval delays." Bad: "project risk". Never leave topicStatement empty.
+
+Use these topic field examples as a pattern. The classification values must be present in the taxonomy vocabulary above, while entity remains the exact named instance from the transcript:
+- entityType: "Project", entity: "M12 milestone", aspect: "Schedule", outcome: "Risk", topicStatement: "M12 integration testing is at risk due to Firmware 6.10 approval delays."
+- entityType: "Product", entity: "Reader 3", aspect: "Quality", outcome: "Issue", topicStatement: "Reader 3 quality validation remains blocked by unresolved defects."
+- entityType: "Technology Platform", entity: "Firmware 6.10", aspect: "Compliance", outcome: "Delay", topicStatement: "Firmware 6.10 approval is delayed pending compliance sign-off."
+- entityType: "Market", entity: "UK Education market", aspect: "Performance", outcome: "Opportunity", topicStatement: "The UK Education market presents a growth opportunity following increased customer demand."
 
 The IDs for topics, people, actions, decisions, and evidence assertions must be deterministic and based on meetingId and the position index. Example: ${submission.meetingId}-topic-1, ${submission.meetingId}-action-1.
 

@@ -8,6 +8,7 @@
 export interface Env {
   DB: D1Database;
   OUTPUT_BUCKET: R2Bucket;
+  PROCESSING_QUEUE: Queue;
   ENVIRONMENT: string;
   AZURE_OPENAI_ENDPOINT: string;
   AZURE_OPENAI_DEPLOYMENT: string;
@@ -16,11 +17,15 @@ export interface Env {
   TEAMS_WEBHOOK_URL?: string;
 }
 
+export interface ProcessingQueueMessage {
+  meetingId: string;
+}
+
 // ── Version constants ──────────────────────────────────────
 
 export const CONTRACT_VERSION = '1';
 export const RUNTIME_VERSION = '1.0.0';
-export const CLASSIFICATION_PROMPT_VERSION = '1';
+export const CLASSIFICATION_PROMPT_VERSION = '2';
 export const CLASSIFICATION_ENGINE_VERSION = '1';
 export const TOPIC_MATCHING_VERSION = '1';
 export const NORMALISATION_VERSION = '1';

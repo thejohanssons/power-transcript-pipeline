@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Cloudflare runtime classification prompt**: Strengthened required extraction of the free-text `entity` and enduring `topicStatement` fields, including v0.2 taxonomy-aligned few-shot examples. Bumped `classificationPromptVersion` to `"2"`.
+
+---
+
 ## [1.9.1] — 2026-07-28
 
 ### Fixed

@@ -1,4 +1,5 @@
-import type { Env, TranscriptSubmission } from './types';
+import type { Env, TranscriptSubmission, ProcessingQueueMessage } from './types';
+import type { Message, QueueEvent } from '@cloudflare/workers-types';
 import { RUNTIME_VERSION } from './types';
 import { isTranscriptSubmission } from './validation';
 import {
@@ -52,7 +53,7 @@ async function enableForeignKeys(db: D1Database): Promise<void> {
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, _ctx?: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
@@ -67,7 +68,7 @@ export default {
       }
 
       if (path === '/v1/meetings' && method === 'POST') {
-        return this.handlePostMeeting(request, env, ctx);
+        return this.handlePostMeeting(request, env);
       }
 
       if (path === '/v1/topic-memory' && method === 'GET') {
@@ -86,7 +87,7 @@ export default {
     }
   },
 
-  async handlePostMeeting(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
+  async handlePostMeeting(request: Request, env: Env): Promise<Response> {
     const auth = request.headers.get('Authorization');
     if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
       return errorResponse('Unauthorised', 401);
@@ -99,15 +100,25 @@ export default {
 
     const submission = body as TranscriptSubmission;
     const transcriptSha256 = await computeSha256(submission.transcript);
+    const transcriptKey = `meetings/${submission.meetingId}/transcript.txt`;
 
     await enableForeignKeys(env.DB);
-    const existing = await env.DB.prepare('SELECT state FROM meetings WHERE meeting_id = ?')
+    const existing = await env.DB.prepare('SELECT state, updated_at FROM meetings WHERE meeting_id = ?')
       .bind(submission.meetingId)
-      .first<{ state: string }>();
+      .first<{ state: string; updated_at: string | null }>();
+
+    if (existing?.state === 'processing' && this.isStaleProcessing(existing.updated_at)) {
+      await env.DB.prepare(updateMeetingFailureSql()).bind('failed', 'stale processing recovery', submission.meetingId).run();
+      existing.state = 'failed';
+    }
 
     if (existing?.state === 'completed' || existing?.state === 'processing' || existing?.state === 'pending') {
       return jsonResponse({ meetingId: submission.meetingId, state: existing.state, already_exists: true }, 200);
     }
+
+    await env.OUTPUT_BUCKET.put(transcriptKey, submission.transcript, {
+      httpMetadata: { contentType: 'text/plain; charset=utf-8' },
+    });
 
     if (existing?.state === 'failed') {
       const insert = insertMeetingSql();
@@ -120,24 +131,86 @@ export default {
         env.DB.prepare('DELETE FROM meetings WHERE meeting_id = ?').bind(submission.meetingId),
         env.DB.prepare(insert).bind(...buildMeetingRow(submission, transcriptSha256, null)),
       ]);
-
-      if (ctx?.waitUntil) {
-        ctx.waitUntil(this.processAndPersist(submission, transcriptSha256, env));
-      }
-
-      return jsonResponse({ meetingId: submission.meetingId, state: 'pending' }, 202);
+    } else {
+      const insert = insertMeetingSql();
+      await env.DB.prepare(insert)
+        .bind(...buildMeetingRow(submission, transcriptSha256, null))
+        .run();
     }
 
-    const insert = insertMeetingSql();
-    await env.DB.prepare(insert)
-      .bind(...buildMeetingRow(submission, transcriptSha256, null))
-      .run();
-
-    if (ctx?.waitUntil) {
-      ctx.waitUntil(this.processAndPersist(submission, transcriptSha256, env));
-    }
-
+    await env.PROCESSING_QUEUE.send({ meetingId: submission.meetingId });
     return jsonResponse({ meetingId: submission.meetingId, state: 'pending' }, 202);
+  },
+
+  async queue(queueEvent: QueueEvent<ProcessingQueueMessage>, env: Env): Promise<void> {
+    for (const message of queueEvent.messages) {
+      await this.handleQueueMessage(message, env);
+    }
+  },
+
+  async handleQueueMessage(message: Message<ProcessingQueueMessage>, env: Env): Promise<void> {
+    const payload = message.body;
+    if (!payload?.meetingId) {
+      console.error('Queue message missing meetingId');
+      return;
+    }
+
+    const meetingRow = await env.DB.prepare('SELECT source_system, native_id, subject, organiser, event_date, transcript_sha256, state, updated_at FROM meetings WHERE meeting_id = ?')
+      .bind(payload.meetingId)
+      .first<{
+        source_system: string;
+        native_id: string;
+        subject: string;
+        organiser: string;
+        event_date: string;
+        transcript_sha256: string;
+        state: string;
+        updated_at: string | null;
+      }>();
+
+    if (!meetingRow) {
+      console.error('Queue message references missing meeting row:', payload.meetingId);
+      return;
+    }
+
+    if (meetingRow.state === 'completed') {
+      return;
+    }
+
+    if (meetingRow.state === 'processing') {
+      if (!this.isStaleProcessing(meetingRow.updated_at)) {
+        return;
+      }
+      await env.DB.prepare(updateMeetingFailureSql()).bind('failed', 'stale processing recovery', payload.meetingId).run();
+    }
+
+    const transcriptKey = `meetings/${payload.meetingId}/transcript.txt`;
+    const transcriptObject = await env.OUTPUT_BUCKET.get(transcriptKey);
+    if (!transcriptObject) {
+      await env.DB.prepare(updateMeetingFailureSql()).bind('failed', 'transcript missing from R2', payload.meetingId).run();
+      console.error('Transcript missing for meeting:', payload.meetingId);
+      return;
+    }
+
+    const transcript = await transcriptObject.text();
+    const submission: TranscriptSubmission = {
+      meetingId: payload.meetingId,
+      sourceSystem: meetingRow.source_system,
+      nativeId: meetingRow.native_id,
+      subject: meetingRow.subject,
+      organiser: meetingRow.organiser,
+      eventDate: meetingRow.event_date,
+      transcript,
+    };
+
+    await this.processAndPersist(submission, meetingRow.transcript_sha256, env);
+  },
+
+  isStaleProcessing(updatedAt: string | null | undefined, thresholdMinutes = 5): boolean {
+    if (!updatedAt) return false;
+    const timestamp = Date.parse(updatedAt);
+    if (Number.isNaN(timestamp)) return false;
+    return Date.now() - timestamp > thresholdMinutes * 60_000;
   },
 
   async processAndPersist(submission: TranscriptSubmission, transcriptSha256: string, env: Env): Promise<void> {
