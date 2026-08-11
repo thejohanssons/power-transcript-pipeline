@@ -15,6 +15,8 @@ function createMockDb() {
     proposed_match_reason: string | null;
   }>();
 
+  const preparedQueries: string[] = [];
+
   return {
     meetings,
     topics,
@@ -22,7 +24,9 @@ function createMockDb() {
     actions,
     decisions,
     topicMemory,
+    preparedQueries,
     prepare(query: string) {
+      preparedQueries.push(query);
       return {
         _query: query,
         _bound: [] as unknown[],
@@ -386,6 +390,31 @@ describe('POST /v1/meetings', () => {
     const res = await dispatch(request, env);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ meetingId: validSubmission.meetingId, state: 'pending', already_exists: true });
+  });
+
+  test('failed resubmission deletes all children in dependency order before recreating the meeting', async () => {
+    const env = createEnv('failed');
+    const request = new Request('http://localhost/v1/meetings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer test-token',
+      },
+      body: JSON.stringify(validSubmission),
+    });
+
+    const res = await dispatch(request, env);
+
+    expect(res.status).toBe(202);
+    const db = env.DB as unknown as ReturnType<typeof createMockDb>;
+    expect(db.preparedQueries.filter((query) => query.startsWith('DELETE FROM '))).toEqual([
+      'DELETE FROM actions WHERE meeting_id = ?',
+      'DELETE FROM decisions WHERE meeting_id = ?',
+      'DELETE FROM people WHERE meeting_id = ?',
+      'DELETE FROM topic_memory WHERE first_seen_meeting_id = ?',
+      'DELETE FROM topics WHERE meeting_id = ?',
+      'DELETE FROM meetings WHERE meeting_id = ?',
+    ]);
   });
 
   test('allows resubmission for failed meeting', async () => {

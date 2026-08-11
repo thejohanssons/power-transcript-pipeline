@@ -45,6 +45,22 @@ export function insertMeetingSql(): string {
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 }
 
+export function deleteMeetingChildrenSql(): {
+  actions: string;
+  decisions: string;
+  people: string;
+  topicMemory: string;
+  topics: string;
+} {
+  return {
+    actions: 'DELETE FROM actions WHERE meeting_id = ?',
+    decisions: 'DELETE FROM decisions WHERE meeting_id = ?',
+    people: 'DELETE FROM people WHERE meeting_id = ?',
+    topicMemory: 'DELETE FROM topic_memory WHERE first_seen_meeting_id = ?',
+    topics: 'DELETE FROM topics WHERE meeting_id = ?',
+  };
+}
+
 export function updateMeetingStateSql(): string {
   return 'UPDATE meetings SET state = ?, updated_at = datetime(\'now\') WHERE meeting_id = ?';
 }

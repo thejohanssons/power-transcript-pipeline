@@ -4,6 +4,7 @@ import { RUNTIME_VERSION } from './types';
 import { isTranscriptSubmission } from './validation';
 import {
   buildMeetingRow,
+  deleteMeetingChildrenSql,
   insertMeetingSql,
   updateMeetingCompletedSql,
   updateMeetingFailureSql,
@@ -121,15 +122,15 @@ export default {
     });
 
     if (existing?.state === 'failed') {
-      const insert = insertMeetingSql();
+      const sqls = deleteMeetingChildrenSql();
       await env.DB.batch([
-        env.DB.prepare('DELETE FROM actions WHERE meeting_id = ?').bind(submission.meetingId),
-        env.DB.prepare('DELETE FROM decisions WHERE meeting_id = ?').bind(submission.meetingId),
-        env.DB.prepare('DELETE FROM people WHERE meeting_id = ?').bind(submission.meetingId),
-        env.DB.prepare('DELETE FROM topics WHERE meeting_id = ?').bind(submission.meetingId),
-        env.DB.prepare('DELETE FROM topic_memory WHERE first_seen_meeting_id = ?').bind(submission.meetingId),
+        env.DB.prepare(sqls.actions).bind(submission.meetingId),
+        env.DB.prepare(sqls.decisions).bind(submission.meetingId),
+        env.DB.prepare(sqls.people).bind(submission.meetingId),
+        env.DB.prepare(sqls.topicMemory).bind(submission.meetingId),
+        env.DB.prepare(sqls.topics).bind(submission.meetingId),
         env.DB.prepare('DELETE FROM meetings WHERE meeting_id = ?').bind(submission.meetingId),
-        env.DB.prepare(insert).bind(...buildMeetingRow(submission, transcriptSha256, null)),
+        env.DB.prepare(insertMeetingSql()).bind(...buildMeetingRow(submission, transcriptSha256, null)),
       ]);
     } else {
       const insert = insertMeetingSql();
