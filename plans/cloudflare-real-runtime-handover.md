@@ -1,7 +1,7 @@
 # Cloudflare Runtime — Handover Document
 
-**Last updated:** 2026-08-10  
-**Status:** Production live. All 5 phases complete. Topic Memory populated.
+**Last updated:** 2026-08-11  
+**Status:** Production live. All 5 phases complete. Topic Memory populated. Daily overnight runs active.
 
 ---
 
@@ -17,14 +17,17 @@
 
 ---
 
-## Current Topic Memory state (2026-08-10)
+## Current Topic Memory state (2026-08-11)
 
 | Metric | Value |
 |---|---|
-| Meetings processed | 72 |
-| Topic Memory records | 516 confirmed |
+| Meetings processed | 67 completed + 21 processing (backfill queue draining) |
+| Topic Memory records | 563 confirmed |
 | Pending review | 0 |
-| Date range covered | 2026-01-05 to 2026-08-10 |
+| Date range covered | 2026-01-05 to 2026-08-11 |
+| Active prompt version | 3 (action/decision text required) |
+| Overnight pipeline | ✅ Running — 7 meetings processed 2026-08-11 02:07 UTC |
+| Teams match notifications | ✅ Working — Vivoka match fired automatically |
 
 ---
 
@@ -92,6 +95,26 @@ Azure Pipeline (daily 02:00 UTC)
 - **Peter (product owner):** Directs, sets objectives, runs pipeline from authenticated terminal, reviews topic matches
 - **Rovo Dev (orchestrator/reviewer):** Designs, specifies, reviews code. Does not implement.
 - **Developer:** Implements against specifications, submits for review before merge/deploy
+
+---
+
+## Changelog — post-deployment fixes
+
+### 2026-08-11
+- **Prompt v3** — added REQUIRED instructions for action/decision `text` fields with good/bad examples. `validation.status` degrades to `warning` when text is empty. `CLASSIFICATION_PROMPT_VERSION` bumped `2` → `3`.
+- **Duplicate child records fix** — `deleteMeetingChildrenSql()` now cleans `actions`, `decisions`, `people`, `topic_memory`, `topics` before failed meeting resubmission. 38 duplicate actions + 22 duplicate decisions cleaned from production D1.
+- **PATCH /v1/topic-memory/:id/match** — `reject` implemented. `accept` returns `501` (Phase 6). Teams review workflow verified end-to-end.
+- **Backfill** — 69 historical meetings submitted (2026-01-05 to 2026-08-07). ~40 July-August meetings reset and reprocessed with prompt v3.
+- **Topic Memory state** — 563 confirmed records, 0 pending review. 88 match proposals reviewed (bulk accepted/rejected).
+
+### 2026-08-10
+- **Queue-based processing** — `ctx.waitUntil` insufficient for full transcripts. Moved to Cloudflare Queue consumer (`eip-cloudflare-runtime-processing`, `max_batch_size: 1`, `max_retries: 2`).
+- **Prompt v2** — strengthened `entity` extraction and `topicStatement` enduring-condition instructions + few-shot examples. `CLASSIFICATION_PROMPT_VERSION` bumped `1` → `2`.
+- **Azure OpenAI endpoint** — correct URL pattern (strip `/openai/v1`, use deployment path).
+- **`max_completion_tokens`** — replaces `max_tokens` (gpt-5.6-terra requirement). Set to 8000.
+- **`temperature`** — removed (not supported by model).
+- **`topics` table** — `outcome`, `disposition`, `executive_scope` columns added to INSERT.
+- **Initial production deployment** — smoke test verified, first real meeting completed.
 
 ---
 
