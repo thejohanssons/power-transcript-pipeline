@@ -2,6 +2,14 @@
 
 An automated PowerShell-based pipeline that fetches Microsoft Teams meeting transcripts via Microsoft Graph and uploads them to SharePoint. This project is specifically designed to run as an **Azure Function** (PowerShell 7.4) using a daily timer trigger.
 
+## Architecture Positioning
+
+The Azure Function and PowerShell pipeline are the primary production system. They retrieve transcripts through the supported intake paths, process them, and create the established structured artefacts, logs, and records in SharePoint.
+
+Cloudflare D1/R2 processing is an independent, asynchronous extension for validating a possible future migration target. After the Azure pipeline completes its existing processing and SharePoint work, it may submit raw transcript content and meeting metadata to Cloudflare for separate processing. Cloudflare must not block, replace, or become the system of record for the Azure-to-SharePoint workflow until an explicit migration decision is made.
+
+For the current Cloudflare runtime status, boundaries, and migration-validation work, see [Cloudflare Runtime Handover](plans/cloudflare-real-runtime-handover.md).
+
 ## 🏗 Architecture
 
 ```mermaid

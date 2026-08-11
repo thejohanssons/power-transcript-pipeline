@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EIP ExCo Cockpit — POC</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Header -->
+  <header class="cockpit-header">
+    <h1>EIP ExCo Cockpit</h1>
+    <span class="poc-badge">Synthetic Data POC</span>
+    <span style="flex:1;"></span>
+    <span id="feedback-count" class="feedback-count" aria-live="polite">0</span>
+    <span style="font-size:12px;color:var(--color-text-muted);margin-left:4px;">feedback</span>
+  </header>
+
+  <!-- Primary tab navigation — exactly two tabs -->
+  <nav class="tab-nav" role="tablist" aria-label="Cockpit sections">
+    <button class="tab-btn" role="tab" id="tab-overview"
+      aria-controls="panel-overview" aria-selected="true" tabindex="0">
+      Overview
+    </button>
+    <button class="tab-btn" role="tab" id="tab-all-content"
+      aria-controls="panel-all-content" aria-selected="false" tabindex="-1">
+      All Content
+    </button>
+  </nav>
+
+  <!-- Main content -->
+  <main class="cockpit-main" id="cockpit-main">
+
+    <!-- ── Overview panel ────────────────────────────────── -->
+    <section id="panel-overview" class="tab-panel active"
+      role="tabpanel" aria-labelledby="tab-overview">
+      <div class="loading" id="overview-loading">Loading overview…</div>
+    </section>
+
+    <!-- ── All Content panel ─────────────────────────────── -->
+    <section id="panel-all-content" class="tab-panel"
+      role="tabpanel" aria-labelledby="tab-all-content">
+
+      <!-- Filter bar -->
+      <div class="filter-bar" id="filter-bar" role="search" aria-label="Content filters">
+        <div class="filter-row">
+
+          <!-- Content type filter -->
+          <div class="filter-group">
+            <label class="filter-label" for="filter-type">Type</label>
+            <select class="filter-select" id="filter-type" aria-label="Content type filter">
+              <option value="">All types</option>
+              <option value="Meeting">Meeting</option>
+              <option value="Topic">Topic</option>
+              <option value="Decision">Decision</option>
+              <option value="Action">Action</option>
+              <option value="Risk">Risk</option>
+              <option value="Topic Memory">Topic Memory</option>
+            </select>
+          </div>
+
+          <!-- Meeting filter -->
+          <div class="filter-group">
+            <label class="filter-label" for="filter-meeting">Meeting</label>
+            <select class="filter-select" id="filter-meeting" aria-label="Meeting filter">
+              <option value="">All meetings</option>
+            </select>
+          </div>
+
+          <!-- Domain filter -->
+          <div class="filter-group">
+            <label class="filter-label" for="filter-domain">Domain</label>
+            <select class="filter-select" id="filter-domain" aria-label="Domain filter">
+              <option value="">All domains</option>
+            </select>
+          </div>
+
+          <!-- Entity family filter (maps to entityType field) -->
+          <div class="filter-group">
+            <label class="filter-label" for="filter-entity-family">Entity family</label>
+            <select class="filter-select" id="filter-entity-family" aria-label="Entity family filter">
+              <option value="">All entity types</option>
+            </select>
+          </div>
+
+          <!-- Keyword search -->
+          <div class="filter-group filter-group-keyword">
+            <label class="filter-label" for="filter-keyword">Keyword</label>
+            <input type="search" class="filter-input" id="filter-keyword"
+              placeholder="Search all content…" aria-label="Keyword search" />
+          </div>
+
+          <!-- Clear all -->
+          <div class="filter-group" style="align-self:flex-end;">
+            <button class="btn-secondary" id="filter-clear" aria-label="Clear all filters">Clear all</button>
+          </div>
+
+        </div>
+
+        <!-- Filter summary + result count -->
+        <div class="filter-summary" id="filter-summary" role="status" aria-live="polite" aria-atomic="true"></div>
+      </div>
+
+      <!-- Results -->
+      <div id="all-content-results">
+        <div class="loading">Loading content…</div>
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+
+<!-- Evidence modal -->
+<div class="modal-overlay" id="evidence-modal" role="dialog"
+  aria-modal="true" aria-labelledby="evidence-modal-title" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="evidence-modal-title">Evidence</h2>
+      <button class="modal-close" id="evidence-modal-close" aria-label="Close evidence">×</button>
+    </div>
+    <div class="modal-body" id="evidence-modal-body">
+      <div class="loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Feedback panel -->
+<aside class="feedback-panel" id="feedback-panel"
+  role="complementary" aria-label="Session feedback" aria-hidden="true">
+  <div class="feedback-panel-header">
+    <span class="feedback-panel-title">Session Feedback</span>
+    <button class="modal-close" id="feedback-panel-close" aria-label="Close feedback">×</button>
+  </div>
+  <div class="feedback-panel-body">
+
+    <div class="feedback-session-notice" role="status">
+      ⚠ Feedback is stored in browser memory only. It will be lost on refresh,
+      browser close, or navigation reload. Export before closing.
+    </div>
+
+    <!-- Feedback form -->
+    <div class="feedback-form" id="feedback-form-section">
+      <div class="feedback-form-title" id="feedback-target-label">Select an item to give feedback</div>
+      <div class="form-group">
+        <label class="form-label" for="feedback-verdict">Verdict <span aria-hidden="true">*</span></label>
+        <select class="form-select" id="feedback-verdict" aria-required="true">
+          <option value="">— select —</option>
+          <option value="accurate">Accurate</option>
+          <option value="incomplete">Incomplete</option>
+          <option value="incorrect">Incorrect</option>
+          <option value="irrelevant">Irrelevant</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="feedback-field">Affected field <span aria-hidden="true">*</span></label>
+        <select class="form-select" id="feedback-field" aria-required="true">
+          <option value="">— select —</option>
+          <option value="overall">Overall</option>
+          <option value="text">Text / Statement</option>
+          <option value="owner">Owner</option>
+          <option value="entity">Entity</option>
+          <option value="entityType">Entity Type</option>
+          <option value="aspect">Aspect</option>
+          <option value="outcome">Outcome</option>
+          <option value="disposition">Disposition</option>
+          <option value="executiveScope">Executive Scope</option>
+          <option value="keyFacts">Key Facts</option>
+          <option value="risks">Risks</option>
+          <option value="decisions">Decisions</option>
+          <option value="actions">Actions</option>
+          <option value="validation">Validation</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="feedback-notes">Notes <span aria-hidden="true">*</span></label>
+        <textarea class="form-textarea" id="feedback-notes"
+          placeholder="Describe what is accurate, missing, incorrect, or irrelevant…"
+          aria-required="true"></textarea>
+      </div>
+      <div id="feedback-error" role="alert" style="color:var(--color-risk);font-size:12px;margin-bottom:8px;"></div>
+      <button class="btn-primary" id="feedback-save" disabled aria-disabled="true">Save Feedback</button>
+    </div>
+
+    <!-- Feedback list -->
+    <hr style="margin:16px 0;border:none;border-top:1px solid var(--color-border);" />
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:12px;font-weight:600;">Recorded this session</span>
+    </div>
+    <ul class="feedback-list" id="feedback-list" aria-live="polite"></ul>
+
+    <div class="feedback-actions">
+      <button class="btn-secondary" id="feedback-export">Export JSON</button>
+      <button class="btn-secondary" id="feedback-reset"
+        style="color:var(--color-risk);border-color:var(--color-risk);">Reset</button>
+    </div>
+
+  </div>
+</aside>
+
+<!-- Feedback toggle button -->
+<button class="feedback-toggle" id="feedback-toggle"
+  aria-label="Open session feedback panel" aria-expanded="false">
+  Feedback<span id="feedback-toggle-count"></span>
+</button>
+
+<script src="/app.js"></script>
+</body>
+</html>
