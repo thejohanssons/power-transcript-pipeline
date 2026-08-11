@@ -235,11 +235,11 @@ function buildAllItems() {
   });
 
   // Topic Memory
-  // Topic Memory does not carry a domain — it is an enduring condition record,
-  // not directly owned by a domain. Domain filtering on Topic Memory is intentionally
-  // excluded: a Topic Memory item appears in Domain filter results only if its
-  // entityType matches the Entity Family filter. Users wishing to filter memory
-  // by domain should use the Entity Family filter instead.
+  // Topic Memory: Domain filter explicitly excludes all Topic Memory records.
+  // No domain is extracted from or derivable for memory records — they are
+  // enduring condition records without an organisational owner field.
+  // The Domain filter select will never match Topic Memory items.
+  // Use the Entity Family filter (on entityType) or Keyword to find relevant memories.
   memories.forEach(m => items.push({
     _type: 'Topic Memory',
     _id: m.memoryId,
@@ -249,7 +249,7 @@ function buildAllItems() {
     ].filter(s => s && !notExtracted(s)).join(' ').toLowerCase(),
     _meetingId: m.firstSeenMeetingId,
     _lastMeetingId: m.lastSeenMeetingId,
-    _domain: null, // intentionally null — see above comment
+    _domain: null, // explicitly excluded — no domain extracted for Topic Memory
     _entityFamily: m.entityType,
     _stateValue: m.matchStatus,
     data: m,

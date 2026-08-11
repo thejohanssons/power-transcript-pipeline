@@ -472,271 +472,260 @@ describe('Overview card deep links', () => {
   }
 });
 
+// ── FIXTURE-BASED CONSTANTS for deterministic assertions ──────
+// These values come from FIXTURE_TOPICS in src/fixtures.ts.
+// fx-topic-001: domain=Product Management, entityType=Product, entity=fx-product-alpha
+// fx-topic-003: domain=Finance, entityType=Metric, entity=fx-metric-gross-margin
+// fx-decision-001: topicDomain=Finance, topicEntityType=Metric (linked to fx-topic-003)
+// fx-decision-002: topicDomain=Product Management, topicEntityType=Product
+// fx-action-001: topicDomain=Product Management, topicEntityType=Product
+// fx-risk-proxy-001: topicDomain=Product Management (linked to fx-topic-001)
+// fx-memory-001: firstSeenMeetingId=fx-meeting-001, lastSeenMeetingId=fx-meeting-002 (spans both)
+// fx-memory-002: firstSeenMeetingId=fx-meeting-001, lastSeenMeetingId=fx-meeting-001 (single meeting)
+
 describe('All Content — Meeting and Topic type filters', () => {
   let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => { ({ dom, window } = buildDOM()); await waitForInit(); window.document.getElementById('tab-all-content')!.click(); });
+  afterEach(() => dom.window.close());
 
-  beforeEach(() => {
-    ({ dom, window } = buildDOM());
-  });
-
-  afterEach(() => {
-    dom.window.close();
-  });
-
-  it('type filter to Meeting shows meetings', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
+  it('type filter to Meeting shows exactly 2 meeting cards (fixture has 2)', async () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect!.value = 'Meeting';
     typeSelect!.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThan(0);
-    cards.forEach(card => {
-      expect(card.textContent).toBeTruthy();
-    });
+    const results = window.document.getElementById('all-content-results')!;
+    // Should show Meeting section header + 2 meeting cards
+    expect(results.innerHTML).toContain('Synthetic ExCo Review');
+    expect(results.innerHTML).toContain('Product &amp; Delivery');
+    expect(results.innerHTML).toContain('Commercial &amp; Finance');
+    // Should NOT show Decision section (exclusive filter)
+    expect(results.innerHTML).not.toContain('content-type-title">Decision');
   });
 
-  it('type filter to Topic shows topics', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
+  it('type filter to Topic shows exactly 6 topic cards (fixture has 6)', async () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect!.value = 'Topic';
     typeSelect!.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThan(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-topic-001 topic statement must appear
+    expect(results.innerHTML).toContain('fx-product-alpha September delivery is at risk');
+    // Should NOT show Meeting or Decision sections
+    expect(results.innerHTML).not.toContain('content-type-title">Meeting');
+    expect(results.innerHTML).not.toContain('content-type-title">Decision');
   });
 
-  it('Topic cards contain domain and entityType from fixture data', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
+  it('Topic cards show domain and entityType from actual fixture data', async () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect!.value = 'Topic';
     typeSelect!.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThan(0);
-    // At least one topic card should have domain or entityType in its text
-    let foundWithDomainOrType = false;
-    cards.forEach(card => {
-      const text = card.textContent || '';
-      if (text.includes('[') && text.includes(']')) {
-        foundWithDomainOrType = true;
-      }
-    });
-    expect(foundWithDomainOrType).toBe(true);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-topic-001 has domain=Product Management and entityType=Product
+    expect(results.innerHTML).toContain('Product Management');
+    expect(results.innerHTML).toContain('[Product]');
   });
 });
 
 describe('Domain filter option population', () => {
   let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => { ({ dom, window } = buildDOM()); await waitForInit(); });
+  afterEach(() => dom.window.close());
 
-  beforeEach(() => {
-    ({ dom, window } = buildDOM());
+  it('Domain select contains Finance option (from fx-topic-003)', async () => {
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    const optionValues = Array.from(domainSelect.querySelectorAll('option')).map(o => o.value);
+    expect(optionValues).toContain('Finance');
+    expect(optionValues).toContain('Product Management');
+    expect(optionValues[0]).toBe(''); // Default empty option is first
   });
 
-  afterEach(() => {
-    dom.window.close();
-  });
-
-  it('Domain select is populated with options from topic domains', async () => {
-    await waitForInit();
-    const domainSelect = window.document.getElementById('filter-domain');
-    const options = domainSelect!.querySelectorAll('option');
-    expect(options.length).toBeGreaterThan(1); // At least default + one domain
-    const optionValues = Array.from(options).map(o => o.value);
-    expect(optionValues[0]).toBe(''); // Default empty option
-  });
-
-  it('Entity family select is populated with entityType values', async () => {
-    await waitForInit();
-    const efSelect = window.document.getElementById('filter-entity-family');
-    const options = efSelect!.querySelectorAll('option');
-    expect(options.length).toBeGreaterThan(1); // At least default + one entity type
-    const optionValues = Array.from(options).map(o => o.value);
-    expect(optionValues[0]).toBe(''); // Default empty option
+  it('Entity family select contains Product and Metric options (from fixtures)', async () => {
+    const efSelect = window.document.getElementById('filter-entity-family')!;
+    const optionValues = Array.from(efSelect.querySelectorAll('option')).map(o => o.value);
+    expect(optionValues).toContain('Product');
+    expect(optionValues).toContain('Metric');
+    expect(optionValues[0]).toBe('');
   });
 });
 
-describe('Domain and Entity Family filters', () => {
+describe('Domain and Entity Family filters — deterministic', () => {
   let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => { ({ dom, window } = buildDOM()); await waitForInit(); window.document.getElementById('tab-all-content')!.click(); });
+  afterEach(() => dom.window.close());
 
-  beforeEach(() => {
-    ({ dom, window } = buildDOM());
-  });
-
-  afterEach(() => {
-    dom.window.close();
-  });
-
-  it('domain filter to Finance shows Finance items', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const domainSelect = window.document.getElementById('filter-domain');
-    const options = Array.from(domainSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return; // Skip if no domains available
-    domainSelect!.value = options[0].value;
-    domainSelect!.dispatchEvent(new window.Event('change'));
+  it('Domain=Finance returns Finance topics and Finance decisions — excludes Product Management', async () => {
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Finance';
+    domainSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-topic-003 is Finance — its topic statement must appear
+    expect(results.innerHTML).toContain('Gross margin');
+    // fx-topic-001 is Product Management — must NOT appear
+    expect(results.innerHTML).not.toContain('fx-product-alpha September delivery');
+    // Not empty
+    expect(results.innerHTML).not.toContain('No items match');
   });
 
-  it('entity family filter to Product shows Product items', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const efSelect = window.document.getElementById('filter-entity-family');
-    const options = Array.from(efSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return; // Skip if no entity types available
-    efSelect!.value = options[0].value;
-    efSelect!.dispatchEvent(new window.Event('change'));
+  it('Entity family=Product returns Product topics and Product-linked items', async () => {
+    const efSelect = window.document.getElementById('filter-entity-family')!;
+    efSelect.value = 'Product';
+    efSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-topic-001 has entityType=Product
+    expect(results.innerHTML).toContain('fx-product-alpha');
+    // fx-topic-003 has entityType=Metric — must NOT appear
+    expect(results.innerHTML).not.toContain('Gross margin for fx-product-alpha');
+    expect(results.innerHTML).not.toContain('No items match');
   });
 
-  it('domain + entity family conjunctive filter', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const domainSelect = window.document.getElementById('filter-domain');
-    const efSelect = window.document.getElementById('filter-entity-family');
-    const domainOptions = Array.from(domainSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    const efOptions = Array.from(efSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (domainOptions.length === 0 || efOptions.length === 0) return;
-    domainSelect!.value = domainOptions[0].value;
-    domainSelect!.dispatchEvent(new window.Event('change'));
-    efSelect!.value = efOptions[0].value;
-    efSelect!.dispatchEvent(new window.Event('change'));
+  it('Domain=Finance + EntityFamily=Metric conjunctive filter returns Finance/Metric items only', async () => {
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Finance';
+    domainSelect.dispatchEvent(new window.Event('change'));
+    const efSelect = window.document.getElementById('filter-entity-family')!;
+    efSelect.value = 'Metric';
+    efSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-topic-003 is Finance/Metric — must appear
+    expect(results.innerHTML).toContain('Gross margin');
+    // Product Management items must not appear
+    expect(results.innerHTML).not.toContain('fx-product-alpha September delivery');
   });
 
-  it('Domain filter propagates to Decisions via topicDomain', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const typeSelect = window.document.getElementById('filter-type');
-    typeSelect!.value = 'Decision';
-    typeSelect!.dispatchEvent(new window.Event('change'));
-    const domainSelect = window.document.getElementById('filter-domain');
-    const options = Array.from(domainSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return;
-    domainSelect!.value = options[0].value;
-    domainSelect!.dispatchEvent(new window.Event('change'));
+  it('Domain=Finance propagates to Decisions linked to Finance topics', async () => {
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Decision';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Finance';
+    domainSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-decision-001 has topicDomain=Finance — must appear
+    expect(results.innerHTML).toContain('Gross margin recovery plan');
+    // fx-decision-002 has topicDomain=Product Management — must NOT appear
+    expect(results.innerHTML).not.toContain('Emergency review');
   });
 
-  it('Domain filter propagates to Actions via topicDomain', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const typeSelect = window.document.getElementById('filter-type');
-    typeSelect!.value = 'Action';
-    typeSelect!.dispatchEvent(new window.Event('change'));
-    const domainSelect = window.document.getElementById('filter-domain');
-    const options = Array.from(domainSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return;
-    domainSelect!.value = options[0].value;
-    domainSelect!.dispatchEvent(new window.Event('change'));
+  it('Domain=Product Management propagates to Actions linked to Product Management topics', async () => {
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Action';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Product Management';
+    domainSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-action-001 has topicDomain=Product Management — must appear
+    expect(results.innerHTML).toContain('Chase component approval');
+    // fx-action-002 has topicDomain=Finance — must NOT appear
+    expect(results.innerHTML).not.toContain('Prepare gross margin');
   });
 
-  it('Domain filter propagates to Risks via topicDomain', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const typeSelect = window.document.getElementById('filter-type');
-    typeSelect!.value = 'Risk';
-    typeSelect!.dispatchEvent(new window.Event('change'));
-    const domainSelect = window.document.getElementById('filter-domain');
-    const options = Array.from(domainSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return;
-    domainSelect!.value = options[0].value;
-    domainSelect!.dispatchEvent(new window.Event('change'));
+  it('Domain=Product Management propagates to Risks linked to Product Management topics', async () => {
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Risk';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Product Management';
+    domainSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-risk-proxy-001 has topicDomain=Product Management — must appear
+    expect(results.innerHTML).toContain('September delivery cannot be achieved');
+    expect(results.innerHTML).not.toContain('No items match');
+  });
+
+  it('Domain filter excludes Topic Memory (no domain extracted for memory records)', async () => {
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain')!;
+    domainSelect.value = 'Finance';
+    domainSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const results = window.document.getElementById('all-content-results')!;
+    // All Topic Memory items should be excluded when Domain filter is active
+    expect(results.innerHTML).toContain('No items match');
   });
 });
 
-describe('Topic Memory last-seen meeting filter', () => {
+describe('Topic Memory last-seen meeting filter — deterministic', () => {
   let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => { ({ dom, window } = buildDOM()); await waitForInit(); window.document.getElementById('tab-all-content')!.click(); });
+  afterEach(() => dom.window.close());
 
-  beforeEach(() => {
-    ({ dom, window } = buildDOM());
-  });
-
-  afterEach(() => {
-    dom.window.close();
-  });
-
-  it('meeting filter matches Topic Memory where lastSeenMeetingId matches', async () => {
-    await waitForInit();
-    const allTab = window.document.getElementById('tab-all-content');
-    allTab!.click();
-    const typeSelect = window.document.getElementById('filter-type');
-    typeSelect!.value = 'Topic Memory';
-    typeSelect!.dispatchEvent(new window.Event('change'));
-    const meetingSelect = window.document.getElementById('filter-meeting');
-    const options = Array.from(meetingSelect!.querySelectorAll('option')).filter(o => o.value !== '');
-    if (options.length === 0) return;
-    meetingSelect!.value = options[0].value;
-    meetingSelect!.dispatchEvent(new window.Event('change'));
+  it('fx-memory-001 appears when filtering by fx-meeting-002 (its lastSeenMeetingId, not firstSeenMeetingId)', async () => {
+    // fx-memory-001: firstSeen=fx-meeting-001, lastSeen=fx-meeting-002
+    // Filtering by fx-meeting-002 must match it via lastSeenMeetingId
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const meetingSelect = window.document.getElementById('filter-meeting')!;
+    meetingSelect.value = 'fx-meeting-002';
+    meetingSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
-    const results = window.document.getElementById('all-content-results');
-    const cards = results!.querySelectorAll('.card');
-    expect(cards.length).toBeGreaterThanOrEqual(0);
+    const results = window.document.getElementById('all-content-results')!;
+    // fx-memory-001 canonical statement must appear
+    expect(results.innerHTML).toContain('fx-product-alpha September delivery is at risk');
+    // fx-memory-002 firstSeen=fx-meeting-001, lastSeen=fx-meeting-001 — must NOT appear
+    expect(results.innerHTML).not.toContain('Gross margin is below target');
+  });
+
+  it('fx-memory-002 appears when filtering by fx-meeting-001 (its only meeting) but not fx-meeting-002', async () => {
+    // fx-memory-002: firstSeen=fx-meeting-001, lastSeen=fx-meeting-001
+    const typeSelect = window.document.getElementById('filter-type')!;
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const meetingSelect = window.document.getElementById('filter-meeting')!;
+    meetingSelect.value = 'fx-meeting-001';
+    meetingSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const results = window.document.getElementById('all-content-results')!;
+    // Both fx-memory-001 (firstSeen=meeting-001) and fx-memory-002 should appear
+    expect(results.innerHTML).toContain('fx-product-alpha September delivery is at risk');
+    expect(results.innerHTML).toContain('Gross margin');
   });
 });
 
-describe('Overview cards produce nonzero results', () => {
+describe('Overview cards — all nonzero cards produce nonempty All Content results', () => {
   let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => { ({ dom, window } = buildDOM()); await waitForInit(); });
+  afterEach(() => dom.window.close());
 
-  beforeEach(() => {
-    ({ dom, window } = buildDOM());
-  });
+  // Fixture counts: meetingCount=2, topicCount=6, decisionCount=3,
+  // openActionCount=4, topicMemoryCount=4, pendingReviewCount=1,
+  // validationWarningCount=3, riskCount=3 — all nonzero.
 
-  afterEach(() => {
-    dom.window.close();
-  });
+  const cardExpectations = [
+    { key: 'meetingCount',           minCards: 2, description: 'meetings' },
+    { key: 'topicCount',             minCards: 6, description: 'topics' },
+    { key: 'decisionCount',          minCards: 3, description: 'decisions' },
+    { key: 'openActionCount',        minCards: 4, description: 'open actions' },
+    { key: 'topicMemoryCount',       minCards: 4, description: 'memory records' },
+    { key: 'pendingReviewCount',     minCards: 1, description: 'pending review memory' },
+    { key: 'validationWarningCount', minCards: 1, description: 'topics with warnings' },
+    { key: 'riskCount',              minCards: 3, description: 'risks' },
+  ];
 
-  it('nonzero overview stat cards produce at least one result when clicked', async () => {
-    await waitForInit();
-    const statCardKeys = ['meetingCount', 'decisionCount', 'riskCount', 'openActionCount', 'topicCount', 'topicMemoryCount'];
-    for (const key of statCardKeys) {
+  for (const { key, minCards, description } of cardExpectations) {
+    it(`${key} card (${description}) produces at least ${minCards} result(s)`, async () => {
       const card = window.document.querySelector(`[data-stat-key="${key}"]`);
-      if (!card) continue;
-      const countText = card.textContent || '';
-      const count = parseInt(countText.match(/\d+/)?.[0] || '0', 10);
-      if (count === 0) continue;
+      expect(card).toBeTruthy();
       card.click();
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 80));
       const allTab = window.document.getElementById('tab-all-content');
       expect(allTab!.getAttribute('aria-selected')).toBe('true');
-      const results = window.document.getElementById('all-content-results');
-      const cards = results!.querySelectorAll('.card');
-      expect(cards.length).toBeGreaterThan(0);
-    }
-  });
+      const results = window.document.getElementById('all-content-results')!;
+      // Must not be empty
+      expect(results.innerHTML).not.toContain('No items match');
+      // Count rendered cards
+      const cards = results.querySelectorAll('.card');
+      expect(cards.length).toBeGreaterThanOrEqual(minCards);
+    });
+  }
 });
