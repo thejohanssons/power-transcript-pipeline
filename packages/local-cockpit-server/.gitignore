@@ -1,0 +1,17 @@
+# Local credentials — NEVER commit these
+.env.local
+*.env.local
+*.env
+
+# Build output
+dist/
+
+# Node modules
+node_modules/
+
+# Run logs (contain sensitive baseline counts)
+run-logs/
+
+# OS
+.DS_Store
+Thumbs.db

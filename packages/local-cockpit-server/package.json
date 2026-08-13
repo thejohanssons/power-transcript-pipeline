@@ -1,0 +1,23 @@
+{
+  "name": "@eip/local-cockpit-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Localhost-only review POC server. Reads production runtime D1 (read-only). Writes feedback to isolated D1. No R2, no Worker, no Wrangler, no remote deployment.",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env.local dist/server.js",
+    "build": "tsc --noEmit && tsc --outDir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "preflight": "node --env-file=.env.local dist/preflight.js",
+    "dev": "echo 'ERROR: Use npm start (after npm run build) to run the local server. Wrangler dev is not supported for this package.' && exit 1",
+    "deploy": "echo 'ERROR: This package must never be deployed. It is a localhost-only POC with live D1 data access.' && exit 1",
+    "wrangler": "echo 'ERROR: Wrangler is not available in this package.' && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.2.7"
+  }
+}
