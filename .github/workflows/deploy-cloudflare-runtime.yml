@@ -1,0 +1,69 @@
+name: Deploy Cloudflare Runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/cloudflare-runtime/**'
+  # Intentional production retry or emergency redeployment only.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare-runtime-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-and-validate:
+    runs-on: ubuntu-latest
+    name: Deploy and validate Cloudflare runtime
+    env:
+      RUNTIME_HEALTHCHECK_URL: https://eip-cloudflare-runtime.homeassistant-8d3.workers.dev/health
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/cloudflare-runtime/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/cloudflare-runtime
+        run: npm ci
+
+      - name: Run runtime tests
+        working-directory: packages/cloudflare-runtime
+        run: npm test -- --run
+
+      - name: Run TypeScript typecheck
+        working-directory: packages/cloudflare-runtime
+        run: npm run typecheck
+
+      - name: Deploy production runtime
+        working-directory: packages/cloudflare-runtime
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Validate production health endpoint
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 "$RUNTIME_HEALTHCHECK_URL")"
+          echo "$response" | jq --exit-status '.status == "ok" and .environment == "production"' >/dev/null
+
+      - name: Record deployment result
+        if: always()
+        run: |
+          {
+            echo "## Cloudflare runtime production deployment"
+            echo
+            echo "- Commit: `${GITHUB_SHA}`"
+            echo "- Health endpoint: $RUNTIME_HEALTHCHECK_URL"
+            echo "- Workflow result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
