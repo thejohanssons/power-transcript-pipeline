@@ -47,7 +47,9 @@
   "env": {
     "staging": {
       "vars": {
-        "ENVIRONMENT": "staging"
+        "ENVIRONMENT": "staging",
+        "AZURE_OPENAI_ENDPOINT": "https://atlassian-rovo-forge.openai.azure.com/openai/v1",
+        "AZURE_OPENAI_DEPLOYMENT": "gpt-5.6-terra"
       },
       "d1_databases": [
         {
@@ -62,7 +64,24 @@
           "binding": "OUTPUT_BUCKET",
           "bucket_name": "eip-cloudflare-runtime-staging-output"
         }
-      ]
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "PROCESSING_QUEUE",
+            "queue": "eip-cloudflare-runtime-processing-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "eip-cloudflare-runtime-processing-staging",
+            "max_batch_size": 1,
+            "max_batch_timeout": 30,
+            "max_retries": 2,
+            "dead_letter_queue": "eip-cloudflare-runtime-processing-staging-dlq"
+          }
+        ]
+      }
     }
   }
 }

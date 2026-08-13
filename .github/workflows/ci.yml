@@ -33,6 +33,65 @@ jobs:
         working-directory: packages/api-worker
         run: npx tsc --noEmit
 
+  guard-local-cockpit-server:
+    runs-on: ubuntu-latest
+    name: CI Guard — Local Cockpit Server (no Wrangler/deploy config)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run CI guard
+        run: node packages/local-cockpit-server/scripts/ci-guard.mjs
+
+  typecheck-local-cockpit-server:
+    runs-on: ubuntu-latest
+    name: Typecheck Local Cockpit Server (tsc)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/local-cockpit-server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/local-cockpit-server
+        run: npm ci
+
+      - name: Run TypeScript typecheck
+        working-directory: packages/local-cockpit-server
+        run: npx tsc --noEmit
+
+  test-local-cockpit-server:
+    runs-on: ubuntu-latest
+    name: Test Local Cockpit Server (vitest)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/local-cockpit-server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/local-cockpit-server
+        run: npm ci
+
+      - name: Run tests
+        working-directory: packages/local-cockpit-server
+        run: npm test
+
   lint-pipeline:
     runs-on: ubuntu-latest
     name: Lint Pipeline Script (PSScriptAnalyzer)

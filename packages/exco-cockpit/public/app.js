@@ -1,7 +1,10 @@
 /* ============================================================
    EIP ExCo Cockpit — Client Application
-   Synthetic-fixture POC. All data from /api/v1 endpoints.
-   Feedback is browser-session only — never server-side.
+   LOCAL LIVE-DATA POC. All data from /api/v1 endpoints backed by
+   production runtime D1 (live, read-only).
+   Feedback is persisted server-side to a dedicated isolated D1.
+   Approved scope: D1 live data + append-only feedback only.
+   R2 is not used in this POC.
    ============================================================ */
 
 'use strict';
@@ -15,8 +18,10 @@ const state = {
   risksActions: null,   // { evidenceProxyNotice, risks[], actions[] }
   topicMemory: null,
   topics: null,
+  reviewQueue: null,
+  reviewQueueAudit: false,
 
-  // Feedback (browser-session only)
+  // Feedback (server-side persistent, dedicated D1)
   feedback: [],
   feedbackTarget: null, // { itemType, itemId, itemLabel } | null
   feedbackPanelOpen: false,
@@ -137,6 +142,64 @@ function switchToAllContent(typeFilter, stateFilter) {
 }
 
 // ── Filter helpers ────────────────────────────────────────
+
+// A Risk outcome is the canonical topic classification. Extracted risks[] are
+// supporting assertions for that topic, except when attached to a non-Risk
+// topic, where they are shown as explicitly labelled evidence-only cards.
+function deriveRisksFromTopics(topics, meetings) {
+  const meetingById = new Map((meetings || []).map(meeting => [meeting.meetingId, meeting]));
+  const risks = [];
+
+  (topics || []).forEach(topic => {
+    const meeting = meetingById.get(topic.meetingId);
+    const base = {
+      meetingId: topic.meetingId,
+      meetingSubject: meeting?.subject || null,
+      meetingEventDate: meeting?.eventDate || null,
+      topicId: topic.topicId,
+      topicStatement: topic.topicStatement,
+      owner: topic.owners && topic.owners.length ? topic.owners[0] : null,
+      topicDomain: topic.domain || null,
+      topicEntityType: topic.entityType || null,
+      topicEntity: topic.entity || null,
+      executiveScope: topic.executiveScope || null,
+      confidence: topic.confidence || null,
+      validation: topic.validation || null,
+      updatedAt: topic.updatedAt || topic.createdAt || null,
+    };
+    const assertions = Array.isArray(topic.risks) ? topic.risks : [];
+
+    if (topic.outcome === 'Risk') {
+      risks.push({
+        ...base,
+        riskId: `topic-risk:${topic.topicId}`,
+        kind: 'classified_topic',
+        riskText: topic.topicStatement,
+        supportingEvidence: assertions,
+        evidenceLabel: assertions.length
+          ? 'Risk-classified topic — extracted assertions shown as supporting evidence.'
+          : 'Risk-classified topic — no separate risk assertions were extracted.',
+      });
+      return;
+    }
+
+    assertions.forEach((assertion, index) => {
+      const text = assertion && typeof assertion === 'object' ? assertion.text : assertion;
+      if (!text) return;
+      const assertionId = assertion && typeof assertion === 'object' && assertion.id ? assertion.id : index;
+      risks.push({
+        ...base,
+        riskId: `risk-evidence:${topic.topicId}:${assertionId}`,
+        kind: 'evidence_only',
+        riskText: text,
+        supportingEvidence: [assertion],
+        evidenceLabel: 'Evidence-only risk assertion from a non-Risk topic.',
+      });
+    });
+  });
+
+  return risks;
+}
 
 function buildAllItems() {
   const items = [];
@@ -292,7 +355,7 @@ function populateFilterOptions() {
   meetings.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m.meetingId;
-    opt.textContent = `${m.eventDate.substring(0,10)} — ${m.subject}`;
+    opt.textContent = `${(m.eventDate || '').substring(0,10)} — ${m.subject}`;
     meetingSelect.appendChild(opt);
   });
 
@@ -377,19 +440,38 @@ function renderAllContent() {
   resultsEl.innerHTML = html;
 }
 
+function meetingAggregateCounts(meetingId) {
+  const topics = (state.topics || []).filter(topic => topic.meetingId === meetingId);
+  const decisions = (state.decisions || []).filter(decision => decision.meetingId === meetingId);
+  const actions = (state.risksActions?.actions || []).filter(action => action.meetingId === meetingId);
+
+  return {
+    topicCount: topics.length,
+    decisionCount: decisions.length,
+    actionCount: actions.length,
+    validationStatus: topics.some(topic => topic.validation?.status === 'fail')
+      ? 'fail'
+      : topics.some(topic => topic.validation?.status === 'warning')
+        ? 'warning'
+        : 'pass',
+  };
+}
+
 function renderItemCard(item) {
   const type = item._type;
   const d = item.data;
 
   switch (type) {
-    case 'Meeting':
+    case 'Meeting': {
+      const counts = meetingAggregateCounts(d.meetingId);
       return `<div class="card">
         <div class="card-header">
           <div class="card-title">${esc(d.subject)}</div>
-          ${validationBadge(d.validationStatus)}
+          ${validationBadge(counts.validationStatus)}
         </div>
-        <div class="card-meta">${esc(d.organiser)} · ${esc((d.eventDate||'').substring(0,10))} · ${d.topicCount} topics · ${d.decisionCount} decisions · ${d.actionCount} actions</div>
+        <div class="card-meta">${esc(d.organiser)} · ${esc((d.eventDate||'').substring(0,10))} · ${counts.topicCount} topics · ${counts.decisionCount} decisions · ${counts.actionCount} actions</div>
       </div>`;
+    }
 
     case 'Topic': {
       const evidenceUrl = `/api/v1/evidence/topic/${d.topicId}`;
@@ -398,7 +480,7 @@ function renderItemCard(item) {
           <div class="card-title">${esc(d.topicStatement)}</div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('topic','${esc(d.topicId)}','Topic evidence')">Evidence</button>
-            <button class="btn-feedback" onclick="openFeedback('topic','${esc(d.topicId)}','${esc((d.topicStatement||'').substring(0,40))}...')">Feedback</button>
+            <button class="btn-feedback" onclick="openFeedback('topic','${esc(d.topicId)}','${esc((d.topicStatement||'').substring(0,40))}...','${esc(d.updatedAt||'')}')">Feedback</button>
           </div>
         </div>
         <div class="card-meta">
@@ -421,7 +503,7 @@ function renderItemCard(item) {
           <div class="card-title">${esc(d.text)}</div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('${esc(evType)}','${esc(evId)}','${esc((d.text||'').substring(0,40))}...')">Evidence</button>
-            <button class="btn-feedback" onclick="openFeedback('decision','${esc(d.decisionId)}','${esc((d.text||'').substring(0,40))}...')">Feedback</button>
+            <button class="btn-feedback" onclick="openFeedback('decision','${esc(d.decisionId)}','${esc((d.text||'').substring(0,40))}...','${esc(d.createdAt||'')}')">Feedback</button>
           </div>
         </div>
         <div class="card-meta">
@@ -442,7 +524,7 @@ function renderItemCard(item) {
           <div class="card-title">${esc(d.text)}</div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('${esc(evType)}','${esc(evId)}','Action evidence')">Evidence</button>
-            <button class="btn-feedback" onclick="openFeedback('action','${esc(d.actionId)}','${esc((d.text||'').substring(0,40))}...')">Feedback</button>
+            <button class="btn-feedback" onclick="openFeedback('action','${esc(d.actionId)}','${esc((d.text||'').substring(0,40))}...','${esc(d.createdAt||'')}')">Feedback</button>
           </div>
         </div>
         <div class="card-meta">
@@ -455,19 +537,22 @@ function renderItemCard(item) {
       </div>`;
     }
 
-    case 'Risk':
+    case 'Risk': {
+      const supportingEvidence = Array.isArray(d.supportingEvidence) ? d.supportingEvidence : [];
       return `<div class="card" style="border-left:3px solid var(--color-risk);">
         <div class="card-header">
           <div class="card-title">${esc(d.riskText)}</div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('topic','${esc(d.topicId)}','Risk evidence')">Evidence</button>
-            <button class="btn-feedback" onclick="openFeedback('topic','${esc(d.topicId)}','Risk: ${esc((d.riskText||'').substring(0,30))}...')">Feedback</button>
+            <button class="btn-feedback" onclick="openFeedback('topic','${esc(d.topicId)}','Risk: ${esc((d.riskText||'').substring(0,30))}...','${esc(d.updatedAt||'')}')">Feedback</button>
           </div>
         </div>
-        <div class="card-meta">Owner: ${renderMaybeExtracted(d.owner)} · Meeting: ${esc(d.meetingId)}</div>
-        <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px;">${esc(d.topicStatement)}</div>
+        <div class="card-meta">Owner: ${renderMaybeExtracted(d.owner)} · ${esc(d.meetingSubject || d.meetingId)}${d.meetingEventDate ? ` · ${esc(d.meetingEventDate.substring(0,10))}` : ''}</div>
+        ${d.kind === 'evidence_only' ? `<div style="font-size:12px;color:var(--color-text-muted);margin-top:4px;">Topic: ${esc(d.topicStatement)}</div>` : ''}
+        ${supportingEvidence.length ? `<div style="margin-top:8px;font-size:12px;color:var(--color-text-muted);">Supporting evidence:<ul class="assertion-list">${supportingEvidence.map(assertion => `<li>${esc(assertion?.text || String(assertion))}</li>`).join('')}</ul></div>` : ''}
         <div style="margin-top:6px;font-size:11px;color:var(--color-text-muted);font-style:italic;">${esc(d.evidenceLabel)}</div>
       </div>`;
+    }
 
     case 'Topic Memory': {
       const isPending = d.matchStatus === 'pending_review';
@@ -480,7 +565,7 @@ function renderItemCard(item) {
           </div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('memory','${esc(d.memoryId)}','Memory evidence')">Evidence</button>
-            <button class="btn-feedback" onclick="openFeedback('memory','${esc(d.memoryId)}','${esc(d.entity)} — ${esc((d.canonicalStatement||'').substring(0,30))}...')">Feedback</button>
+            <button class="btn-feedback" onclick="openFeedback('memory','${esc(d.memoryId)}','${esc(d.entity)} — ${esc((d.canonicalStatement||'').substring(0,30))}...','${esc(d.updatedAt||'')}')">Feedback</button>
           </div>
         </div>
         <div class="card-meta">
@@ -497,6 +582,331 @@ function renderItemCard(item) {
 }
 
 // ── Overview panel ────────────────────────────────────────
+
+// ── Reviewer name — localStorage persistence ──────────────
+const REVIEWER_NAME_KEY = 'eip-cockpit-reviewer-name';
+
+function getReviewerName() {
+  return localStorage.getItem(REVIEWER_NAME_KEY) || '';
+}
+
+function setReviewerName(name) {
+  localStorage.setItem(REVIEWER_NAME_KEY, name.trim());
+  ['feedback-reviewer-name', 'pending-reviewer-name'].forEach(id => {
+    const inp = el(id);
+    if (inp && inp.value !== name.trim()) inp.value = name.trim();
+  });
+}
+
+function initReviewerNameInputs() {
+  const saved = getReviewerName();
+  ['feedback-reviewer-name', 'pending-reviewer-name'].forEach(id => {
+    const inp = el(id);
+    if (!inp) return;
+    if (saved) inp.value = saved;
+    inp.addEventListener('input', () => setReviewerName(inp.value));
+    inp.addEventListener('change', () => setReviewerName(inp.value));
+  });
+}
+
+// ── Pending Review tab ────────────────────────────────────
+
+// ── Match decision quick-submit (no modal) ───────────────
+
+function handleMatchClick(btn) {
+  if (btn.disabled) return;
+  const memoryId    = btn.dataset.memoryId;
+  const topicId     = btn.dataset.topicId || '';
+  const memoryUpdatedAt = btn.dataset.memoryUpdated || '';
+  const topicUpdatedAt  = btn.dataset.topicUpdated || '';
+  const decision    = btn.dataset.decision;
+  const reviewerName = getReviewerName();
+  submitMatchDecision(memoryId, topicId, decision, memoryUpdatedAt, topicUpdatedAt, reviewerName);
+}
+
+async function submitMatchDecision(memoryId, topicId, decision, memoryUpdatedAt, topicUpdatedAt, reviewerName) {
+  const noteInput = el('pending-decision-note');
+  const acknowledgement = el('pending-decision-warning');
+  const note = noteInput?.value?.trim() || '';
+  if (!reviewerName || !reviewerName.trim()) {
+    alert('Please enter your reviewer name before recording a runtime decision.');
+    return;
+  }
+  if (!note) {
+    alert('Please enter a non-empty decision note.');
+    noteInput?.focus();
+    return;
+  }
+  if (!acknowledgement?.checked) {
+    alert('Please acknowledge permanent retention before recording a runtime decision.');
+    return;
+  }
+  const approve = decision === 'match';
+  const outcome = approve ? 'approve this match and merge the candidate trajectory into the existing thread' : 'reject this match and keep the candidate as a separate confirmed memory';
+  if (!window.confirm(`Confirm runtime decision: ${outcome}?`)) return;
+
+  const buttons = document.querySelectorAll(`#match-card-${memoryId} .match-actions button`);
+  buttons.forEach(button => { button.disabled = true; button.setAttribute('aria-disabled', 'true'); });
+  const status = el('pending-decision-status');
+  if (status) { status.textContent = 'Applying runtime decision…'; status.className = 'loading'; }
+
+  try {
+    const response = await fetch(`/api/v1/review-queue/memory/${encodeURIComponent(memoryId)}/decision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        decision: approve ? 'approve_match' : 'reject_match',
+        expectedSourceVersion: memoryUpdatedAt,
+        expectedProposedMatchMemoryId: (document.querySelector(`#match-card-${memoryId} [data-expected-target]`))?.dataset.expectedTarget || '',
+        reviewerName: reviewerName.trim(),
+        note,
+        warningAcknowledged: true,
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 409) {
+      await refreshReviewQueue();
+      throw new Error(result.error || 'The candidate changed. The queue was refreshed; reassess the current data.');
+    }
+    if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    await refreshReviewQueue();
+    if (status) { status.textContent = `${approve ? 'Approve match and merge' : 'Reject match and keep separate'} applied. Audit event: ${result.data?.auditEventId || result.auditEventId}`; status.className = 'success'; }
+  } catch (e) {
+    buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-disabled'); });
+    if (status) { status.textContent = `Runtime decision failed: ${e.message}`; status.className = 'error-msg'; }
+    alert(`Failed to apply runtime decision: ${e.message}`);
+  }
+}
+
+function renderPendingReview() {
+  const container = el('pending-review-content');
+  if (!container) return;
+
+  const proposedMatches = (state.topicMemory || []).filter(m => m.matchStatus === 'pending_review');
+
+  // Update tab badge
+  const badge = el('tab-pending-count');
+  if (badge) badge.textContent = proposedMatches.length ? `(${proposedMatches.length})` : '';
+
+  // ── Section: Proposed matches (with matching topic details) ─
+  const proposedMatchesHtml = proposedMatches.length
+    ? proposedMatches.map(m => {
+        // Find the topic(s) from the same meeting that share entity+aspect
+        // The memory record represents the new observation; find the source topic
+        const sourceTopic = (state.topics || []).find(t =>
+          t.meetingId === m.lastSeenMeetingId &&
+          t.entity === m.entity &&
+          t.entityType === m.entityType
+        );
+
+        // Find the target memory record (what it's proposed to merge into)
+        const targetMemory = (state.topicMemory || []).find(x => x.memoryId === m.proposedMatchMemoryId);
+
+        const safeId = `match-card-${m.memoryId}`;
+        return `
+          <div class="card" id="${esc(safeId)}" style="margin-bottom:16px;padding:0;overflow:hidden;">
+
+            <!-- Proposed match context header -->
+            <div style="background:var(--color-info-bg,#eff6ff);border-bottom:1px solid var(--color-border);padding:10px 14px;">
+              <span class="badge" style="background:var(--color-info,#3b82f6);color:#fff;margin-bottom:4px;">⚡ Proposed addition to existing thread</span>
+              <div style="font-size:12px;font-weight:600;margin-top:4px;">${esc(m.entity)} — ${esc(m.entityType)}</div>
+              ${m.proposedMatchReason
+                ? `<div style="font-size:11px;color:var(--color-text-muted);margin-top:2px;">${esc(m.proposedMatchReason)}</div>`
+                : ''}
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--color-border);">
+
+              <!-- New topic -->
+              <div style="padding:12px 14px;border-right:1px solid var(--color-border);">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-warning,#f59e0b);margin-bottom:6px;">🆕 New observation</div>
+                <div style="font-size:12px;font-weight:600;">${esc(m.canonicalStatement)}</div>
+                <div class="card-meta" style="margin-top:4px;font-size:11px;">
+                  Outcome: ${esc(m.latestOutcome||'?')} · ${esc(m.latestDisposition||'?')} · ${esc(m.latestExecutiveScope||'?')}
+                </div>
+                <div class="card-meta" style="font-size:11px;">Meeting: ${esc(m.lastSeenMeetingId||'?')}</div>
+                ${sourceTopic ? `
+                  <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--color-border);">
+                    <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px;">Source topic:</div>
+                    <div style="font-size:12px;">${esc(sourceTopic.topicStatement)}</div>
+                    ${sourceTopic.keyFacts?.length ? `<ul style="margin:4px 0 0 16px;padding:0;font-size:11px;">${sourceTopic.keyFacts.slice(0,3).map(f=>`<li>${esc(f.text||f)}</li>`).join('')}</ul>` : ''}
+                  </div>` : ''}
+              </div>
+
+              <!-- Existing memory thread -->
+              <div style="padding:12px 14px;">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--color-info,#3b82f6);margin-bottom:6px;">📚 Existing thread</div>
+                ${targetMemory ? (() => {
+                  // Find most recent topic from the existing thread's last-seen meeting
+                  const threadTopic = (state.topics || []).find(t =>
+                    t.meetingId === targetMemory.lastSeenMeetingId &&
+                    t.entity === targetMemory.entity &&
+                    t.entityType === targetMemory.entityType
+                  );
+                  const sectionHtml = (title, items) => {
+                    if (!items || !items.length) return '';
+                    return `<div style="margin-top:6px;">
+                      <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">${esc(title)}</div>
+                      <ul style="margin:0;padding-left:16px;font-size:11px;">
+                        ${items.map(a => `<li>${esc(a.text || String(a))}</li>`).join('')}
+                      </ul>
+                    </div>`;
+                  };
+                  return `
+                    <div style="font-size:12px;font-weight:600;">${esc(targetMemory.canonicalStatement)}</div>
+                    <div class="card-meta" style="margin-top:4px;">
+                      <strong>[${esc(targetMemory.entityType||'?')}]</strong> ${esc(targetMemory.entity||'?')}
+                      ${targetMemory.aspect ? `· <em>${esc(targetMemory.aspect)}</em>` : ''}
+                      · ${esc(targetMemory.domain||'?')}
+                    </div>
+                    <div class="card-meta" style="font-size:11px;margin-top:2px;">
+                      Outcome: ${esc(targetMemory.latestOutcome||'?')} · ${esc(targetMemory.latestDisposition||'?')} · ${esc(targetMemory.latestExecutiveScope||'?')}
+                    </div>
+                    <div class="card-meta" style="font-size:11px;margin-top:2px;">
+                      Seen ${targetMemory.meetingCount} time${targetMemory.meetingCount !== 1 ? 's' : ''}
+                      · First: ${esc((targetMemory.firstSeenDate||'').substring(0,10))}
+                      · Last: ${esc((targetMemory.lastSeenDate||'').substring(0,10))}
+                      · Status: ${esc(targetMemory.status||'?')}
+                    </div>
+                    ${threadTopic ? `
+                      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--color-border);">
+                        <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px;">Last seen topic (${esc(targetMemory.lastSeenMeetingId||'')}):</div>
+                        <div style="font-size:12px;">${esc(threadTopic.topicStatement)}</div>
+                        ${sectionHtml('Key Facts', threadTopic.keyFacts)}
+                        ${sectionHtml('Decisions', threadTopic.decisions)}
+                        ${sectionHtml('Actions', threadTopic.actions)}
+                        ${sectionHtml('Risks', threadTopic.risks)}
+                      </div>` : `
+                      <div style="margin-top:8px;font-size:11px;color:var(--color-text-muted);">
+                        Last seen meeting: ${esc(targetMemory.lastSeenMeetingId||'?')}<br/>
+                        (Topic not in current 200-record page)
+                      </div>`}`;
+                })()
+                : `<div style="font-size:12px;color:var(--color-text-muted);">Target: <code style="font-size:10px;">${esc(m.proposedMatchMemoryId||'?')}</code><br/><span style="font-size:11px;">Not in current memory page (500 limit)</span></div>`}
+              </div>
+            </div>
+
+            <!-- Match / No match actions -->
+            <div class="match-actions" style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--color-bg,#f9fafb);border-top:1px solid var(--color-border);">
+              <button class="btn-primary" style="font-size:12px;background:var(--color-pass,#16a34a);border-color:var(--color-pass,#16a34a);"
+                data-memory-id="${esc(m.memoryId)}"
+                data-topic-id="${esc(sourceTopic?.topicId||'')}"
+                data-memory-updated="${esc(m.updatedAt||'')}"
+                data-topic-updated="${esc(sourceTopic?.updatedAt||'')}"
+                data-expected-target="${esc(m.proposedMatchMemoryId||'')}"
+                data-decision="match"
+                onclick="handleMatchClick(this)">
+                ✓ Match
+              </button>
+              <button class="btn-secondary" style="font-size:12px;color:var(--color-risk,#dc2626);border-color:var(--color-risk,#dc2626);"
+                data-memory-id="${esc(m.memoryId)}"
+                data-topic-id="${esc(sourceTopic?.topicId||'')}"
+                data-memory-updated="${esc(m.updatedAt||'')}"
+                data-topic-updated="${esc(sourceTopic?.updatedAt||'')}"
+                data-expected-target="${esc(m.proposedMatchMemoryId||'')}"
+                data-decision="no-match"
+                onclick="handleMatchClick(this)">
+                ✗ No match
+              </button>
+              <button class="btn-feedback" style="font-size:11px;margin-left:auto;"
+                onclick="openFeedback('memory','${esc(m.memoryId)}','${esc(m.entity)} — match review','${esc(m.updatedAt||'')}')">
+                Add note
+              </button>
+            </div>
+          </div>`;
+      }).join('')
+    : '<div class="empty-state">No proposed matches awaiting review.</div>';
+
+  container.innerHTML = `
+    <div style="padding:16px 0;">
+      <h2 class="section-title">
+        Pending Memory Review
+        <span style="font-size:13px;font-weight:400;color:var(--color-text-muted);">
+          — ${proposedMatches.length} proposed match${proposedMatches.length !== 1 ? 'es' : ''} awaiting decision
+        </span>
+      </h2>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 14px;background:var(--color-bg,#f9fafb);border:1px solid var(--color-border);border-radius:6px;">
+        <label style="font-size:12px;font-weight:600;white-space:nowrap;" for="pending-reviewer-name">Your name:</label>
+        <input id="pending-reviewer-name" type="text"
+          placeholder="Required before recording Match / No match"
+          style="flex:1;padding:5px 10px;border:1px solid var(--color-border);border-radius:4px;font-size:12px;" />
+        <span style="font-size:11px;color:var(--color-text-muted);">Runtime decisions change the live memory state and are permanently audited.</span>
+      </div>
+      <div style="margin-bottom:12px;display:grid;gap:8px;">
+        <label for="pending-decision-note" style="font-size:12px;font-weight:600;">Decision note <span aria-hidden="true">*</span></label>
+        <textarea id="pending-decision-note" rows="2" placeholder="Explain why this match should be merged or kept separate. Do not paste transcript text." style="width:100%;padding:7px 10px;border:1px solid var(--color-border);border-radius:4px;font-size:12px;"></textarea>
+        <label style="font-size:11px;color:var(--color-text-muted);display:flex;gap:7px;align-items:flex-start;">
+          <input id="pending-decision-warning" type="checkbox" aria-required="true" />
+          <span>I acknowledge this note is permanently retained and contains no raw transcript or sensitive source material.</span>
+        </label>
+        <div id="pending-decision-status" role="status" aria-live="polite" style="min-height:16px;font-size:12px;"></div>
+      </div>
+
+      <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:16px;">
+        For each proposed match: review the new observation (left) against the existing memory thread (right),
+        then record <strong>Match</strong> (merges the candidate trajectory into the existing thread) or <strong>No match</strong>
+        (keeps the candidate as a separate confirmed memory). Decisions mutate runtime state and are retained in the authoritative audit log.
+      </p>
+
+      ${proposedMatchesHtml || '<div class="empty-state">No proposed matches awaiting review.</div>'}
+    </div>`;
+}
+
+function reviewDispositionHtml(disposition) {
+  if (!disposition) return '';
+  return `<div class="card-meta" style="margin-top:8px;">
+    Reviewer: ${esc(disposition.reviewerName)} · Verdict: <strong>${esc(disposition.verdict)}</strong><br/>
+    Field: ${esc(disposition.affectedField)} · Recorded: ${esc(disposition.createdAt)}
+    ${disposition.correctsFeedbackId ? `<br/>Correction of: ${esc(disposition.correctsFeedbackId)}` : ''}
+  </div>`;
+}
+
+function renderReviewQueue() {
+  const queue = state.reviewQueue;
+  const container = el('review-queue-content');
+  if (!container) return;
+  if (!queue) {
+    container.innerHTML = '<div class="loading">Loading review queue…</div>';
+    return;
+  }
+  const awaiting = queue.awaitingReview || [];
+  const recorded = queue.recordedDecisions || [];
+  const card = item => `<div class="card" style="margin-bottom:8px;">
+    <div class="card-title" style="font-size:13px;">${esc(item.title)}</div>
+    <div class="card-meta">[${esc(item.entityType || '?')}] ${esc(item.entity || '?')}${item.aspect ? ` · ${esc(item.aspect)}` : ''}</div>
+    ${item.summary ? `<div style="font-size:12px;margin-top:5px;">${esc(item.summary)}</div>` : ''}
+    ${item.proposedMatchMemoryId ? `<div class="validation-warning" style="margin-top:6px;font-size:11px;">Proposed match: ${esc(item.proposedMatchMemoryId)}${item.proposedMatchReason ? ` — ${esc(item.proposedMatchReason)}` : ''}</div>` : ''}
+    <div class="card-meta" style="margin-top:6px;">Source version: ${esc(item.sourceVersion)}</div>
+    ${item.disposition ? reviewDispositionHtml(item.disposition) : `<button class="btn-feedback" style="margin-top:8px;font-size:11px;" onclick="openFeedback('memory','${esc(item.itemId)}','${esc(item.title)}','${esc(item.sourceVersion)}')">Give feedback</button>`}
+  </div>`;
+  container.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div><strong>${awaiting.length}</strong> awaiting review</div>
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="review-queue-audit-toggle" ${state.reviewQueueAudit ? 'checked' : ''} aria-controls="review-queue-recorded" />
+        Show recorded decisions (audit)
+      </label>
+    </div>
+    <div style="margin-top:10px;">${awaiting.length ? awaiting.map(card).join('') : '<div class="empty-state">No candidates awaiting review.</div>'}</div>
+    <div id="review-queue-recorded" ${state.reviewQueueAudit ? '' : 'hidden'} style="margin-top:14px;padding-top:10px;border-top:1px solid var(--color-border);">
+      <h4 style="margin:0 0 8px;">Recorded decisions (${recorded.length})</h4>
+      ${recorded.length ? recorded.map(card).join('') : '<div class="empty-state">No recorded decisions.</div>'}
+      <p class="card-meta">Recorded decisions are audit history only and do not alter runtime state.</p>
+    </div>`;
+  const toggle = el('review-queue-audit-toggle');
+  if (toggle) toggle.addEventListener('change', () => { state.reviewQueueAudit = toggle.checked; renderReviewQueue(); });
+}
+
+async function refreshReviewQueue() {
+  try {
+    state.reviewQueue = await apiFetch('/api/v1/review-queue');
+    renderReviewQueue();
+  } catch (error) {
+    const container = el('review-queue-content');
+    if (container) container.innerHTML = `<div class="error-msg">Review queue unavailable: ${esc(error.message)}</div>`;
+  }
+}
 
 function renderOverview(data) {
   const riskCount = state.risksActions ? state.risksActions.risks.length : 0;
@@ -533,9 +943,10 @@ function renderOverview(data) {
           <div class="card-title" style="font-size:13px;">${esc(r.riskText)}</div>
           <button class="btn-evidence" onclick="showEvidence('topic','${esc(r.topicId)}','Risk evidence')">Evidence</button>
         </div>
-        <div class="card-meta">Owner: ${renderMaybeExtracted(r.owner)} · ${esc(r.meetingId)}</div>
+        <div class="card-meta">Owner: ${renderMaybeExtracted(r.owner)} · ${esc(r.meetingSubject || r.meetingId)}</div>
+        ${r.supportingEvidence?.length ? `<div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">${r.supportingEvidence.length} supporting risk assertion${r.supportingEvidence.length === 1 ? '' : 's'}</div>` : ''}
       </div>`).join('')
-    : '<div class="empty-state">No risk evidence extracted.</div>';
+    : '<div class="empty-state">No risk-classified topics or evidence-only risk assertions.</div>';
 
   // Key decisions
   const decisions = state.decisions ? state.decisions.slice(0,3) : [];
@@ -575,16 +986,78 @@ function renderOverview(data) {
       </div>`
     : '<div class="card-meta">No validation warnings.</div>';
 
-  // Pending memory review
-  const pending = state.topicMemory ? state.topicMemory.filter(m => m.matchStatus === 'pending_review') : [];
-  const pendingHtml = pending.length
-    ? pending.map(m => `<div class="card">
-        <span class="badge badge-pending" style="margin-bottom:6px;">⚡ Pending review</span>
-        <div class="card-title" style="font-size:13px;">${esc(m.canonicalStatement)}</div>
-        <div class="card-meta">[${esc(m.entityType)}] ${esc(m.entity)}</div>
-        ${!notExtracted(m.proposedMatchStatement) ? `<div class="validation-warning" style="margin-top:6px;font-size:11px;">Proposed match: ${esc(m.proposedMatchStatement)}</div>` : ''}
-      </div>`).join('')
-    : '<div class="card-meta">No pending reviews.</div>';
+  // ── Pending review — two categories ─────────────────────
+  // 1. New topics: topics with no memoryId (not yet linked to any memory thread)
+  // 2. Proposed match: memory records with matchStatus === 'pending_review'
+  //    (pipeline thinks this topic extends an existing thread, needs confirmation)
+
+  const newTopics = (state.topics || []).filter(t => !t.memoryId);
+  const proposedMatches = (state.topicMemory || []).filter(m => m.matchStatus === 'pending_review');
+  const SHOW_NEW = 5;
+
+  const newTopicsHtml = newTopics.length
+    ? `<div style="font-size:11px;color:var(--color-text-muted);margin-bottom:6px;">
+        ${newTopics.length} topic${newTopics.length !== 1 ? 's' : ''} not yet linked to a memory thread
+       </div>` +
+      newTopics.slice(0, SHOW_NEW).map(t => `
+        <div class="card" style="border-left:3px solid var(--color-warning,#f59e0b);margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div>
+              <span class="badge" style="background:var(--color-warning,#f59e0b);color:#fff;margin-bottom:4px;">🆕 New topic</span>
+              <div class="card-title" style="font-size:12px;">${esc(t.topicStatement)}</div>
+              <div class="card-meta">[${esc(t.entityType||'?')}] ${esc(t.entity||'?')} · ${esc(t.domain||'?')}</div>
+              <div class="card-meta" style="font-size:11px;">${esc(t.meetingId)}</div>
+            </div>
+            <button class="btn-feedback" style="flex-shrink:0;"
+              onclick="openFeedback('topic','${esc(t.topicId)}','${esc((t.topicStatement||'').substring(0,40))}...','${esc(t.updatedAt||'')}')">
+              Feedback
+            </button>
+          </div>
+        </div>`).join('') +
+      (newTopics.length > SHOW_NEW
+        ? `<div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">
+            + ${newTopics.length - SHOW_NEW} more —
+            <button class="btn-secondary" style="font-size:11px;" onclick="switchToAllContent('Topic','')">
+              View all in All Content →
+            </button>
+           </div>`
+        : '')
+    : '<div class="card-meta" style="font-size:12px;">No unlinked topics.</div>';
+
+  const proposedMatchesHtml = proposedMatches.length
+    ? proposedMatches.map(m => `
+        <div class="card" style="border-left:3px solid var(--color-info,#3b82f6);margin-bottom:6px;">
+          <span class="badge" style="background:var(--color-info,#3b82f6);color:#fff;margin-bottom:4px;">⚡ Proposed match</span>
+          <div class="card-title" style="font-size:12px;">${esc(m.canonicalStatement)}</div>
+          <div class="card-meta">[${esc(m.entityType)}] ${esc(m.entity)} · ${esc(m.domain||'?')}</div>
+          ${m.proposedMatchMemoryId
+            ? `<div class="validation-warning" style="margin-top:4px;font-size:11px;">
+                Proposed match to: <code style="font-size:10px;">${esc(m.proposedMatchMemoryId)}</code>
+               </div>
+               ${m.proposedMatchReason ? `<div style="font-size:11px;color:var(--color-text-muted);margin-top:2px;">${esc(m.proposedMatchReason)}</div>` : ''}`
+            : ''}
+          <div style="margin-top:6px;">
+            <button class="btn-feedback" style="font-size:11px;"
+              onclick="openFeedback('memory','${esc(m.memoryId)}','${esc(m.entity)} — match review','${esc(m.updatedAt||'')}')">
+              Feedback
+            </button>
+          </div>
+        </div>`).join('')
+    : '<div class="card-meta" style="font-size:12px;">No proposed matches awaiting review.</div>';
+
+  const pendingHtml = `
+    <div style="margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--color-warning,#f59e0b);">
+        🆕 New (not yet in memory thread)
+      </div>
+      ${newTopicsHtml}
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--color-info,#3b82f6);">
+        ⚡ Proposed additions to existing thread (${proposedMatches.length})
+      </div>
+      ${proposedMatchesHtml}
+    </div>`;
 
   // Data gaps
   const gaps = [];
@@ -605,6 +1078,10 @@ function renderOverview(data) {
   el('panel-overview').innerHTML = `
     <h2 class="section-title">Overview <span style="font-size:12px;font-weight:400;color:var(--color-text-muted);">— select a card to explore All Content</span></h2>
     ${statsHtml}
+    <section class="card" id="review-queue" aria-labelledby="review-queue-title" style="margin-top:20px;">
+      <h3 class="section-title" id="review-queue-title">Review Queue</h3>
+      <div id="review-queue-content"></div>
+    </section>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;" class="overview-grid">
       <div>
@@ -614,7 +1091,6 @@ function renderOverview(data) {
       <div>
         <h3 class="section-title">Open Actions</h3>${actionsHtml}
         <h3 class="section-title" style="margin-top:16px;">Validation Warnings</h3>${warningsHtml}
-        <h3 class="section-title" style="margin-top:16px;">Pending Memory Review</h3>${pendingHtml}
         <h3 class="section-title" style="margin-top:16px;">Data Gaps</h3>${gapsHtml}
       </div>
     </div>`;
@@ -675,41 +1151,53 @@ function initFilters() {
 
 // ── Evidence modal ────────────────────────────────────────
 
-async function showEvidence(itemType, itemId, label) {
+function showEvidence(itemType, itemId, label) {
+  // Evidence drill-down via /api/v1/evidence/ is not implemented in this POC.
+  // Approved scope: D1 live data + append-only feedback only. R2 is not used in this POC.
+  // Topic key-facts, decisions, actions, and risks are available per-topic via
+  // the /api/v1/meetings/:id and /api/v1/topics endpoints (already loaded in state).
+  // A future production cockpit should implement a dedicated evidence endpoint.
   const modal = el('evidence-modal');
   const body = el('evidence-modal-body');
   el('evidence-modal-title').textContent = `Evidence — ${label}`;
-  body.innerHTML = '<div class="loading">Loading evidence...</div>';
+
+  // Surface the already-loaded D1 data for this item from state
+  let content = '';
+  if (itemType === 'topic' || itemType === 'memory') {
+    const topic = state.topics && state.topics.find
+      ? state.topics.find(t => t.topicId === itemId || t.memoryId === itemId)
+      : null;
+    if (topic) {
+      const section = (title, items) => {
+        if (!items || !items.length) return '';
+        return `<div class="modal-section">
+          <div class="modal-section-title">${esc(title)}</div>
+          <ul class="assertion-list">${items.map(a => `<li>${esc(a.text || String(a))}</li>`).join('')}</ul>
+        </div>`;
+      };
+      content = `
+        <div class="card-meta" style="margin-bottom:12px;">${esc(topic.topicStatement)}</div>
+        ${topic.validation?.status ? `<div style="margin-bottom:8px;">${validationBadge(topic.validation.status)}</div>` : ''}
+        ${topic.validation?.reasons?.length ? `<div class="validation-warning">Validation: ${topic.validation.reasons.map(esc).join('; ')}</div>` : ''}
+        ${section('Key Facts', topic.keyFacts)}
+        ${section('Decisions', topic.decisions)}
+        ${section('Actions', topic.actions)}
+        ${section('Risks', topic.risks)}
+        ${!topic.keyFacts?.length && !topic.decisions?.length && !topic.actions?.length && !topic.risks?.length
+          ? '<div class="empty-state">No evidence assertions in the D1 record for this item.</div>' : ''}`;
+    } else {
+      content = '<div class="empty-state">Item not found in loaded D1 data.</div>';
+    }
+  } else {
+    content = `<div class="empty-state" style="color:var(--color-text-muted);font-size:13px;">
+      Evidence drill-down is not available for <strong>${esc(itemType)}</strong> items in this POC.<br/>
+      Use the meeting detail view to see all extracted fields for this item.
+    </div>`;
+  }
+
+  body.innerHTML = content;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
-
-  try {
-    const data = await apiFetch(`/api/v1/evidence/${itemType}/${itemId}`);
-    const warnings = data.validationWarnings && data.validationWarnings.length
-      ? `<div class="validation-warning"><strong>Validation warnings:</strong><ul>${data.validationWarnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`
-      : '';
-    const gaps = data.dataGaps && data.dataGaps.length
-      ? `<div class="validation-warning"><strong>Data gaps:</strong> ${data.dataGaps.map(esc).join(', ')}</div>`
-      : '';
-    const section = (title, items) => {
-      if (!items || !items.length) return '';
-      return `<div class="modal-section">
-        <div class="modal-section-title">${title}</div>
-        <ul class="assertion-list">${items.map(a => `<li>${esc(a.text)}</li>`).join('')}</ul>
-      </div>`;
-    };
-    body.innerHTML = `
-      <div class="card-meta" style="margin-bottom:12px;">${esc(data.meetingSubject)} · ${esc((data.eventDate||'').substring(0,10))}</div>
-      ${warnings}${gaps}
-      ${section('Key Facts', data.keyFacts)}
-      ${section('Decisions', data.decisions)}
-      ${section('Actions', data.actions)}
-      ${section('Risks', data.risks)}
-      ${!data.keyFacts.length && !data.decisions.length && !data.actions.length && !data.risks.length
-        ? '<div class="empty-state">No evidence assertions extracted for this item.</div>' : ''}`;
-  } catch (err) {
-    body.innerHTML = `<div class="error-msg">Could not load evidence: ${esc(err.message)}</div>`;
-  }
 }
 
 function closeEvidence() {
@@ -720,22 +1208,27 @@ function closeEvidence() {
 
 // ── Feedback ──────────────────────────────────────────────
 
-function openFeedback(itemType, itemId, itemLabel) {
-  state.feedbackTarget = { itemType, itemId, itemLabel };
+function openFeedback(itemType, itemId, itemLabel, sourceVersion) {
+  // sourceVersion captures the item's updatedAt or ETag for feedback provenance
+  state.feedbackTarget = { itemType, itemId, itemLabel, sourceVersion: sourceVersion || null };
   el('feedback-target-label').textContent = itemLabel || `${itemType}/${itemId}`;
   el('feedback-verdict').value = '';
   el('feedback-field').value = '';
   el('feedback-notes').value = '';
+  el('feedback-warning-ack') && (el('feedback-warning-ack').checked = false);
   el('feedback-error').textContent = '';
+  el('feedback-success').textContent = '';
   // Enable Save — target is now set
   const saveBtn = el('feedback-save');
   saveBtn.disabled = false;
   saveBtn.removeAttribute('aria-disabled');
-  // Open panel
+  // Open panel and load existing feedback for this item
   state.feedbackPanelOpen = true;
   el('feedback-panel').classList.add('open');
   el('feedback-panel').setAttribute('aria-hidden', 'false');
   el('feedback-toggle').setAttribute('aria-expanded', 'true');
+  // Load existing feedback for this item from server
+  loadFeedbackForItem(itemType, itemId);
 }
 
 function closeFeedback() {
@@ -750,8 +1243,11 @@ function closeFeedback() {
   el('feedback-toggle').setAttribute('aria-expanded', 'false');
 }
 
-function saveFeedback() {
+async function saveFeedback() {
   const errorEl = el('feedback-error');
+  const successEl = el('feedback-success');
+  errorEl.textContent = '';
+  successEl.textContent = '';
 
   // Guard: no target selected (panel opened via toggle without item selection)
   if (!state.feedbackTarget) {
@@ -759,27 +1255,89 @@ function saveFeedback() {
     return;
   }
 
+  const reviewerName = (el('feedback-reviewer-name')?.value || '').trim();
   const verdict = el('feedback-verdict').value;
   const field = el('feedback-field').value;
   const notes = el('feedback-notes').value.trim();
+  const warningAck = el('feedback-warning-ack')?.checked === true;
 
+  if (!reviewerName) { errorEl.textContent = 'Please enter your reviewer name.'; return; }
   if (!verdict) { errorEl.textContent = 'Please select a verdict.'; return; }
   if (!field) { errorEl.textContent = 'Please select an affected field.'; return; }
   if (!notes) { errorEl.textContent = 'Please enter notes.'; return; }
-  errorEl.textContent = '';
+  if (!warningAck) { errorEl.textContent = 'You must acknowledge the data retention warning before submitting.'; return; }
 
-  state.feedback.push({
-    itemType: state.feedbackTarget.itemType,
-    itemId: state.feedbackTarget.itemId,
-    verdict,
-    affectedField: field,
-    notes,
-    createdAt: new Date().toISOString(),
-  });
+  const saveBtn = el('feedback-save');
+  saveBtn.disabled = true;
 
-  renderFeedbackList();
-  updateFeedbackCount();
-  closeFeedback();
+  try {
+    const body = {
+      itemType: state.feedbackTarget.itemType,
+      itemId: state.feedbackTarget.itemId,
+      sourceKind: 'd1',
+      sourceVersion: state.feedbackTarget.sourceVersion,
+      reviewerName,
+      verdict,
+      affectedField: field,
+      note: notes,
+      warningAcknowledged: true,
+      correctsFeedbackId: null,
+      sourceLocation: state.feedbackTarget.itemId,
+    };
+
+    const res = await fetch('/api/v1/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      errorEl.textContent = `Submission failed: ${data.error || res.status}`;
+      return;
+    }
+
+    const result = await res.json();
+    // Add to local session cache and refresh per-item history
+    state.feedback.push({ ...body, feedbackId: result.data?.feedbackId, createdAt: new Date().toISOString() });
+    successEl.textContent = '✓ Feedback saved to the dedicated feedback database.';
+    renderFeedbackList();
+    updateFeedbackCount();
+    // Reload server-side history for this item
+    loadFeedbackForItem(state.feedbackTarget.itemType, state.feedbackTarget.itemId);
+    void refreshReviewQueue();
+  } catch (fetchErr) {
+    errorEl.textContent = `Network error: ${fetchErr.message}`;
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+async function loadFeedbackForItem(itemType, itemId) {
+  const historyEl = el('feedback-item-history');
+  if (!historyEl) return;
+  historyEl.innerHTML = '<li style="color:var(--color-text-muted);font-size:11px;">Loading history…</li>';
+  try {
+    const res = await fetch(`/api/v1/feedback/item/${encodeURIComponent(itemType)}/${encodeURIComponent(itemId)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const rows = json.data || [];
+    if (!rows.length) {
+      historyEl.innerHTML = '<li style="color:var(--color-text-muted);font-size:11px;">No prior feedback for this item.</li>';
+      return;
+    }
+    historyEl.innerHTML = rows.map(f => `
+      <li class="feedback-list-item" style="font-size:11px;">
+        <div class="feedback-list-item-header">
+          <span>${esc(f.reviewer_name)}</span>
+          <span class="badge ${f.verdict === 'accurate' ? 'badge-pass' : f.verdict === 'incomplete' ? 'badge-warning' : 'badge-risk'}">${esc(f.verdict)}</span>
+        </div>
+        <div style="color:var(--color-text-muted);">Field: ${esc(f.affected_field)} · ${esc((f.created_at||'').substring(0,10))}</div>
+        <div>${esc(f.note)}</div>
+      </li>`).join('');
+  } catch (e) {
+    historyEl.innerHTML = `<li style="color:var(--color-text-muted);font-size:11px;">Could not load history: ${esc(e.message)}</li>`;
+  }
 }
 
 function renderFeedbackList() {
@@ -795,20 +1353,26 @@ function renderFeedbackList() {
         <span>${esc(f.itemType)}/${esc(f.itemId)}</span>
         <span class="badge ${f.verdict === 'accurate' ? 'badge-pass' : f.verdict === 'incomplete' ? 'badge-warning' : 'badge-risk'}">${esc(f.verdict)}</span>
       </div>
-      <div style="color:var(--color-text-muted);">Field: ${esc(f.affectedField)}</div>
-      <div>${esc(f.notes)}</div>
+      <div style="color:var(--color-text-muted);">Field: ${esc(f.affectedField)} · ${esc(f.reviewerName || '')}</div>
+      <div>${esc(f.note || f.notes || '')}</div>
     </li>`).join('');
 }
 
-function exportFeedback() {
-  if (!state.feedback.length) { alert('No feedback to export.'); return; }
-  const blob = new Blob([JSON.stringify(state.feedback, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `eip-cockpit-feedback-${new Date().toISOString().substring(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+async function exportFeedback() {
+  // Export from server (full persistent store), not just session cache
+  try {
+    const res = await fetch('/api/v1/feedback/export');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `eip-cockpit-feedback-${new Date().toISOString().substring(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`Export failed: ${e.message}`);
+  }
 }
 
 function resetFeedback() {
@@ -832,6 +1396,7 @@ function updateFeedbackCount() {
 async function init() {
   initTabs();
   initFilters();
+  initReviewerNameInputs(); // populates feedback-reviewer-name from localStorage
 
   // Evidence modal
   el('evidence-modal-close').addEventListener('click', closeEvidence);
@@ -869,22 +1434,34 @@ async function init() {
 
   // Load all data in parallel
   try {
-    const [overview, decisions, risksActions, topicMemory, topics] = await Promise.all([
+    const [overview, decisions, risksActions, topicMemory, topics, reviewQueue] = await Promise.all([
       apiFetch('/api/v1/overview'),
       apiFetch('/api/v1/decisions'),
       apiFetch('/api/v1/risks-actions'),
       apiFetch('/api/v1/topic-memory'),
       apiFetch('/api/v1/topics'),
+      apiFetch('/api/v1/review-queue'),
     ]);
 
     state.overview = overview;
     state.decisions = decisions;
-    state.risksActions = risksActions;
     state.topicMemory = topicMemory;
     state.topics = topics;
+    state.reviewQueue = reviewQueue;
+
+    // risksActions currently returns a flat action array. Derive the canonical
+    // Risk collection once from D1 topic classification plus risk assertions.
+    state.risksActions = {
+      actions: Array.isArray(risksActions) ? risksActions : (risksActions?.actions || []),
+      risks: deriveRisksFromTopics(topics, overview?.meetings),
+      evidenceProxyNotice: 'Risk-classified topics are shown once; assertions on non-Risk topics are evidence-only, not a governed risk register.',
+    };
 
     populateFilterOptions();
     renderOverview(overview);
+    renderReviewQueue();
+    renderPendingReview();
+    initReviewerNameInputs(); // re-init after renderPendingReview creates pending-reviewer-name input
     renderAllContent();
   } catch (err) {
     el('overview-loading').className = 'error-msg';
@@ -898,8 +1475,10 @@ document.addEventListener('DOMContentLoaded', init);
 // These are not used by production consumers — the UI is
 // the only consumer of this state machine.
 window.state = state;
+window.handleMatchClick = handleMatchClick;
 window.openFeedback = openFeedback;
 window.closeFeedback = closeFeedback;
 window.switchToAllContent = switchToAllContent;
+window.onStatCardClick = onStatCardClick;
 window.clearFilters = clearFilters;
 window.showEvidence = showEvidence;

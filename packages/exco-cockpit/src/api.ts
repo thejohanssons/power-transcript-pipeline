@@ -140,6 +140,22 @@ export function handleGetTopicMemory(request: Request): Response {
   return json(envelope(FIXTURE_TOPIC_MEMORY));
 }
 
+// ── GET /api/v1/review-queue ──────────────────────────────
+// The static cockpit test harness mirrors the live server contract.
+export function handleGetReviewQueue(request: Request): Response {
+  if (request.method !== 'GET') return methodNotAllowed();
+  const awaitingReview = FIXTURE_TOPIC_MEMORY
+    .filter(memory => memory.matchStatus === 'pending_review')
+    .map(memory => ({
+      itemType: 'memory', itemId: memory.memoryId, sourceKind: 'd1', sourceVersion: memory.updatedAt,
+      candidateStatus: 'pending_review', title: memory.canonicalStatement, summary: null,
+      entityType: memory.entityType, entity: memory.entity, aspect: memory.aspect,
+      proposedMatchMemoryId: memory.proposedMatchMemoryId, proposedMatchReason: memory.proposedMatchReason,
+      updatedAt: memory.updatedAt, disposition: null,
+    }));
+  return json(envelope({ generatedAt: new Date().toISOString(), awaitingReview, recordedDecisions: [] }));
+}
+
 // ── GET /api/v1/evidence/:itemType/:itemId ────────────────
 // :itemType must be one of: topic | decision | action | memory
 // Evidence responses never contain transcript content.
@@ -165,6 +181,7 @@ export function routeApiRequest(request: Request, url: URL): Response | null {
   if (path === '/api/v1/decisions') return handleGetDecisions(request);
   if (path === '/api/v1/risks-actions') return handleGetRisksActions(request);
   if (path === '/api/v1/topic-memory') return handleGetTopicMemory(request);
+  if (path === '/api/v1/review-queue') return handleGetReviewQueue(request);
 
   // Two-segment evidence route: /api/v1/evidence/:itemType/:itemId
   const evidenceMatch = path.match(/^\/api\/v1\/evidence\/([^/]+)\/([^/]+)$/);

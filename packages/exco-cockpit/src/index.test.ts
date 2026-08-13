@@ -40,6 +40,7 @@ describe('API envelope', () => {
     '/api/v1/decisions',
     '/api/v1/risks-actions',
     '/api/v1/topic-memory',
+    '/api/v1/review-queue',
   ];
 
   for (const path of endpoints) {
@@ -148,6 +149,7 @@ async function getAllResponseText(): Promise<string> {
     '/api/v1/decisions',
     '/api/v1/risks-actions',
     '/api/v1/topic-memory',
+    '/api/v1/review-queue',
     ...FIXTURE_EVIDENCE.map(e => `/api/v1/evidence/${e.itemType}/${e.itemId}`),
   ];
   const texts = await Promise.all(paths.map(async p => {

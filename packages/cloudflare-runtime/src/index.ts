@@ -1,4 +1,10 @@
-import type { Env, TranscriptSubmission, ProcessingQueueMessage } from './types';
+import type {
+  Env,
+  TranscriptSubmission,
+  ProcessingQueueMessage,
+  TopicMemoryReviewDecisionRequest,
+  TopicMemoryReviewDecisionResponse,
+} from './types';
 import type { Message, QueueEvent } from '@cloudflare/workers-types';
 import { RUNTIME_VERSION } from './types';
 import { isTranscriptSubmission } from './validation';
@@ -51,6 +57,75 @@ async function enableForeignKeys(db: D1Database): Promise<void> {
   // The statement is harmless and documents the intended behavior, but it
   // does not actually enforce FK constraints in D1 today.
   await db.prepare('PRAGMA foreign_keys = ON').run();
+}
+
+interface ReviewMemoryRow {
+  memory_id: string;
+  canonical_statement: string;
+  first_seen_meeting_id: string | null;
+  last_seen_meeting_id: string | null;
+  first_seen_date: string | null;
+  last_seen_date: string | null;
+  meeting_count: number;
+  latest_outcome: string | null;
+  latest_disposition: string | null;
+  latest_executive_scope: string | null;
+  match_status: string;
+  proposed_match_memory_id: string | null;
+  proposed_match_reason: string | null;
+  merged_into_memory_id: string | null;
+  updated_at: string;
+}
+
+type ReviewTargetRow = Pick<ReviewMemoryRow, 'memory_id' | 'canonical_statement' | 'first_seen_meeting_id' |
+  'last_seen_meeting_id' | 'first_seen_date' | 'last_seen_date' | 'meeting_count' | 'latest_outcome' |
+  'latest_disposition' | 'latest_executive_scope' | 'match_status' | 'merged_into_memory_id' | 'updated_at'>;
+
+type D1ResultLike = { meta?: { changes?: number } };
+
+function isSafeReviewIdentifier(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value);
+}
+
+function boundedText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength) return null;
+  return trimmed;
+}
+
+function validateReviewDecisionBody(body: unknown):
+  | { ok: true; value: TopicMemoryReviewDecisionRequest }
+  | { ok: false; message: string } {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, message: 'Request body must be an object' };
+  const value = body as Record<string, unknown>;
+  if (value.decision !== 'approve_match' && value.decision !== 'reject_match') {
+    return { ok: false, message: 'decision must be approve_match or reject_match' };
+  }
+  const expectedSourceVersion = boundedText(value.expectedSourceVersion, 128);
+  const expectedTarget = boundedText(value.expectedProposedMatchMemoryId, 128);
+  const reviewerName = boundedText(value.reviewerName, 200);
+  const note = boundedText(value.note, 4000);
+  const idempotencyKey = boundedText(value.idempotencyKey, 200);
+  if (!expectedSourceVersion || !expectedTarget || !reviewerName || !note || !idempotencyKey) {
+    return { ok: false, message: 'expectedSourceVersion, expectedProposedMatchMemoryId, reviewerName, note, and idempotencyKey are required and bounded' };
+  }
+  if (!isSafeReviewIdentifier(expectedTarget) || !isSafeReviewIdentifier(idempotencyKey)) {
+    return { ok: false, message: 'Invalid target or idempotency key' };
+  }
+  if (value.warningAcknowledged !== true) return { ok: false, message: 'warningAcknowledged must be true' };
+  return {
+    ok: true,
+    value: {
+      decision: value.decision as 'approve_match' | 'reject_match',
+      expectedSourceVersion,
+      expectedProposedMatchMemoryId: expectedTarget,
+      reviewerName,
+      note,
+      warningAcknowledged: true,
+      idempotencyKey,
+    },
+  };
 }
 
 export default {
@@ -266,32 +341,185 @@ export default {
 
   async handlePatchTopicMemoryMatch(id: string, request: Request, env: Env): Promise<Response> {
     const auth = request.headers.get('Authorization');
-    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+    if (!auth || auth !== `Bearer ${env.REVIEW_DECISION_TOKEN}`) {
       return errorResponse('Unauthorised', 401);
     }
 
+    if (!isSafeReviewIdentifier(id)) return errorResponse('Invalid candidate memory ID', 400);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body !== 'object' || !('decision' in body) || (body.decision !== 'accept' && body.decision !== 'reject')) {
-      return errorResponse('Request body must contain decision: "accept" or "reject"', 400);
+    const parsed = validateReviewDecisionBody(body);
+    if (!parsed.ok) return errorResponse(parsed.message, 400);
+    const decision = parsed.value;
+
+    const existingEvent = await env.DB.prepare(`SELECT review_event_id, candidate_memory_id, target_memory_id,
+        decision, expected_source_version, expected_proposed_match_memory_id, reviewer_name, reviewer_note,
+        warning_acknowledged, idempotency_key, candidate_match_status_after, created_at
+      FROM topic_memory_review_events WHERE idempotency_key = ?`)
+      .bind(decision.idempotencyKey)
+      .first<{
+        review_event_id: string; candidate_memory_id: string; target_memory_id: string; decision: string;
+        expected_source_version: string; expected_proposed_match_memory_id: string; reviewer_name: string;
+        reviewer_note: string; warning_acknowledged: number; idempotency_key: string;
+        candidate_match_status_after: 'merged' | 'confirmed'; created_at: string;
+      }>();
+
+    if (existingEvent) {
+      const samePayload = existingEvent.candidate_memory_id === id &&
+        existingEvent.decision === decision.decision &&
+        existingEvent.expected_source_version === decision.expectedSourceVersion &&
+        existingEvent.expected_proposed_match_memory_id === decision.expectedProposedMatchMemoryId &&
+        existingEvent.reviewer_name === decision.reviewerName &&
+        existingEvent.reviewer_note === decision.note &&
+        existingEvent.warning_acknowledged === 1;
+      if (!samePayload) return errorResponse('Idempotency key was already used for a different decision', 409);
+      const replayCandidate = await env.DB.prepare(
+        `SELECT updated_at FROM topic_memory WHERE memory_id = ?`,
+      ).bind(id).first<{ updated_at: string }>();
+      const replayTarget = await env.DB.prepare(
+        `SELECT updated_at FROM topic_memory WHERE memory_id = ?`,
+      ).bind(existingEvent.target_memory_id).first<{ updated_at: string }>();
+      return jsonResponse({
+        decision: existingEvent.decision as 'approve_match' | 'reject_match',
+        candidateMemoryId: id,
+        candidateMatchStatus: existingEvent.candidate_match_status_after,
+        targetMemoryId: existingEvent.target_memory_id,
+        candidateUpdatedAt: replayCandidate?.updated_at ?? existingEvent.created_at,
+        targetUpdatedAt: existingEvent.decision === 'approve_match' ? replayTarget?.updated_at ?? null : null,
+        auditEventId: existingEvent.review_event_id,
+        appliedAt: existingEvent.created_at,
+        idempotentReplay: true,
+      } satisfies TopicMemoryReviewDecisionResponse);
     }
 
-    if (body.decision === 'accept') {
-      return errorResponse('Accept merge not yet implemented', 501);
+    const candidate = await env.DB.prepare(`SELECT memory_id, canonical_statement, first_seen_meeting_id,
+        last_seen_meeting_id, first_seen_date, last_seen_date, meeting_count, latest_outcome,
+        latest_disposition, latest_executive_scope, match_status, proposed_match_memory_id,
+        proposed_match_reason, merged_into_memory_id, updated_at
+      FROM topic_memory WHERE memory_id = ?`).bind(id).first<ReviewMemoryRow>();
+    if (!candidate) return errorResponse('Candidate not found', 404);
+    if (candidate.match_status !== 'pending_review') return errorResponse('Candidate is no longer pending review', 409);
+
+    const targetId = candidate.proposed_match_memory_id;
+    if (!targetId || targetId !== decision.expectedProposedMatchMemoryId || targetId === id) {
+      return errorResponse('Candidate proposed target is no longer eligible', 409);
+    }
+    if (candidate.updated_at !== decision.expectedSourceVersion || candidate.merged_into_memory_id) {
+      return errorResponse('Candidate source version is stale', 409);
+    }
+    if (!isSafeReviewIdentifier(targetId)) return errorResponse('Candidate proposed target is invalid', 409);
+
+    const target = await env.DB.prepare(`SELECT memory_id, canonical_statement, first_seen_meeting_id,
+        last_seen_meeting_id, first_seen_date, last_seen_date, meeting_count, latest_outcome,
+        latest_disposition, latest_executive_scope, match_status, merged_into_memory_id, updated_at
+      FROM topic_memory WHERE memory_id = ?`).bind(targetId).first<ReviewTargetRow>();
+    if (!target || target.match_status === 'merged' || target.merged_into_memory_id) {
+      return errorResponse('Proposed target is missing or no longer eligible', 409);
     }
 
-    const result = await env.DB.prepare(`UPDATE topic_memory
-      SET match_status = 'confirmed',
-          proposed_match_memory_id = NULL,
-          proposed_match_reason = NULL,
-          updated_at = datetime('now')
-      WHERE memory_id = ? AND match_status = 'pending_review'`)
-      .bind(id)
-      .run();
+    const auditEventId = crypto.randomUUID();
+    const statements = [
+      env.DB.prepare(`INSERT INTO topic_memory_review_events (
+        review_event_id, candidate_memory_id, target_memory_id, decision,
+        expected_source_version, observed_source_version, expected_proposed_match_memory_id,
+        observed_proposed_match_memory_id, reviewer_name, reviewer_note, warning_acknowledged,
+        idempotency_key, candidate_match_status_before, candidate_match_status_after,
+        target_meeting_count_before, target_meeting_count_after
+      ) SELECT ?, ?, ?, ?, ?, updated_at, ?, proposed_match_memory_id, ?, ?, 1, ?, 'pending_review', ?, meeting_count, ?
+        FROM topic_memory
+        WHERE memory_id = ? AND match_status = 'pending_review' AND updated_at = ?
+          AND proposed_match_memory_id = ? AND merged_into_memory_id IS NULL
+          AND EXISTS (SELECT 1 FROM topic_memory t WHERE t.memory_id = ? AND t.memory_id != ?
+            AND t.match_status != 'merged' AND t.merged_into_memory_id IS NULL)`)
+        .bind(
+          auditEventId, id, targetId, decision.decision, decision.expectedSourceVersion,
+          decision.expectedProposedMatchMemoryId, decision.reviewerName, decision.note,
+          decision.idempotencyKey, decision.decision === 'approve_match' ? 'merged' : 'confirmed',
+          decision.decision === 'approve_match' ? target.meeting_count + candidate.meeting_count : target.meeting_count,
+          id, decision.expectedSourceVersion, decision.expectedProposedMatchMemoryId, targetId, id,
+        ),
+      env.DB.prepare(decision.decision === 'approve_match' ? `UPDATE topic_memory
+        SET match_status = 'merged', merged_into_memory_id = ?, review_resolved_at = datetime('now'),
+            review_event_id = ?, updated_at = datetime('now')
+        WHERE memory_id = ? AND match_status = 'pending_review' AND updated_at = ?
+          AND proposed_match_memory_id = ? AND merged_into_memory_id IS NULL` : `UPDATE topic_memory
+        SET match_status = 'confirmed', merged_into_memory_id = NULL, review_resolved_at = datetime('now'),
+            review_event_id = ?, proposed_match_memory_id = NULL, proposed_match_reason = NULL,
+            updated_at = datetime('now')
+        WHERE memory_id = ? AND match_status = 'pending_review' AND updated_at = ?
+          AND proposed_match_memory_id = ? AND merged_into_memory_id IS NULL`)
+        .bind(...(decision.decision === 'approve_match'
+          ? [targetId, auditEventId, id, decision.expectedSourceVersion, decision.expectedProposedMatchMemoryId]
+          : [auditEventId, id, decision.expectedSourceVersion, decision.expectedProposedMatchMemoryId])),
+    ];
 
-    if (!result.meta.changes) {
-      return errorResponse('Not found', 404);
+    if (decision.decision === 'approve_match') {
+      statements.push(env.DB.prepare(`UPDATE topic_memory SET
+          first_seen_date = CASE WHEN first_seen_date IS NULL OR ( ? IS NOT NULL AND ? < first_seen_date ) THEN ? ELSE first_seen_date END,
+          first_seen_meeting_id = CASE WHEN first_seen_date IS NULL OR ( ? IS NOT NULL AND ? < first_seen_date ) THEN ? ELSE first_seen_meeting_id END,
+          last_seen_date = CASE WHEN last_seen_date IS NULL OR ( ? IS NOT NULL AND ? > last_seen_date ) THEN ? ELSE last_seen_date END,
+          last_seen_meeting_id = CASE WHEN last_seen_date IS NULL OR ( ? IS NOT NULL AND ? > last_seen_date ) THEN ? ELSE last_seen_meeting_id END,
+          latest_outcome = CASE WHEN last_seen_date IS NULL OR ( ? IS NOT NULL AND ? > last_seen_date ) THEN ? ELSE latest_outcome END,
+          latest_disposition = CASE WHEN last_seen_date IS NULL OR ( ? IS NOT NULL AND ? > last_seen_date ) THEN ? ELSE latest_disposition END,
+          latest_executive_scope = CASE WHEN last_seen_date IS NULL OR ( ? IS NOT NULL AND ? > last_seen_date ) THEN ? ELSE latest_executive_scope END,
+          meeting_count = meeting_count + ?, updated_at = datetime('now')
+        WHERE memory_id = ? AND match_status != 'merged' AND merged_into_memory_id IS NULL
+          AND EXISTS (SELECT 1 FROM topic_memory c WHERE c.memory_id = ? AND c.match_status = 'merged'
+            AND c.merged_into_memory_id = ? AND c.review_event_id = ?)`)
+        .bind(
+          candidate.first_seen_date, candidate.first_seen_date, candidate.first_seen_date,
+          candidate.first_seen_date, candidate.first_seen_date, candidate.first_seen_meeting_id,
+          candidate.last_seen_date, candidate.last_seen_date, candidate.last_seen_date,
+          candidate.last_seen_date, candidate.last_seen_date, candidate.last_seen_meeting_id,
+          candidate.last_seen_date, candidate.last_seen_date, candidate.latest_outcome,
+          candidate.last_seen_date, candidate.last_seen_date, candidate.latest_disposition,
+          candidate.last_seen_date, candidate.last_seen_date, candidate.latest_executive_scope,
+          candidate.meeting_count, targetId, id, targetId, auditEventId,
+        ));
     }
 
-    return jsonResponse({ memoryId: id, decision: 'reject', matchStatus: 'confirmed' });
+    const targetMeetingCountAfter = decision.decision === 'approve_match'
+      ? target.meeting_count + candidate.meeting_count
+      : target.meeting_count;
+    statements.push(
+      env.DB.prepare(`INSERT INTO topic_memory_review_commit_guards (
+          review_event_id, candidate_memory_id, target_memory_id, decision, target_meeting_count_after
+        ) VALUES (?, ?, ?, ?, ?)`)
+        .bind(auditEventId, id, targetId, decision.decision, targetMeetingCountAfter),
+      env.DB.prepare(`DELETE FROM topic_memory_review_commit_guards WHERE review_event_id = ?`)
+        .bind(auditEventId),
+    );
+
+    let results: D1ResultLike[];
+    try {
+      results = await env.DB.batch(statements) as D1ResultLike[];
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('review decision invariant failed')) {
+        return errorResponse('Review candidate changed while the decision was being applied; refresh and reassess', 409);
+      }
+      throw error;
+    }
+    const auditResult = results[0] as D1ResultLike;
+    const candidateResult = results[1] as D1ResultLike;
+    const targetResult = decision.decision === 'approve_match' ? results[2] as D1ResultLike : null;
+    if (auditResult?.meta?.changes !== 1 || candidateResult?.meta?.changes !== 1 ||
+        (decision.decision === 'approve_match' && targetResult?.meta?.changes !== 1)) {
+      return errorResponse('Review candidate changed while the decision was being applied; refresh and reassess', 409);
+    }
+
+    const updatedCandidate = await env.DB.prepare(`SELECT updated_at FROM topic_memory WHERE memory_id = ?`).bind(id).first<{ updated_at: string }>();
+    const updatedTarget = decision.decision === 'approve_match'
+      ? await env.DB.prepare(`SELECT updated_at FROM topic_memory WHERE memory_id = ?`).bind(targetId).first<{ updated_at: string }>()
+      : null;
+    return jsonResponse({
+      decision: decision.decision,
+      candidateMemoryId: id,
+      candidateMatchStatus: decision.decision === 'approve_match' ? 'merged' : 'confirmed',
+      targetMemoryId: targetId,
+      candidateUpdatedAt: updatedCandidate?.updated_at ?? new Date().toISOString(),
+      targetUpdatedAt: updatedTarget?.updated_at ?? null,
+      auditEventId,
+      appliedAt: new Date().toISOString(),
+      idempotentReplay: false,
+    } satisfies TopicMemoryReviewDecisionResponse);
   },
 };

@@ -126,8 +126,11 @@ export interface CockpitTopicMemory {
   latestOutcome: MaybeExtracted<string>;
   latestDisposition: MaybeExtracted<string>;
   latestExecutiveScope: MaybeExtracted<string>;
-  matchStatus: 'confirmed' | 'pending_review' | 'rejected';
+  matchStatus: 'confirmed' | 'pending_review' | 'merged';
   proposedMatchStatement: MaybeExtracted<string>;
+  proposedMatchMemoryId?: string;
+  proposedMatchReason?: string;
+  updatedAt?: string;
   status: 'open' | 'resolved' | 'closed' | 'watching';
 }
 

@@ -178,6 +178,27 @@ export const FIXTURE_TOPICS: CockpitTopic[] = [
       ],
     },
   },
+  // Regression fixture: Risk classification must produce a primary Risk card
+  // even when the source record has no separately extracted risk assertions.
+  {
+    topicId: 'fx-topic-007',
+    meetingId: 'fx-meeting-002',
+    domain: 'Product Management',
+    entityType: 'Product',
+    entity: 'fx-product-beta',
+    aspect: 'Schedule',
+    outcome: 'Risk',
+    disposition: 'Monitoring',
+    executiveScope: 'Operational',
+    topicStatement: 'fx-product-beta delivery is at risk because verification work was temporarily deprioritised to investigate intermittent input latency.',
+    summary: 'The product team temporarily moved verification capacity to a customer-impacting investigation, creating a delivery risk.',
+    keyFacts: [],
+    risks: [],
+    owners: ['fx-role-cpo'],
+    accountableExecutive: 'fx-role-cpo',
+    confidence: 'medium',
+    validation: { status: 'pass', reasons: [] },
+  },
   {
     topicId: 'fx-topic-006',
     meetingId: 'fx-meeting-002',
@@ -323,6 +344,8 @@ export const FIXTURE_TOPIC_MEMORY: CockpitTopicMemory[] = [
     matchStatus: 'pending_review',
     // Proposed match is an older memory with slightly different phrasing
     proposedMatchStatement: 'Margin compression is being tracked following the Q2 supplier cost review.',
+    proposedMatchMemoryId: 'fx-memory-001',
+    updatedAt: '2026-07-15T12:00:00.000Z',
     status: 'open',
   },
   {

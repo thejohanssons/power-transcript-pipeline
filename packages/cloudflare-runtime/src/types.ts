@@ -14,6 +14,7 @@ export interface Env {
   AZURE_OPENAI_DEPLOYMENT: string;
   AZURE_OPENAI_API_KEY: string;
   SUBMISSION_TOKEN: string;
+  REVIEW_DECISION_TOKEN?: string;
   TEAMS_WEBHOOK_URL?: string;
 }
 
@@ -196,9 +197,12 @@ export interface TopicMemoryRecord {
   latestDisposition: string | null;
   latestExecutiveScope: string | null;
   // Match review
-  matchStatus: 'confirmed' | 'pending_review' | 'rejected';
+  matchStatus: 'confirmed' | 'pending_review' | 'merged';
   proposedMatchMemoryId?: string;
   proposedMatchReason?: string;
+  mergedIntoMemoryId?: string;
+  reviewResolvedAt?: string;
+  reviewEventId?: string;
   // Status
   status: 'open' | 'resolved' | 'closed' | 'watching';
   createdAt: string;
@@ -207,7 +211,24 @@ export interface TopicMemoryRecord {
 
 // ── Topic Memory match review ─────────────────────────────
 
-export interface TopicMemoryMatchDecision {
-  decision: 'accept' | 'reject';
-  reviewerNote?: string;
+export interface TopicMemoryReviewDecisionRequest {
+  decision: 'approve_match' | 'reject_match';
+  expectedSourceVersion: string;
+  expectedProposedMatchMemoryId: string;
+  reviewerName: string;
+  note: string;
+  warningAcknowledged: true;
+  idempotencyKey: string;
+}
+
+export interface TopicMemoryReviewDecisionResponse {
+  decision: 'approve_match' | 'reject_match';
+  candidateMemoryId: string;
+  candidateMatchStatus: 'merged' | 'confirmed';
+  targetMemoryId: string;
+  candidateUpdatedAt: string;
+  targetUpdatedAt: string | null;
+  auditEventId: string;
+  appliedAt: string;
+  idempotentReplay: boolean;
 }

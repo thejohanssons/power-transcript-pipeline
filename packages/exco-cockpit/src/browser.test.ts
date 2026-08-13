@@ -45,16 +45,38 @@ function buildDOM() {
   });
 
   const { window } = dom;
+  let queueRecorded = false;
 
   // Mock fetch — serves real fixture data via the actual API handlers.
   // This ensures tests exercise the same data as the production endpoints.
-  window.fetch = vi.fn(async (url) => {
+  window.fetch = vi.fn(async (url, init) => {
     const path = typeof url === 'string' ? url : url.toString();
+    if (path.startsWith('/api/v1/review-queue/memory/') && init?.method === 'POST') {
+      queueRecorded = true;
+      return { ok: true, status: 200, json: async () => ({ apiVersion: 'v1', data: { auditEventId: 'audit-event-1', decision: 'approve_match' } }) };
+    }
+    if (path === '/api/v1/feedback' && init?.method === 'POST') {
+      const submission = JSON.parse(init.body);
+      if (submission.itemType === 'memory') queueRecorded = true;
+      return { ok: true, status: 201, json: async () => ({ apiVersion: 'v1', data: { feedbackId: 'fixture-feedback-1', created: true } }) };
+    }
     const body = await realApiResponse(path);
+    if (path === '/api/v1/review-queue' && queueRecorded) {
+      const queue = body.data;
+      const item = queue.awaitingReview[0];
+      if (item) {
+        queue.awaitingReview = [];
+        queue.recordedDecisions = [{ ...item, disposition: {
+          feedbackId: 'fixture-feedback-1', verdict: 'accurate', affectedField: 'overall',
+          reviewerName: 'Executive Reviewer', createdAt: new Date().toISOString(), correctsFeedbackId: null,
+        } }];
+      }
+    }
     return {
       ok: true,
       status: 200,
       json: async () => body,
+      blob: async () => new window.Blob([JSON.stringify(body)], { type: 'application/json' }),
     };
   });
 
@@ -71,6 +93,11 @@ function buildDOM() {
 // Wait for async init (fetch + render) to complete
 async function waitForInit() {
   await new Promise(r => setTimeout(r, 50));
+}
+
+function acknowledgeFeedbackWarning(window: AnyWindow) {
+  const checkbox = window.document.getElementById('feedback-warning-ack');
+  if (checkbox) checkbox.checked = true;
 }
 
 // ── Tests ─────────────────────────────────────────────────
@@ -101,9 +128,9 @@ describe('Tab navigation', () => {
     expect(panel.classList.contains('active')).toBe(true);
   });
 
-  it('only two tabs exist', () => {
+  it('all cockpit tabs are present', () => {
     const tabs = window.document.querySelectorAll('[role="tab"]');
-    expect(tabs.length).toBe(2);
+    expect(tabs.length).toBe(3);
   });
 });
 
@@ -181,6 +208,9 @@ describe('Item-level feedback targeting and validation', () => {
   beforeEach(async () => {
     ({ dom, window } = buildDOM());
     await waitForInit();
+    const reviewer = window.document.getElementById('feedback-reviewer-name');
+    reviewer.value = 'Executive Reviewer';
+    reviewer.dispatchEvent(new window.Event('input'));
   });
   afterEach(() => dom.window.close());
 
@@ -210,28 +240,32 @@ describe('Item-level feedback targeting and validation', () => {
     expect(window.state.feedback.length).toBe(0);
   });
 
-  it('saves valid feedback and closes panel', () => {
+  it('saves valid feedback and closes panel', async () => {
     window.openFeedback('decision', 'fx-decision-001', 'label');
+    acknowledgeFeedbackWarning(window);
     window.document.getElementById('feedback-verdict').value = 'incomplete';
     window.document.getElementById('feedback-field').value = 'owner';
     window.document.getElementById('feedback-notes').value = 'Owner field is missing context.';
     window.document.getElementById('feedback-save').click();
+    await new Promise(r => setTimeout(r, 100));
     expect(window.state.feedback.length).toBe(1);
     expect(window.state.feedback[0].verdict).toBe('incomplete');
     expect(window.state.feedback[0].itemId).toBe('fx-decision-001');
-    // Panel should be closed after save
-    expect(window.document.getElementById('feedback-panel').getAttribute('aria-hidden')).toBe('true');
+    // The feedback panel remains open so the reviewer can inspect history.
+    expect(window.document.getElementById('feedback-panel').getAttribute('aria-hidden')).toBe('false');
   });
 
-  it('all four verdicts can be saved', () => {
+  it('all four verdicts can be saved', async () => {
     const verdicts = ['accurate', 'incomplete', 'incorrect', 'irrelevant'];
-    verdicts.forEach((v, i) => {
+    for (const [i, v] of verdicts.entries()) {
       window.openFeedback('action', `fx-action-00${i+1}`, `label ${i}`);
+      acknowledgeFeedbackWarning(window);
       window.document.getElementById('feedback-verdict').value = v;
       window.document.getElementById('feedback-field').value = 'overall';
       window.document.getElementById('feedback-notes').value = `Note for ${v}.`;
       window.document.getElementById('feedback-save').click();
-    });
+      await new Promise(r => setTimeout(r, 100));
+    }
     expect(window.state.feedback.length).toBe(4);
     const saved = window.state.feedback.map(f => f.verdict);
     expect(saved).toContain('accurate');
@@ -249,14 +283,17 @@ describe('Feedback export from live session state', () => {
   });
   afterEach(() => dom.window.close());
 
-  it('export creates a Blob from actual session feedback records', () => {
+  it('export creates a Blob from actual session feedback records', async () => {
     window.openFeedback('decision', 'fx-decision-001', 'test');
+    acknowledgeFeedbackWarning(window);
     window.document.getElementById('feedback-verdict').value = 'accurate';
     window.document.getElementById('feedback-field').value = 'overall';
     window.document.getElementById('feedback-notes').value = 'Correct.';
     window.document.getElementById('feedback-save').click();
+    await new Promise(r => setTimeout(r, 100));
 
     window.document.getElementById('feedback-export').click();
+    await new Promise(r => setTimeout(r, 100));
 
     // URL.createObjectURL should have been called with a Blob
     expect(window.URL.createObjectURL).toHaveBeenCalledOnce();
@@ -274,23 +311,70 @@ describe('Reset — cancel and confirm paths', () => {
     await waitForInit();
     // Add a feedback entry
     window.openFeedback('decision', 'fx-decision-001', 'label');
+    const reviewer = window.document.getElementById('feedback-reviewer-name');
+    reviewer.value = 'Executive Reviewer';
+    reviewer.dispatchEvent(new window.Event('input'));
+    acknowledgeFeedbackWarning(window);
     window.document.getElementById('feedback-verdict').value = 'accurate';
     window.document.getElementById('feedback-field').value = 'overall';
     window.document.getElementById('feedback-notes').value = 'note';
     window.document.getElementById('feedback-save').click();
+    await new Promise(r => setTimeout(r, 250));
   });
   afterEach(() => dom.window.close());
 
-  it('cancel reset leaves feedback intact', () => {
+  it('cancel reset leaves feedback intact', async () => {
+    await new Promise(r => setTimeout(r, 100));
     window.confirm = vi.fn(() => false); // user cancels
     window.document.getElementById('feedback-reset').click();
     expect(window.state.feedback.length).toBe(1);
   });
 
-  it('confirm reset clears all feedback', () => {
+  it('confirm reset clears all feedback', async () => {
+    await new Promise(r => setTimeout(r, 100));
     window.confirm = vi.fn(() => true); // user confirms
     window.document.getElementById('feedback-reset').click();
     expect(window.state.feedback.length).toBe(0);
+  });
+});
+
+describe('Meeting filter option resilience', () => {
+  it('initialises when a live meeting has no event date', async () => {
+    const { dom, window } = buildDOM();
+    const originalFetch = window.fetch;
+    window.fetch = vi.fn(async (url, init) => {
+      const path = typeof url === 'string' ? url : url.toString();
+      const response = await originalFetch(url, init);
+      if (path !== '/api/v1/overview') return response;
+      const body = await response.json();
+      body.data.meetings[0].eventDate = null;
+      return { ...response, json: async () => body };
+    });
+
+    window.eval(readFileSync(join(__dirname, '../public/app.js'), 'utf8'));
+    await waitForInit();
+
+    const meetingOptions = window.document.querySelectorAll('#filter-meeting option');
+    expect(meetingOptions.length).toBeGreaterThan(1);
+    expect(meetingOptions[1].textContent).toContain('—');
+    dom.window.close();
+  });
+});
+
+describe('Meeting aggregate counts', () => {
+  it('derives counts from loaded API collections when meeting summaries omit them', async () => {
+    const { dom, window } = buildDOM();
+    await waitForInit();
+
+    const meetingCard = [...window.document.querySelectorAll('#all-content-results .card')]
+      .find(card => card.querySelector('.card-title')?.textContent === 'Synthetic ExCo Review — Product & Delivery');
+    const meetingText = meetingCard?.textContent ?? '';
+
+    expect(meetingText).toContain('3 topics');
+    expect(meetingText).toContain('2 decisions');
+    expect(meetingText).toContain('3 actions');
+    expect(meetingText).not.toContain('undefined');
+    dom.window.close();
   });
 });
 
@@ -331,7 +415,7 @@ describe('All Content filters', () => {
     expect(results.innerHTML).not.toContain('content-type-title">Decision');
   });
 
-  it('type filter to Risk shows only risks', () => {
+  it('type filter to Risk shows only canonical risk cards', () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect.value = 'Risk';
     typeSelect.dispatchEvent(new window.Event('change'));
@@ -340,10 +424,46 @@ describe('All Content filters', () => {
     expect(results.innerHTML).not.toContain('content-type-title">Decision');
   });
 
-  it('type filter to Topic Memory shows only memories', () => {
+  it('shows one primary Risk card for a risk-classified topic with no extracted assertions', () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Risk';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const results = window.document.getElementById('all-content-results');
+    const statement = 'fx-product-beta delivery is at risk because verification work was temporarily deprioritised';
+    expect(results.innerHTML).toContain(statement);
+    expect(results.innerHTML).toContain('Risk-classified topic — no separate risk assertions were extracted.');
+    expect(window.state.risksActions.risks.find(r => r.topicId === 'fx-topic-007')).toMatchObject({
+      riskId: 'topic-risk:fx-topic-007',
+      kind: 'classified_topic',
+      topicDomain: 'Product Management',
+      topicEntityType: 'Product',
+      meetingSubject: 'Synthetic ExCo Review — Commercial & Finance',
+    });
+  });
+
+  it('does not duplicate a risk-classified topic per extracted assertion and labels non-Risk assertions as evidence-only', () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Risk';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const risks = window.state.risksActions.risks;
+    expect(risks.filter(r => r.topicId === 'fx-topic-001')).toHaveLength(1);
+    expect(risks.find(r => r.topicId === 'fx-topic-001')).toMatchObject({
+      riskId: 'topic-risk:fx-topic-001',
+      kind: 'classified_topic',
+    });
+    expect(risks.find(r => r.topicId === 'fx-topic-003')).toMatchObject({
+      riskId: 'risk-evidence:fx-topic-003:fx-risk-002',
+      kind: 'evidence_only',
+    });
+    const results = window.document.getElementById('all-content-results');
+    expect(results.innerHTML).toContain('Evidence-only risk assertion from a non-Risk topic.');
+  });
+
+  it('type filter to Topic Memory shows only memories', async () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect.value = 'Topic Memory';
     typeSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
     const results = window.document.getElementById('all-content-results');
     expect(results.innerHTML).toContain('Topic Memory');
   });
@@ -502,7 +622,7 @@ describe('All Content — Meeting and Topic type filters', () => {
     expect(results.innerHTML).not.toContain('content-type-title">Decision');
   });
 
-  it('type filter to Topic shows exactly 6 topic cards (fixture has 6)', async () => {
+  it('type filter to Topic shows exactly 7 topic cards (fixture has 7)', async () => {
     const typeSelect = window.document.getElementById('filter-type');
     typeSelect!.value = 'Topic';
     typeSelect!.dispatchEvent(new window.Event('change'));
@@ -689,6 +809,174 @@ describe('Topic Memory last-seen meeting filter — deterministic', () => {
     // Both fx-memory-001 (firstSeen=meeting-001) and fx-memory-002 should appear
     expect(results.innerHTML).toContain('fx-product-alpha September delivery is at risk');
     expect(results.innerHTML).toContain('Gross margin');
+  });
+});
+
+describe('Review Queue', () => {
+  let dom: JSDOM, window: AnyWindow;
+
+  beforeEach(async () => {
+    ({ dom, window } = buildDOM());
+    window.localStorage.clear();
+    await waitForInit();
+  });
+  afterEach(() => dom.window.close());
+
+  function queueItem() {
+    return window.state.reviewQueue.awaitingReview[0];
+  }
+
+  async function submitCurrentMemoryFeedback() {
+    const item = queueItem();
+    window.openFeedback('memory', item.itemId, item.title, item.sourceVersion);
+    const reviewer = window.document.getElementById('feedback-reviewer-name');
+    reviewer.value = 'Executive Reviewer';
+    reviewer.dispatchEvent(new window.Event('input'));
+    acknowledgeFeedbackWarning(window);
+    window.document.getElementById('feedback-verdict').value = 'accurate';
+    window.document.getElementById('feedback-field').value = 'overall';
+    window.document.getElementById('feedback-notes').value = 'Current-version queue review.';
+    window.document.getElementById('feedback-save').click();
+    await new Promise(r => setTimeout(r, 100));
+    return item;
+  }
+
+  it('shows Awaiting review by default', () => {
+    const queue = window.document.getElementById('review-queue-content');
+    expect(queue.textContent).toContain('awaiting review');
+    expect(queue.textContent).toContain(queueItem().title);
+  });
+
+  it('hides Recorded decisions before the audit toggle is activated', () => {
+    expect(window.document.getElementById('review-queue-recorded')?.hasAttribute('hidden')).toBe(true);
+    expect(window.document.getElementById('review-queue-recorded')?.textContent).not.toContain('Reviewer:');
+  });
+
+  it('reveals recorded reviewer and verdict context through the accessible audit toggle', async () => {
+    await submitCurrentMemoryFeedback();
+    const toggle = window.document.getElementById('review-queue-audit-toggle');
+    toggle.checked = true;
+    toggle.dispatchEvent(new window.Event('change'));
+    const recorded = window.document.getElementById('review-queue-recorded');
+    expect(recorded.hasAttribute('hidden')).toBe(false);
+    expect(recorded.textContent).toContain('Executive Reviewer');
+    expect(recorded.textContent).toContain('accurate');
+  });
+
+  it('moves an exact-current-version item from Awaiting review to Recorded decisions after feedback', async () => {
+    const item = await submitCurrentMemoryFeedback();
+    expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === item.itemId)).toBe(false);
+    expect(window.state.reviewQueue.recordedDecisions.some(x => x.itemId === item.itemId)).toBe(true);
+  });
+
+  it('does not expose storage locators or transcript fields in queue output', () => {
+    const text = window.document.getElementById('review-queue')?.textContent || '';
+    expect(text).not.toMatch(/r2|transcript|credential|storage locator|hash/i);
+    expect(JSON.stringify(window.state.reviewQueue)).not.toMatch(/r2|transcript|credential|storage locator|hash/i);
+  });
+});
+
+describe('Pending Review match decisions', () => {
+  let dom: JSDOM, window: AnyWindow;
+
+  beforeEach(async () => {
+    ({ dom, window } = buildDOM());
+    // jsdom reuses this origin's storage between DOM instances. Start each
+    // match-decision test without a reviewer so validation is deterministic.
+    window.localStorage.clear();
+    window.alert = vi.fn();
+    await waitForInit();
+  });
+
+  afterEach(() => dom.window.close());
+
+  function setReviewerName(name = 'Executive Reviewer') {
+    const input = window.document.getElementById('pending-reviewer-name')!;
+    input.value = name;
+    input.dispatchEvent(new window.Event('input'));
+  }
+
+  function pendingButtons() {
+    return Array.from(window.document.querySelectorAll('.match-actions button'));
+  }
+
+  function prepareDecision(note = 'Reviewed current evidence and trajectory.') {
+    window.document.getElementById('pending-decision-note').value = note;
+    window.document.getElementById('pending-decision-warning').checked = true;
+    window.confirm = vi.fn(() => true);
+  }
+
+  it('exposes the handler used by the inline Match and No match buttons', () => {
+    expect(typeof window.handleMatchClick).toBe('function');
+  });
+
+  it('requires a reviewer name before submitting a Match decision', async () => {
+    const [match] = pendingButtons();
+    match.click();
+    await new Promise(r => setTimeout(r, 80));
+
+    expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Please enter your reviewer name'));
+    expect(window.fetch.mock.calls.filter(([url, init]) => url === '/api/v1/feedback' && init?.method === 'POST')).toHaveLength(0);
+  });
+
+  it('sends approve_match with exact source version and target without mutating fixture memory', async () => {
+    const memory = window.state.topicMemory.find(m => m.matchStatus === 'pending_review');
+    const before = JSON.stringify(memory);
+    setReviewerName();
+    prepareDecision();
+
+    const [match] = pendingButtons();
+    match.click();
+    await new Promise(r => setTimeout(r, 80));
+
+    const decisionCalls = window.fetch.mock.calls.filter(([url, init]) => String(url).includes('/api/v1/review-queue/memory/') && init?.method === 'POST');
+    expect(decisionCalls).toHaveLength(1);
+    expect(JSON.parse(decisionCalls[0][1].body)).toMatchObject({
+      decision: 'approve_match',
+      expectedSourceVersion: memory.updatedAt,
+      expectedProposedMatchMemoryId: memory.proposedMatchMemoryId,
+      reviewerName: 'Executive Reviewer',
+      warningAcknowledged: true,
+    });
+    expect(JSON.parse(decisionCalls[0][1].body).note).toBe('Reviewed current evidence and trajectory.');
+    expect(JSON.stringify(memory)).toBe(before);
+    expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === memory.memoryId)).toBe(false);
+  });
+
+  it('sends reject_match with exact source version and target', async () => {
+    const memory = window.state.topicMemory.find(m => m.matchStatus === 'pending_review');
+    setReviewerName();
+    prepareDecision('Evidence does not support extending the existing thread.');
+
+    const [, noMatch] = pendingButtons();
+    noMatch.click();
+    await new Promise(r => setTimeout(r, 80));
+
+    const decisionCalls = window.fetch.mock.calls.filter(([url, init]) => String(url).includes('/api/v1/review-queue/memory/') && init?.method === 'POST');
+    expect(JSON.parse(decisionCalls[0][1].body)).toMatchObject({
+      decision: 'reject_match',
+      expectedSourceVersion: memory.updatedAt,
+      expectedProposedMatchMemoryId: memory.proposedMatchMemoryId,
+      reviewerName: 'Executive Reviewer',
+    });
+    expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === memory.memoryId)).toBe(false);
+  });
+
+  it('retains the action buttons and reports runtime command failure', async () => {
+    setReviewerName();
+    prepareDecision();
+    window.fetch.mockImplementation(async (url, init) => {
+      if (String(url).startsWith('/api/v1/review-queue/memory/') && init?.method === 'POST') return { ok: false, status: 500, json: async () => ({}) };
+      const body = await realApiResponse(typeof url === 'string' ? url : url.toString());
+      return { ok: true, status: 200, json: async () => body };
+    });
+
+    const [match] = pendingButtons();
+    match.click();
+    await new Promise(r => setTimeout(r, 80));
+
+    expect(window.alert).toHaveBeenCalledWith('Failed to apply runtime decision: HTTP 500');
+    expect(window.document.querySelectorAll('.match-actions button')).toHaveLength(3);
   });
 });
 

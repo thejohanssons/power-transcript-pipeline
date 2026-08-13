@@ -13,17 +13,21 @@
   <!-- Header -->
   <header class="cockpit-header">
     <h1>EIP ExCo Cockpit</h1>
-    <span class="poc-badge">Synthetic Data POC</span>
+    <span class="poc-badge" style="background:var(--color-risk,#dc2626);color:#fff;">⚠ Live Data — Local POC Only</span>
     <span style="flex:1;"></span>
     <span id="feedback-count" class="feedback-count" aria-live="polite">0</span>
     <span style="font-size:12px;color:var(--color-text-muted);margin-left:4px;">feedback</span>
   </header>
 
-  <!-- Primary tab navigation — exactly two tabs -->
+  <!-- Primary tab navigation -->
   <nav class="tab-nav" role="tablist" aria-label="Cockpit sections">
     <button class="tab-btn" role="tab" id="tab-overview"
       aria-controls="panel-overview" aria-selected="true" tabindex="0">
       Overview
+    </button>
+    <button class="tab-btn" role="tab" id="tab-pending-review"
+      aria-controls="panel-pending-review" aria-selected="false" tabindex="-1">
+      Pending Review <span id="tab-pending-count" style="font-size:11px;opacity:0.8;"></span>
     </button>
     <button class="tab-btn" role="tab" id="tab-all-content"
       aria-controls="panel-all-content" aria-selected="false" tabindex="-1">
@@ -38,6 +42,14 @@
     <section id="panel-overview" class="tab-panel active"
       role="tabpanel" aria-labelledby="tab-overview">
       <div class="loading" id="overview-loading">Loading overview…</div>
+    </section>
+
+    <!-- ── Pending Review panel ──────────────────────────── -->
+    <section id="panel-pending-review" class="tab-panel"
+      role="tabpanel" aria-labelledby="tab-pending-review">
+      <div id="pending-review-content">
+        <div class="loading">Loading pending review items…</div>
+      </div>
     </section>
 
     <!-- ── All Content panel ─────────────────────────────── -->
@@ -131,21 +143,34 @@
 
 <!-- Feedback panel -->
 <aside class="feedback-panel" id="feedback-panel"
-  role="complementary" aria-label="Session feedback" aria-hidden="true">
+  role="complementary" aria-label="Quality feedback" aria-hidden="true">
   <div class="feedback-panel-header">
-    <span class="feedback-panel-title">Session Feedback</span>
+    <span class="feedback-panel-title">Quality Feedback</span>
     <button class="modal-close" id="feedback-panel-close" aria-label="Close feedback">×</button>
   </div>
   <div class="feedback-panel-body">
 
-    <div class="feedback-session-notice" role="status">
-      ⚠ Feedback is stored in browser memory only. It will be lost on refresh,
-      browser close, or navigation reload. Export before closing.
+    <div class="feedback-session-notice" role="status" style="background:var(--color-warning-bg,#fff8e1);border:1px solid var(--color-warning,#f59e0b);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+      ⚠ <strong>Data retention warning:</strong> Feedback notes are permanently retained
+      in a dedicated remote database. <strong>Do not reproduce raw transcript text or
+      sensitive source material in notes.</strong> By submitting you acknowledge this.
     </div>
 
     <!-- Feedback form -->
     <div class="feedback-form" id="feedback-form-section">
-      <div class="feedback-form-title" id="feedback-target-label">Select an item to give feedback</div>
+      <div class="feedback-form-title" id="feedback-target-label"
+        style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--color-text-muted);">
+        Select an item to give feedback
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="feedback-reviewer-name">Your name <span aria-hidden="true">*</span></label>
+        <input class="form-input" id="feedback-reviewer-name" type="text"
+          placeholder="Display name (stored with every submission)"
+          aria-required="true"
+          style="width:100%;padding:6px 10px;border:1px solid var(--color-border);border-radius:4px;font-size:13px;" />
+      </div>
+
       <div class="form-group">
         <label class="form-label" for="feedback-verdict">Verdict <span aria-hidden="true">*</span></label>
         <select class="form-select" id="feedback-verdict" aria-required="true">
@@ -156,6 +181,7 @@
           <option value="irrelevant">Irrelevant</option>
         </select>
       </div>
+
       <div class="form-group">
         <label class="form-label" for="feedback-field">Affected field <span aria-hidden="true">*</span></label>
         <select class="form-select" id="feedback-field" aria-required="true">
@@ -176,27 +202,51 @@
           <option value="validation">Validation</option>
         </select>
       </div>
+
       <div class="form-group">
         <label class="form-label" for="feedback-notes">Notes <span aria-hidden="true">*</span></label>
         <textarea class="form-textarea" id="feedback-notes"
-          placeholder="Describe what is accurate, missing, incorrect, or irrelevant…"
+          placeholder="Describe what is accurate, missing, incorrect, or irrelevant. Do not paste transcript text."
           aria-required="true"></textarea>
       </div>
-      <div id="feedback-error" role="alert" style="color:var(--color-risk);font-size:12px;margin-bottom:8px;"></div>
+
+      <div class="form-group" style="display:flex;align-items:flex-start;gap:8px;margin-top:4px;">
+        <input type="checkbox" id="feedback-warning-ack" aria-required="true"
+          style="margin-top:2px;flex-shrink:0;" />
+        <label for="feedback-warning-ack" style="font-size:12px;color:var(--color-text-muted);cursor:pointer;">
+          I acknowledge that this note will be <strong>permanently retained</strong> and
+          must not contain raw transcript text or sensitive source material.
+        </label>
+      </div>
+
+      <div id="feedback-error" role="alert"
+        style="color:var(--color-risk);font-size:12px;margin:8px 0;min-height:16px;"></div>
+      <div id="feedback-success" role="status"
+        style="color:var(--color-pass,#16a34a);font-size:12px;margin-bottom:8px;min-height:16px;"></div>
+
       <button class="btn-primary" id="feedback-save" disabled aria-disabled="true">Save Feedback</button>
     </div>
 
-    <!-- Feedback list -->
-    <hr style="margin:16px 0;border:none;border-top:1px solid var(--color-border);" />
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span style="font-size:12px;font-weight:600;">Recorded this session</span>
+    <!-- Per-item history from server -->
+    <hr style="margin:14px 0;border:none;border-top:1px solid var(--color-border);" />
+    <div style="font-size:12px;font-weight:600;margin-bottom:6px;">Prior feedback for this item</div>
+    <ul class="feedback-list" id="feedback-item-history" aria-live="polite"
+      style="max-height:160px;overflow-y:auto;">
+      <li style="color:var(--color-text-muted);font-size:11px;">Select an item to see its feedback history.</li>
+    </ul>
+
+    <!-- Session cache list -->
+    <hr style="margin:14px 0;border:none;border-top:1px solid var(--color-border);" />
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:12px;font-weight:600;">Submitted this session</span>
+      <span id="feedback-count" style="font-size:11px;color:var(--color-text-muted);"></span>
     </div>
     <ul class="feedback-list" id="feedback-list" aria-live="polite"></ul>
 
-    <div class="feedback-actions">
-      <button class="btn-secondary" id="feedback-export">Export JSON</button>
+    <div class="feedback-actions" style="margin-top:12px;">
+      <button class="btn-secondary" id="feedback-export">Export all (server)</button>
       <button class="btn-secondary" id="feedback-reset"
-        style="color:var(--color-risk);border-color:var(--color-risk);">Reset</button>
+        style="color:var(--color-risk);border-color:var(--color-risk);">Clear session</button>
     </div>
 
   </div>

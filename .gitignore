@@ -5,12 +5,13 @@ obj
 appsettings.json
 local.settings.json
 
-# Local secrets - contains API keys and credentials, do not commit
-# classification_rules.json: ignore secret versions, allow sanitised config/ version
+# Local and secret-bearing configuration
+# The package pipeline_config.json is a tracked, sanitised production-default file.
+# Credentials must remain external via environment variables.
 /classification_rules.json
-pipeline_config.json
+/pipeline_config.json
 packages/pipeline/classification_rules.json
-packages/pipeline/pipeline_config.json
+packages/local-cockpit-server/.env.local
 
 
 # Azurite artifacts
