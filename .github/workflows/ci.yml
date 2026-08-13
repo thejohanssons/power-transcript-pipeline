@@ -3,11 +3,9 @@ name: CI Validation
 on:
   push:
     branches:
-      - develop
       - main
   pull_request:
     branches:
-      - develop
       - main
 
 jobs:
@@ -91,6 +89,50 @@ jobs:
       - name: Run tests
         working-directory: packages/local-cockpit-server
         run: npm test
+
+  test-cloudflare-runtime:
+    runs-on: ubuntu-latest
+    name: Test Cloudflare Runtime (vitest)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/cloudflare-runtime/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/cloudflare-runtime
+        run: npm ci
+
+      - name: Run Cloudflare runtime tests
+        working-directory: packages/cloudflare-runtime
+        run: npm test -- --run
+
+  test-exco-cockpit:
+    runs-on: ubuntu-latest
+    name: Test ExCo Cockpit (vitest)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/exco-cockpit/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/exco-cockpit
+        run: npm ci
+
+      - name: Run ExCo Cockpit tests
+        working-directory: packages/exco-cockpit
+        run: npm test -- --run
 
   lint-pipeline:
     runs-on: ubuntu-latest
