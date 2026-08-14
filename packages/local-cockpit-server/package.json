@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "preflight": "node --env-file=.env.local dist/preflight.js",
+    "test:runtime-topic-lists": "node --env-file=.env.local scripts/test-runtime-topic-lists.mjs",
     "dev": "echo 'ERROR: Use npm start (after npm run build) to run the local server. Wrangler dev is not supported for this package.' && exit 1",
     "deploy": "echo 'ERROR: This package must never be deployed. It is a localhost-only POC with live D1 data access.' && exit 1",
     "wrangler": "echo 'ERROR: Wrangler is not available in this package.' && exit 1"
