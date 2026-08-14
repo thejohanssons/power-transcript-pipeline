@@ -191,6 +191,9 @@ describe('mapTopicMemoryToCockpit', () => {
     expect(m.entity).toBe('Reader 3');
     expect(m.matchStatus).toBe('pending_review');
     expect(m.meetingCount).toBe(1);
+    expect(m.mergedIntoMemoryId).toBeNull();
+    expect(m.reviewResolvedAt).toBeNull();
+    expect(m.reviewEventId).toBeNull();
   });
 });
 
@@ -213,6 +216,11 @@ describe('buildOverview', () => {
     expect(overview.openActionCount).toBe(1);  // only open actions
     expect(overview.topicMemoryCount).toBe(1);
     expect(overview.pendingReviewCount).toBe(1);  // pending_review memory
+
+    const mergedMemory = { ...MEMORY_ROW, memory_id: 'mem-merged', match_status: 'merged', merged_into_memory_id: 'mem-001' };
+    const rootOnlyOverview = buildOverview([MEETING_ROW], [TOPIC_ROW], [openAction], [DECISION_ROW], [MEMORY_ROW, mergedMemory]);
+    expect(rootOnlyOverview.topicMemoryCount).toBe(1);
+    expect(rootOnlyOverview.pendingReviewCount).toBe(1);
     expect(overview.validationWarningCount).toBe(1);  // topic has 'warning' status
   });
 

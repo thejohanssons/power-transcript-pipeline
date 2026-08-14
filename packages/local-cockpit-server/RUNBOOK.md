@@ -115,6 +115,30 @@ The server logs a warning banner on startup. Confirm it shows `127.0.0.1`.
 
 ## 5. During the review session
 
+### Topic Memory review semantics
+
+- A Topic Memory is a durable canonical trajectory across one or more meetings, not merely a matched pair.
+- **Match** means `merge candidate into existing Topic Memory trajectory`; the Runtime Worker is the only component permitted to perform that write.
+- **No match** means `confirm separate Topic Memory`; it preserves the candidate as an independent root.
+- The local D1 adapter is read-only and uses fixed `SELECT` statements. Do not modify Runtime D1 directly from the Cockpit or workstation.
+- Merged source observations remain retained for provenance but are not counted as additional Topic Memory trajectories in the default All Content view.
+- After a successful decision, verify that Overview, All Content, Topic Memories, Topics, and Pending review all refresh from the live snapshot.
+
+### Read-only merged-target diagnostic
+
+If the Cockpit shows `target unavailable` for a merged source observation, run the read-only report in `packages/cloudflare-runtime/diagnostics/topic-memory-merge-integrity.sql` against the Runtime D1 database using an approved read-only operational procedure. Inspect the SQL before execution; it contains `SELECT` statements only and must not be modified into a repair script.
+
+The report classifies records as:
+
+- `merged_missing_target`: merged status but no `merged_into_memory_id`;
+- `merged_missing_audit`: no review event with a target ID;
+- `merged_target_audit_mismatch`: stored target differs from the latest audit target;
+- `merged_target_missing`: stored target ID does not resolve to a Topic Memory;
+- `merged_target_is_merged`: target is itself a merged child;
+- `healthy_merged`: target and audit relationship are present.
+
+Capture the report output for review. Do not repair rows through the local D1 adapter or by editing the diagnostic query; any correction must use an approved Runtime Worker-authorized maintenance operation.
+
 - Do not paste raw transcripts into feedback notes
 - Do not share the server port with other machines
 - Do not run `wrangler deploy` or any Wrangler command from this package

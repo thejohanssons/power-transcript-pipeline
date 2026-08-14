@@ -310,6 +310,7 @@ export const FIXTURE_TOPIC_MEMORY: CockpitTopicMemory[] = [
   // Requirement 5: spans two meetings, meeting_count > 1
   {
     memoryId: 'fx-memory-001',
+    domain: 'Product Management',
     entityType: 'Product',
     entity: 'fx-product-alpha',
     aspect: 'Schedule',
@@ -326,9 +327,33 @@ export const FIXTURE_TOPIC_MEMORY: CockpitTopicMemory[] = [
     proposedMatchStatement: NOT_EXTRACTED,
     status: 'open',
   },
+  // Synthetic provenance-only source observation for opt-in browser coverage.
+  {
+    memoryId: 'fx-memory-001-source-merged',
+    domain: 'Product Management',
+    entityType: 'Product',
+    entity: 'fx-product-alpha',
+    aspect: 'Schedule',
+    canonicalStatement: 'Historical source observation for fx-product-alpha September delivery trajectory.',
+    firstSeenMeetingId: 'fx-meeting-001',
+    lastSeenMeetingId: 'fx-meeting-001',
+    firstSeenDate: '2026-07-15',
+    lastSeenDate: '2026-07-15',
+    meetingCount: 1,
+    latestOutcome: 'Risk',
+    latestDisposition: 'Action',
+    latestExecutiveScope: 'Operational',
+    matchStatus: 'merged',
+    mergedIntoMemoryId: 'fx-memory-001',
+    reviewResolvedAt: '2026-07-23T10:15:00.000Z',
+    reviewEventId: 'fx-audit-merge-001',
+    proposedMatchStatement: NOT_EXTRACTED,
+    status: 'open',
+  },
   // Requirement 6: pending_review match state
   {
     memoryId: 'fx-memory-002',
+    domain: 'Finance',
     entityType: 'Metric',
     entity: 'fx-metric-gross-margin',
     aspect: 'Cost',
@@ -350,6 +375,7 @@ export const FIXTURE_TOPIC_MEMORY: CockpitTopicMemory[] = [
   },
   {
     memoryId: 'fx-memory-003',
+    domain: 'Commercial',
     entityType: 'Market',
     entity: 'fx-market-edu-uk',
     aspect: 'Performance',
@@ -368,6 +394,7 @@ export const FIXTURE_TOPIC_MEMORY: CockpitTopicMemory[] = [
   },
   {
     memoryId: 'fx-memory-004',
+    domain: 'Operations',
     entityType: 'Team',
     entity: 'fx-team-engineering',
     aspect: 'Capability',
@@ -549,8 +576,8 @@ export const FIXTURE_OVERVIEW: CockpitOverview = {
   topicCount: FIXTURE_TOPICS.length,
   decisionCount: FIXTURE_DECISIONS.length,
   openActionCount: FIXTURE_ACTIONS.filter(a => a.status === 'open').length,
-  topicMemoryCount: FIXTURE_TOPIC_MEMORY.length,
-  pendingReviewCount: FIXTURE_TOPIC_MEMORY.filter(m => m.matchStatus === 'pending_review').length,
+  topicMemoryCount: FIXTURE_TOPIC_MEMORY.filter(m => !m.mergedIntoMemoryId && m.matchStatus !== 'merged').length,
+  pendingReviewCount: FIXTURE_TOPIC_MEMORY.filter(m => !m.mergedIntoMemoryId && m.matchStatus === 'pending_review').length,
   validationWarningCount: FIXTURE_TOPICS.filter(t => t.validation.status !== 'pass').length,
   meetings: FIXTURE_MEETINGS,
 };

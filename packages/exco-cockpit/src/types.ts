@@ -114,6 +114,7 @@ export interface CockpitAction {
 
 export interface CockpitTopicMemory {
   memoryId: string;
+  domain?: MaybeExtracted<string>;
   entityType: string;
   entity: string;
   aspect: MaybeExtracted<string>;
@@ -130,6 +131,9 @@ export interface CockpitTopicMemory {
   proposedMatchStatement: MaybeExtracted<string>;
   proposedMatchMemoryId?: string;
   proposedMatchReason?: string;
+  mergedIntoMemoryId?: string | null;
+  reviewResolvedAt?: string | null;
+  reviewEventId?: string | null;
   updatedAt?: string;
   status: 'open' | 'resolved' | 'closed' | 'watching';
 }

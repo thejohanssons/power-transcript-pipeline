@@ -27,7 +27,7 @@ const state = {
   feedbackPanelOpen: false,
 
   // Filters
-  filters: { type: '', meeting: '', domain: '', entityFamily: '', keyword: '' },
+  filters: { type: '', meeting: '', domain: '', entityFamily: '', keyword: '', trajectoryScope: '' },
 };
 
 // ── Overview card → content-type mapping ──────────────────
@@ -121,13 +121,14 @@ function switchToAllContent(typeFilter, stateFilter) {
   state.filters.domain = '';
   state.filters.entityFamily = '';
   state.filters.keyword = '';
-
+  state.filters.trajectoryScope = '';
   // Update filter UI
   if (el('filter-type')) el('filter-type').value = typeFilter || '';
   if (el('filter-meeting')) el('filter-meeting').value = '';
   if (el('filter-domain')) el('filter-domain').value = '';
   if (el('filter-entity-family')) el('filter-entity-family').value = '';
   if (el('filter-keyword')) el('filter-keyword').value = '';
+  if (el('filter-trajectory-scope')) el('filter-trajectory-scope').value = '';
 
   // Store state filter for render (e.g. open actions, pending memory)
   state._stateFilter = stateFilter || null;
@@ -207,7 +208,17 @@ function buildAllItems() {
   const decisions = state.decisions || [];
   const risks = state.risksActions ? state.risksActions.risks : [];
   const actions = state.risksActions ? state.risksActions.actions : [];
-  const memories = state.topicMemory || [];
+  // Topic Memory results are grouped by canonical root. Merged source
+  // observations are attached as branches and never become separate items.
+  const allMemories = state.topicMemory || [];
+  const rootMemories = allMemories.filter(m => !m.mergedIntoMemoryId && m.matchStatus !== 'merged');
+  const branchesByRoot = new Map();
+  allMemories.filter(m => m.mergedIntoMemoryId || m.matchStatus === 'merged').forEach(branch => {
+    const targetId = branch.mergedIntoMemoryId;
+    if (!targetId) return;
+    if (!branchesByRoot.has(targetId)) branchesByRoot.set(targetId, []);
+    branchesByRoot.get(targetId).push(branch);
+  });
   const topics = state.topics || [];
 
   // Meetings
@@ -297,40 +308,48 @@ function buildAllItems() {
     });
   });
 
-  // Topic Memory
-  // Topic Memory: Domain filter explicitly excludes all Topic Memory records.
-  // No domain is extracted from or derivable for memory records — they are
-  // enduring condition records without an organisational owner field.
-  // The Domain filter select will never match Topic Memory items.
-  // Use the Entity Family filter (on entityType) or Keyword to find relevant memories.
-  memories.forEach(m => items.push({
-    _type: 'Topic Memory',
-    _id: m.memoryId,
-    _searchText: [
-      m.canonicalStatement, m.entity, m.entityType, m.aspect,
-      m.latestOutcome, m.proposedMatchStatement,
-    ].filter(s => s && !notExtracted(s)).join(' ').toLowerCase(),
-    _meetingId: m.firstSeenMeetingId,
-    _lastMeetingId: m.lastSeenMeetingId,
-    _domain: null, // explicitly excluded — no domain extracted for Topic Memory
-    _entityFamily: m.entityType,
-    _stateValue: m.matchStatus,
-    data: m,
-  }));
+  // Topic Memory: one All Content item per canonical root. Merged
+  // observations are attached to the root as trajectoryBranches.
+  rootMemories.forEach(root => {
+    const branches = branchesByRoot.get(root.memoryId) || [];
+    const observations = [root, ...branches];
+    items.push({
+      _type: 'Topic Memory',
+      _id: root.memoryId,
+      _searchText: observations.flatMap(m => [
+        m.canonicalStatement, m.entity, m.entityType, m.aspect, m.domain,
+        m.latestOutcome, m.proposedMatchStatement,
+      ]).filter(s => s && !notExtracted(s)).join(' ').toLowerCase(),
+      _meetingId: root.firstSeenMeetingId,
+      _lastMeetingId: root.lastSeenMeetingId,
+      _meetingIds: observations.flatMap(m => [m.firstSeenMeetingId, m.lastSeenMeetingId]).filter(Boolean),
+      _domain: root.domain && root.domain !== 'Not extracted' ? root.domain : null,
+      _entityFamily: root.entityType,
+      _stateValue: root.matchStatus,
+      data: { ...root, trajectoryBranches: branches },
+    });
+  });
 
   return items;
 }
 
 function applyFilters(items) {
-  const { type, meeting, domain, entityFamily, keyword } = state.filters;
+  const { type, meeting, domain, entityFamily, keyword, trajectoryScope } = state.filters;
   const stateFilter = state._stateFilter || null;
 
   return items.filter(item => {
     if (type && item._type !== type) return false;
+    if (trajectoryScope && item._type === 'Topic Memory') {
+      const memory = item.data;
+      if (trajectoryScope === 'multi_meeting' && memory.meetingCount <= 1) return false;
+      if (trajectoryScope === 'standalone' && (memory.meetingCount !== 1 || memory.matchStatus === 'pending_review')) return false;
+      if (trajectoryScope === 'pending_review' && memory.matchStatus !== 'pending_review') return false;
+    }
     // For Topic Memory items, match if either first OR last meeting ID matches
     if (meeting) {
       if (item._type === 'Topic Memory') {
-        if (item._meetingId !== meeting && item._lastMeetingId !== meeting) return false;
+        const meetingIds = item._meetingIds || [item._meetingId, item._lastMeetingId];
+        if (!meetingIds.includes(meeting)) return false;
       } else {
         if (item._meetingId !== meeting) return false;
       }
@@ -349,6 +368,7 @@ function applyFilters(items) {
 function populateFilterOptions() {
   const meetings = state.overview ? state.overview.meetings : [];
   const topics = state.topics || [];
+  const memories = state.topicMemory || [];
 
   // Meeting options
   const meetingSelect = el('filter-meeting');
@@ -359,8 +379,11 @@ function populateFilterOptions() {
     meetingSelect.appendChild(opt);
   });
 
-  // Domain options — from Topics
-  const domains = [...new Set(topics.map(t => t.domain).filter(d => d && d !== 'Not extracted'))].sort();
+  // Domain options come from both Topics and Topic Memories.
+  const domains = [...new Set([
+    ...topics.map(t => t.domain),
+    ...memories.map(m => m.domain),
+  ].filter(d => d && d !== 'Not extracted'))].sort();
   const domainSelect = el('filter-domain');
   domains.forEach(d => {
     const opt = document.createElement('option');
@@ -390,6 +413,10 @@ function renderFilterSummary(filtered, total) {
   if (state.filters.domain) active.push(`Domain: <span class="filter-active-tag">${esc(state.filters.domain)}</span>`);
   if (state.filters.entityFamily) active.push(`Entity family: <span class="filter-active-tag">${esc(state.filters.entityFamily)}</span>`);
   if (state.filters.keyword) active.push(`Keyword: <span class="filter-active-tag">${esc(state.filters.keyword)}</span>`);
+  if (state.filters.trajectoryScope) {
+    const scopeLabels = { multi_meeting: 'multi-meeting trajectories', standalone: 'standalone one-meeting memories', pending_review: 'pending review memories' };
+    active.push(`Trajectory: <span class="filter-active-tag">${esc(scopeLabels[state.filters.trajectoryScope] || state.filters.trajectoryScope)}</span>`);
+  }
   if (state._stateFilter) active.push(`State: <span class="filter-active-tag">${esc(state._stateFilter)}</span>`);
 
   const summaryEl = el('filter-summary');
@@ -556,12 +583,29 @@ function renderItemCard(item) {
 
     case 'Topic Memory': {
       const isPending = d.matchStatus === 'pending_review';
+      const branches = Array.isArray(d.trajectoryBranches) ? d.trajectoryBranches : [];
+      const branchRows = branches.map(branch => `<div style="position:relative;padding:8px 0 8px 22px;border-left:2px solid var(--color-border);margin-left:7px;">
+        <span aria-hidden="true" style="position:absolute;left:-7px;top:12px;width:11px;height:11px;border-radius:50%;background:var(--color-surface);border:2px solid var(--color-primary);"></span>
+        <strong>Matched and merged source observation</strong>
+        <span class="card-meta"> · ${esc(branch.memoryId)} · ${esc(branch.firstSeenDate)} · Meeting: ${esc(branch.firstSeenMeetingId)}</span>
+        ${branch.reviewResolvedAt ? `<div class="card-meta">Reviewed: ${esc(branch.reviewResolvedAt)}${branch.reviewEventId ? ` · Audit: ${esc(branch.reviewEventId)}` : ''}</div>` : ''}
+        <div style="font-size:12px;margin-top:3px;">${esc(branch.canonicalStatement)}</div>
+      </div>`).join('');
+      const trajectoryHtml = `<div class="topic-memory-timeline" style="margin-top:12px;padding:10px;border:1px solid var(--color-border);border-radius:6px;">
+        <strong>Trajectory observations (${branches.length + 1})</strong>
+        <div style="position:relative;margin-top:8px;padding:8px 0 8px 22px;">
+          <span aria-hidden="true" style="position:absolute;left:1px;top:12px;width:13px;height:13px;border-radius:50%;background:var(--color-primary);border:2px solid var(--color-primary);"></span>
+          <strong>Root observation</strong>
+          <span class="card-meta"> · ${esc(d.memoryId)} · ${esc(d.firstSeenDate)} · Meeting: ${esc(d.firstSeenMeetingId)}</span>
+        </div>
+        ${branchRows}
+      </div>`;
       return `<div class="card" style="position:relative;">
         ${isPending ? '<span class="badge badge-pending" style="position:absolute;top:12px;right:12px;">⚡ Pending review</span>' : ''}
         <div class="card-header">
           <div>
             <div class="card-title">${esc(d.canonicalStatement)}</div>
-            <div class="card-meta">[${esc(d.entityType)}] ${esc(d.entity)}</div>
+            <div class="card-meta">[${esc(d.entityType)}] ${esc(d.entity)}${d.domain ? ` · Domain: ${esc(d.domain)}` : ''}</div>
           </div>
           <div class="btn-actions">
             <button class="btn-evidence" onclick="showEvidence('memory','${esc(d.memoryId)}','Memory evidence')">Evidence</button>
@@ -569,9 +613,14 @@ function renderItemCard(item) {
           </div>
         </div>
         <div class="card-meta">
-          Seen ${d.meetingCount}× · First: ${esc(d.firstSeenDate)} · Last: ${esc(d.lastSeenDate)} ·
-          Outcome: ${renderMaybeExtracted(d.latestOutcome)} · Scope: ${renderMaybeExtracted(d.latestExecutiveScope)}
+          ${d.matchStatus === 'pending_review' ? 'Pending match · 1 meeting' : (d.meetingCount === 1 ? 'Standalone memory · 1 meeting' : `Active trajectory · ${d.meetingCount} meetings`)} · First: ${esc(d.firstSeenDate)} · Last: ${esc(d.lastSeenDate)} ·
+          Latest classification: ${renderMaybeExtracted(d.latestOutcome)} · Status: ${esc(d.status || 'open')} · Match: ${esc(d.matchStatus)}
         </div>
+        <div style="font-size:12px;color:var(--color-text-muted);margin-top:4px;">
+          Disposition: ${renderMaybeExtracted(d.latestDisposition)} · Scope: ${renderMaybeExtracted(d.latestExecutiveScope)}
+        </div>
+        ${d.reviewResolvedAt ? `<div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">Reviewed: ${esc(d.reviewResolvedAt)}${d.reviewEventId ? ` · Audit: ${esc(d.reviewEventId)}` : ''}</div>` : ''}
+        ${branches.length ? trajectoryHtml : ''}
         ${isPending && !notExtracted(d.proposedMatchStatement) ? `<div class="validation-warning" style="margin-top:8px;">Proposed match: ${esc(d.proposedMatchStatement)}</div>` : ''}
       </div>`;
     }
@@ -669,7 +718,7 @@ async function submitMatchDecision(memoryId, topicId, decision, memoryUpdatedAt,
       throw new Error(result.error || 'The candidate changed. The queue was refreshed; reassess the current data.');
     }
     if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-    await refreshReviewQueue();
+    await refreshLiveSnapshot();
     if (status) { status.textContent = `${approve ? 'Approve match and merge' : 'Reject match and keep separate'} applied. Audit event: ${result.data?.auditEventId || result.auditEventId}`; status.className = 'success'; }
   } catch (e) {
     buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-disabled'); });
@@ -898,10 +947,36 @@ function renderReviewQueue() {
   if (toggle) toggle.addEventListener('change', () => { state.reviewQueueAudit = toggle.checked; renderReviewQueue(); });
 }
 
+async function refreshLiveSnapshot() {
+  const [overview, decisions, risksActions, topicMemory, topics, reviewQueue] = await Promise.all([
+    apiFetch('/api/v1/overview'),
+    apiFetch('/api/v1/decisions'),
+    apiFetch('/api/v1/risks-actions'),
+    apiFetch('/api/v1/topic-memory'),
+    apiFetch('/api/v1/topics'),
+    apiFetch('/api/v1/review-queue'),
+  ]);
+  state.overview = overview;
+  state.decisions = decisions;
+  state.topicMemory = topicMemory;
+  state.topics = topics;
+  state.reviewQueue = reviewQueue;
+  state.risksActions = {
+    actions: Array.isArray(risksActions) ? risksActions : (risksActions?.actions || []),
+    risks: deriveRisksFromTopics(topics, overview?.meetings),
+    evidenceProxyNotice: 'Risk-classified topics are shown once; assertions on non-Risk topics are evidence-only, not a governed risk register.',
+  };
+  populateFilterOptions();
+  renderOverview(overview);
+  renderReviewQueue();
+  renderPendingReview();
+  initReviewerNameInputs();
+  renderAllContent();
+}
+
 async function refreshReviewQueue() {
   try {
-    state.reviewQueue = await apiFetch('/api/v1/review-queue');
-    renderReviewQueue();
+    await refreshLiveSnapshot();
   } catch (error) {
     const container = el('review-queue-content');
     if (container) container.innerHTML = `<div class="error-msg">Review queue unavailable: ${esc(error.message)}</div>`;
@@ -1105,23 +1180,25 @@ function onStatCardClick(key) {
 // ── Filter wiring ─────────────────────────────────────────
 
 function clearFilters() {
-  state.filters = { type: '', meeting: '', domain: '', entityFamily: '', keyword: '' };
+  state.filters = { type: '', meeting: '', domain: '', entityFamily: '', keyword: '', trajectoryScope: '' };
   state._stateFilter = null;
   if (el('filter-type')) el('filter-type').value = '';
   if (el('filter-meeting')) el('filter-meeting').value = '';
   if (el('filter-domain')) el('filter-domain').value = '';
   if (el('filter-entity-family')) el('filter-entity-family').value = '';
   if (el('filter-keyword')) el('filter-keyword').value = '';
+  if (el('filter-trajectory-scope')) el('filter-trajectory-scope').value = '';
   renderAllContent();
 }
 
 function initFilters() {
-  ['filter-type','filter-meeting','filter-domain','filter-entity-family'].forEach(id => {
+  ['filter-type','filter-trajectory-scope','filter-meeting','filter-domain','filter-entity-family'].forEach(id => {
     const sel = el(id);
     if (!sel) return;
     sel.addEventListener('change', () => {
       const key = {
         'filter-type': 'type',
+        'filter-trajectory-scope': 'trajectoryScope',
         'filter-meeting': 'meeting',
         'filter-domain': 'domain',
         'filter-entity-family': 'entityFamily',
