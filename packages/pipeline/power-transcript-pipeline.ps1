@@ -3147,28 +3147,20 @@ function Process-VttFile {
     $eventDate   = $parsed.EventDate
     $subject     = $parsed.Subject
 
-    # Meeting ID: sanitised filename + file creation date (ensures uniqueness)
+    # Fallback identity for files without reliable embedded metadata. MeetingIntelligence
+    # files normally carry a canonical subject/start header, so this is not the preferred ID.
     $fileCreated = if ($FileItem.fileSystemInfo -and $FileItem.fileSystemInfo.createdDateTime) {
         [datetime]$FileItem.fileSystemInfo.createdDateTime
     } else { Get-Date }
     $createdDateStr = $fileCreated.ToString("yyyy-MM-dd")
     $cleanBase   = $baseName -replace '[^a-zA-Z0-9_\-]', '_' -replace '__+', '_'
-    $mId         = "${cleanBase}_${createdDateStr}"
+    $filenameMeetingId = "${cleanBase}_${createdDateStr}"
 
-    Write-Host "Processing VTT: $($FileItem.name) → [$mId]"
+    Write-Host "Inspecting transcript source: $($FileItem.name)"
 
-    # 1. Skip if already processed in Master Log
-    $alreadyProcessed = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId -and $_.Status -eq "success" }
-    if ($alreadyProcessed) {
-        Write-Host "  [VTT] Already in master log — skipping"
-        if (-not $SkipDeletion) {
-            Remove-VttInboxFile -DriveId $SourceDriveId -ItemId $FileItem.id | Out-Null
-            Write-Host "  [VTT] Source file deleted from inbox ✅"
-        }
-        return
-    }
+    # 1. Download VTT/TXT content before duplicate detection. MeetingIntelligence
+    # metadata is required to derive the same identity as the Calendar path.
 
-    # 2. Download VTT content
     $vttContent = $null
     try {
         Ensure-GraphToken
@@ -3204,6 +3196,28 @@ function Process-VttFile {
     if ($parsedContent.StartDate) { 
         $eventDate = $parsedContent.StartDate 
         Write-Host "  [VTT/TXT] Date overridden from content: $($eventDate.ToString('yyyy-MM-dd HH:mm'))"
+    }
+
+    # Use the same canonical date+subject identity as Calendar whenever the
+    # transcript contains MeetingIntelligence metadata. This makes overlapping
+    # Calendar and MeetingIntelligence transcripts converge on one MeetingId.
+    $mId = if ($parsedContent.Subject -and $parsedContent.StartDate) {
+        Get-MeetingLogId -EventDate $eventDate -Subject $subject
+    } else {
+        $filenameMeetingId
+    }
+    Write-Host "Processing VTT/TXT: $($FileItem.name) → [$mId]"
+
+    # 2. Skip if already processed in Master Log. The check must occur after
+    # metadata parsing so it compares the canonical cross-source MeetingId.
+    $alreadyProcessed = $script:masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mId -and $_.Status -eq "success" }
+    if ($alreadyProcessed) {
+        Write-Host "  [VTT/TXT] Already in master log — skipping"
+        if (-not $SkipDeletion) {
+            Remove-VttInboxFile -DriveId $SourceDriveId -ItemId $FileItem.id | Out-Null
+            Write-Host "  [VTT/TXT] Source file deleted from inbox ✅"
+        }
+        return
     }
 
     $organiser = $script:calendarUserUpn
