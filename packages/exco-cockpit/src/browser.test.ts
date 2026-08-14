@@ -466,6 +466,112 @@ describe('All Content filters', () => {
     await new Promise(r => setTimeout(r, 50));
     const results = window.document.getElementById('all-content-results');
     expect(results.innerHTML).toContain('Topic Memory');
+    expect(results.innerHTML).toMatch(/Pending match|Standalone memory|Active trajectory/);
+  });
+
+  it('filters Topic Memories to multi-meeting trajectories', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const scope = window.document.getElementById('filter-trajectory-scope');
+    scope.value = 'multi_meeting';
+    scope.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const results = window.document.getElementById('all-content-results');
+    expect(results.querySelectorAll('.card')).toHaveLength(1);
+    expect(results.textContent).toContain('Active trajectory · 2 meetings');
+    expect(results.textContent).not.toContain('Standalone memory');
+    expect(window.document.getElementById('filter-summary').textContent).toContain('multi-meeting trajectories');
+  });
+
+  it('filters Topic Memories to standalone and pending scopes with clear labels', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const scope = window.document.getElementById('filter-trajectory-scope');
+    scope.value = 'standalone';
+    scope.dispatchEvent(new window.Event('change'));
+    expect(window.document.getElementById('all-content-results').textContent).toContain('Standalone memory · 1 meeting');
+    expect(window.document.querySelectorAll('#all-content-results .card')).toHaveLength(2);
+    scope.value = 'pending_review';
+    scope.dispatchEvent(new window.Event('change'));
+    expect(window.document.getElementById('all-content-results').textContent).toContain('Pending match · 1 meeting');
+    expect(window.document.querySelectorAll('#all-content-results .card')).toHaveLength(1);
+  });
+
+  it('does not apply trajectory scope to non-memory types and clears it with filters', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const before = window.document.querySelectorAll('#all-content-results .card').length;
+    const scope = window.document.getElementById('filter-trajectory-scope');
+    scope.value = 'multi_meeting';
+    scope.dispatchEvent(new window.Event('change'));
+    expect(window.document.querySelectorAll('#all-content-results .card').length).toBe(before);
+    window.document.getElementById('filter-clear').click();
+    expect(scope.value).toBe('');
+    expect(window.state.filters.trajectoryScope).toBe('');
+  });
+
+  it('groups merged observations inside one root Topic Memory card', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const cards = window.document.querySelectorAll('#all-content-results .card');
+    const results = window.document.getElementById('all-content-results');
+    expect(cards).toHaveLength(4);
+    expect(results.textContent).toContain('Active trajectory · 2 meetings');
+    expect(results.textContent).toContain('Trajectory observations (2)');
+    expect(results.querySelector('.topic-memory-timeline')).toBeTruthy();
+    expect(results.textContent).toContain('Root observation');
+    expect(results.textContent).toContain('Matched and merged source observation');
+    expect(results.textContent).toContain('fx-memory-001-source-merged');
+    expect(results.textContent).toContain('Reviewed: 2026-07-23T10:15:00.000Z');
+    expect(results.textContent).toContain('Audit: fx-audit-merge-001');
+  });
+
+  it('keeps Topic Memory counts root-based while Topics remain individual', async () => {
+    const baselineCount = window.state.overview.topicMemoryCount;
+    expect(baselineCount).toBe(4);
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    expect(window.document.querySelectorAll('#all-content-results .card').length).toBeGreaterThan(4);
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    expect(window.state.overview.topicMemoryCount).toBe(baselineCount);
+  });
+
+  it('applies Domain and keyword filters across grouped branch observations', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain');
+    domainSelect.value = 'Product Management';
+    domainSelect.dispatchEvent(new window.Event('change'));
+    const kw = window.document.getElementById('filter-keyword');
+    kw.value = 'historical source observation';
+    kw.dispatchEvent(new window.Event('input'));
+    await new Promise(r => setTimeout(r, 300));
+    const results = window.document.getElementById('all-content-results');
+    expect(results.textContent).toContain('Trajectory observations (2)');
+    expect(results.textContent).toContain('Historical source observation for fx-product-alpha');
+  });
+
+  it('Domain filter includes Topic Memory records with their originating domain', async () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Topic Memory';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const domainSelect = window.document.getElementById('filter-domain');
+    const domain = Array.from(domainSelect.options).map(option => option.value).find(Boolean);
+    expect(domain).toBeTruthy();
+    domainSelect.value = domain;
+    domainSelect.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 50));
+    const results = window.document.getElementById('all-content-results');
+    expect(results.textContent).toContain(`Domain: ${domain}`);
   });
 
   it('keyword filter is case-insensitive', async () => {
@@ -760,7 +866,7 @@ describe('Domain and Entity Family filters — deterministic', () => {
     expect(results.innerHTML).not.toContain('No items match');
   });
 
-  it('Domain filter excludes Topic Memory (no domain extracted for memory records)', async () => {
+  it('Domain filter includes matching Topic Memory records', async () => {
     const typeSelect = window.document.getElementById('filter-type')!;
     typeSelect.value = 'Topic Memory';
     typeSelect.dispatchEvent(new window.Event('change'));
@@ -769,8 +875,8 @@ describe('Domain and Entity Family filters — deterministic', () => {
     domainSelect.dispatchEvent(new window.Event('change'));
     await new Promise(r => setTimeout(r, 50));
     const results = window.document.getElementById('all-content-results')!;
-    // All Topic Memory items should be excluded when Domain filter is active
-    expect(results.innerHTML).toContain('No items match');
+    expect(results.textContent).toContain('Domain: Finance');
+    expect(results.textContent).not.toContain('No items match');
   });
 });
 
@@ -941,6 +1047,9 @@ describe('Pending Review match decisions', () => {
     expect(JSON.parse(decisionCalls[0][1].body).note).toBe('Reviewed current evidence and trajectory.');
     expect(JSON.stringify(memory)).toBe(before);
     expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === memory.memoryId)).toBe(false);
+    for (const endpoint of ['/api/v1/overview', '/api/v1/decisions', '/api/v1/risks-actions', '/api/v1/topic-memory', '/api/v1/topics', '/api/v1/review-queue']) {
+      expect(window.fetch.mock.calls.some(([url, init]) => url === endpoint && (!init || init.method === 'GET'))).toBe(true);
+    }
   });
 
   it('sends reject_match with exact source version and target', async () => {

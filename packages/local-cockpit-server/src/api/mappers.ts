@@ -121,6 +121,9 @@ export interface CockpitTopicMemory {
   matchStatus: string;
   proposedMatchMemoryId: string | null;
   proposedMatchReason: string | null;
+  mergedIntoMemoryId: string | null;
+  reviewResolvedAt: string | null;
+  reviewEventId: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +148,9 @@ export function mapTopicMemoryToCockpit(rows: TopicMemoryRow[]): CockpitTopicMem
     matchStatus: r.match_status,
     proposedMatchMemoryId: r.proposed_match_memory_id,
     proposedMatchReason: r.proposed_match_reason,
+    mergedIntoMemoryId: r.merged_into_memory_id ?? null,
+    reviewResolvedAt: r.review_resolved_at ?? null,
+    reviewEventId: r.review_event_id ?? null,
     status: r.status,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -256,8 +262,8 @@ export function buildOverview(
     topicCount: topics.length,
     decisionCount: decisions.length,
     openActionCount: actions.filter(a => a.status === 'open').length,
-    topicMemoryCount: memory.length,
-    pendingReviewCount: memory.filter(m => m.match_status === 'pending_review').length,
+    topicMemoryCount: memory.filter(m => !m.merged_into_memory_id && m.match_status !== 'merged').length,
+    pendingReviewCount: memory.filter(m => !m.merged_into_memory_id && m.match_status === 'pending_review').length,
     validationWarningCount: topics.filter(t => t.validation_status !== 'pass').length,
     meetings: mapMeetingsToCockpit(meetings),
   };
