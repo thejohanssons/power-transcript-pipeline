@@ -17,14 +17,16 @@ function responseCapture() {
 
 function deps() {
   const runtimeReviewClient = { submitTopicMemoryDecision: vi.fn() };
+  const memoryRow = {
+    memory_id: 'memory-1', domain: 'Product', entity_type: 'initiative', entity: 'Alpha', aspect: 'delivery',
+    canonical_statement: 'Alpha delivery is at risk', first_seen_meeting_id: null, last_seen_meeting_id: null,
+    first_seen_date: null, last_seen_date: null, meeting_count: 1, latest_outcome: null, latest_disposition: null,
+    latest_executive_scope: null, match_status: 'pending_review', proposed_match_memory_id: null,
+    proposed_match_reason: null, status: 'active', created_at: '2026-08-01', updated_at: '2026-08-10',
+  };
   const runtimeD1 = {
-    listTopicMemory: vi.fn().mockResolvedValue([{
-      memory_id: 'memory-1', domain: 'Product', entity_type: 'initiative', entity: 'Alpha', aspect: 'delivery',
-      canonical_statement: 'Alpha delivery is at risk', first_seen_meeting_id: null, last_seen_meeting_id: null,
-      first_seen_date: null, last_seen_date: null, meeting_count: 1, latest_outcome: null, latest_disposition: null,
-      latest_executive_scope: null, match_status: 'pending_review', proposed_match_memory_id: null,
-      proposed_match_reason: null, status: 'active', created_at: '2026-08-01', updated_at: '2026-08-10',
-    }]),
+    listTopicMemory: vi.fn().mockResolvedValue([memoryRow]),
+    getTopicMemory: vi.fn().mockImplementation(async (memoryId: string) => memoryId === memoryRow.memory_id ? memoryRow : null),
   } as unknown as RuntimeD1Adapter;
   const feedbackD1 = {
     listFeedbackForReviewQueue: vi.fn().mockResolvedValue([]),
@@ -48,6 +50,26 @@ describe('GET /api/v1/review-queue', () => {
     expect(dependencies.feedbackD1.listFeedbackForReviewQueue).toHaveBeenCalledOnce();
     expect((dependencies.runtimeD1 as any).insert).toBeUndefined();
     expect((dependencies.feedbackD1 as any).insertFeedback).toBeUndefined();
+  });
+
+  it('loads one topic memory by ID for referenced targets', async () => {
+    const dependencies = deps();
+    const router = createApiRouter(dependencies);
+    const capture = responseCapture();
+    await router({ method: 'GET' } as any, capture.response, new URL('http://localhost/api/v1/topic-memory/memory-1'), undefined);
+    const result = capture.read();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data).toMatchObject({ memoryId: 'memory-1', canonicalStatement: 'Alpha delivery is at risk' });
+    expect((dependencies.runtimeD1 as any).getTopicMemory).toHaveBeenCalledWith('memory-1');
+  });
+
+  it('returns 404 for an unknown topic memory target', async () => {
+    const dependencies = deps();
+    const router = createApiRouter(dependencies);
+    const capture = responseCapture();
+    await router({ method: 'GET' } as any, capture.response, new URL('http://localhost/api/v1/topic-memory/missing'), undefined);
+    expect(capture.read().status).toBe(404);
   });
 
   it('does not expose recorded decisions until an exact current version matches', async () => {

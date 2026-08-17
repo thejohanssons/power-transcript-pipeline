@@ -121,6 +121,16 @@ export function createApiRouter(deps: ApiDeps) {
       return json(res, mapActionsToCockpit(actions, meetings, topics));
     }
 
+    // ── GET /api/v1/topic-memory/:id ────────────────────────
+    const memoryMatch = path.match(/^\/api\/v1\/topic-memory\/([^/]+)$/);
+    if (memoryMatch && method === 'GET') {
+      const memoryId = parseId(memoryMatch[1]);
+      if (!memoryId) return err(res, 'Invalid topic memory ID', 400);
+      const row = await runtimeD1.getTopicMemory(memoryId);
+      if (!row) return err(res, 'Topic memory not found', 404);
+      return json(res, mapTopicMemoryToCockpit([row])[0]);
+    }
+
     // ── GET /api/v1/topic-memory ────────────────────────────
     if (path === '/api/v1/topic-memory' && method === 'GET') {
       const rows = await runtimeD1.listTopicMemory();
