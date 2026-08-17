@@ -133,6 +133,15 @@ export function handleGetRisksActions(request: Request): Response {
   return json(envelope(enrichedResponse));
 }
 
+// ── GET /api/v1/topic-memory/:id ──────────────────────────
+
+export function handleGetTopicMemoryById(request: Request, memoryId: string): Response {
+  if (request.method !== 'GET') return methodNotAllowed();
+  const memory = FIXTURE_TOPIC_MEMORY.find(item => item.memoryId === memoryId);
+  if (!memory) return notFound(`Topic memory '${memoryId}' not found`);
+  return json(envelope(memory));
+}
+
 // ── GET /api/v1/topic-memory ──────────────────────────────
 
 export function handleGetTopicMemory(request: Request): Response {
@@ -180,6 +189,8 @@ export function routeApiRequest(request: Request, url: URL): Response | null {
   if (path === '/api/v1/topics') return handleGetTopics(request);
   if (path === '/api/v1/decisions') return handleGetDecisions(request);
   if (path === '/api/v1/risks-actions') return handleGetRisksActions(request);
+  const topicMemoryMatch = path.match(/^\/api\/v1\/topic-memory\/([^/]+)$/);
+  if (topicMemoryMatch) return handleGetTopicMemoryById(request, decodeURIComponent(topicMemoryMatch[1]));
   if (path === '/api/v1/topic-memory') return handleGetTopicMemory(request);
   if (path === '/api/v1/review-queue') return handleGetReviewQueue(request);
 

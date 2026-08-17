@@ -214,6 +214,17 @@ describe('Validation warnings and pending memory review', () => {
     expect(overview.pendingReviewCount).toBeGreaterThan(0);
   });
 
+  it('topic-memory endpoint resolves a referenced memory by ID', async () => {
+    const { status, body } = await callApi('/api/v1/topic-memory/fx-memory-001');
+    expect(status).toBe(200);
+    expect((body as { data: { memoryId: string } }).data.memoryId).toBe('fx-memory-001');
+  });
+
+  it('topic-memory endpoint returns 404 for an unknown memory ID', async () => {
+    const { status } = await callApi('/api/v1/topic-memory/missing-memory');
+    expect(status).toBe(404);
+  });
+
   it('topic-memory endpoint contains at least one pending_review item with proposed match', async () => {
     const { body } = await callApi('/api/v1/topic-memory');
     const memories = (body as { data: typeof FIXTURE_TOPIC_MEMORY }).data;

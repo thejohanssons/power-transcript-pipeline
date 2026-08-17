@@ -8,7 +8,7 @@ The Azure Function and PowerShell pipeline are the primary production system. Th
 
 Cloudflare D1/R2 processing is an independent, asynchronous extension for validating a possible future migration target. After the Azure pipeline completes its existing processing and SharePoint work, it may submit raw transcript content and meeting metadata to Cloudflare for separate processing. Cloudflare must not block, replace, or become the system of record for the Azure-to-SharePoint workflow until an explicit migration decision is made.
 
-For the current Cloudflare runtime status, boundaries, and migration-validation work, see [Cloudflare Runtime Handover](plans/cloudflare-real-runtime-handover.md).
+For the current repository-wide project scope, package status, architecture boundaries, and continuation gates, see the canonical [Project Status](plans/STATUS.md). For detailed Cloudflare runtime handover and migration-validation work, see [Cloudflare Runtime Handover](plans/cloudflare-real-runtime-handover.md).
 
 ## 🏗 Architecture
 
@@ -31,6 +31,38 @@ graph TD
 - **7-Day Retry Window**: Automated runs look back 7 days by default. This ensures that any transcripts that failed or were delayed in previous runs are retried, while built-in deduplication (SKIP logic) prevents duplicate processing.
 - **SharePoint Integration**: Automatically organizes transcripts into month-based folders (`YYYY-MM`) and maintains execution logs.
 - **Resilient Execution**: Configured with a 10-minute timeout to handle large batches of meetings.
+
+## 🔎 Local Runtime D1 Report
+
+The localhost-only Cockpit package includes a read-only runtime D1 reporting script:
+
+```text
+packages/local-cockpit-server/scripts/test-runtime-topic-lists.mjs
+```
+
+Run it from the repository root with:
+
+```bash
+npm --prefix packages/local-cockpit-server run test:runtime-topic-lists
+```
+
+The report reads runtime topics, topic memories, actions, decisions, and risks, and presents them as:
+
+1. **Topic memory cards** — branched cards with domain, type, status, match status, meeting count, dates, outcome, disposition, and last meeting.
+2. **Actions by owner** — every action listed beneath its owner with ID, status, due date, meeting, topic, and memory context.
+3. **Decisions** — decision text with owner, meeting, topic, and memory context.
+4. **Risks** — risk text with severity, status, meeting, topic, and memory context.
+
+Optional filters are available for focused checks:
+
+```bash
+npm --prefix packages/local-cockpit-server run test:runtime-topic-lists -- \
+  --meeting-id "2026-08-11_1130_npi_stage_3___biweekly" \
+  --owner "Theo Davies" \
+  --status open
+```
+
+Supported filters are `--owner`, `--status`, `--meeting-id`, and `--topic-memory-id`. Use `--json` for machine-readable output. The script is read-only: it queries runtime D1 and does not access R2, write D1 records, or persist feedback.
 
 ## 🔑 Permissions (Microsoft Graph)
 

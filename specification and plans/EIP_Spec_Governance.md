@@ -10,7 +10,8 @@ This register establishes document precedence for EIP and records known conflict
 ## 2. Binding Precedence
 
 1. [`WIP-roadmap.md`](WIP-roadmap.md:1) — **CANONICAL ROADMAP**
-   - Governs product vision, scope, scenarios, phase sequencing, target outcomes, and acceptance priorities.
+   - Governs product vision, mission, scope, scenarios, phase sequencing, target outcomes, and acceptance priorities.
+   - Its mandatory feature-direction test is the required reference for every new feature, specification, implementation plan, and change request.
 2. [`EIP_Implementation_Description_v1.7.7.md`](EIP_Implementation_Description_v1.7.7.md:1) — **CANONICAL IMPLEMENTATION PLAN**
    - Governs current-state implementation detail and delivery design needed to fulfil the roadmap.
    - Cannot expand, contradict, or reprioritise the roadmap.
@@ -56,6 +57,7 @@ When documents conflict, the higher-precedence document governs. Conflicts must 
 ## 5. Required Change Control
 
 - Any proposed change to scope, phase ordering, target outcome, or acceptance criterion starts with an update to [`WIP-roadmap.md`](WIP-roadmap.md:1).
+- Every new feature, specification, implementation plan, and change request must cite the mission and feature-direction test in [`WIP-roadmap.md`](WIP-roadmap.md:7), explaining the direct mission contribution or the necessary platform-infrastructure rationale before design or implementation proceeds.
 - Any implementation design change must cite the roadmap section it implements and update [`EIP_Implementation_Description_v1.7.7.md`](EIP_Implementation_Description_v1.7.7.md:1).
 - Any taxonomy, identity, or controlled-vocabulary change requires an approved update to `EIP_Taxonomy_v2.md`, machine registry changes, matching-rule changes, and regression fixtures together.
 - Runtime code/configuration that conflicts with a canonical document must be logged in this register and addressed through a planned migration; deployed behaviour does not silently redefine the canon.

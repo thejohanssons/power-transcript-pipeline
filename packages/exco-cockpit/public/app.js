@@ -82,6 +82,31 @@ async function apiFetch(path) {
   return json.data;
 }
 
+async function hydrateProposedMatchTargets(reviewQueue) {
+  const queueItems = [
+    ...(reviewQueue?.awaitingReview || []),
+    ...(reviewQueue?.recordedDecisions || []),
+  ];
+  const referencedIds = [...new Set(queueItems
+    .map(item => item.proposedMatchMemoryId)
+    .filter(Boolean))];
+  const loadedIds = new Set((state.topicMemory || []).map(memory => memory.memoryId));
+  const missingIds = referencedIds.filter(id => !loadedIds.has(id));
+  if (!missingIds.length) return;
+
+  const fetched = await Promise.all(missingIds.map(async memoryId => {
+    try {
+      return await apiFetch(`/api/v1/topic-memory/${encodeURIComponent(memoryId)}`);
+    } catch {
+      return null;
+    }
+  }));
+  state.topicMemory = [
+    ...(state.topicMemory || []),
+    ...fetched.filter(Boolean),
+  ];
+}
+
 // ── Tab navigation ────────────────────────────────────────
 
 function initTabs() {
@@ -828,10 +853,10 @@ function renderPendingReview() {
                       </div>` : `
                       <div style="margin-top:8px;font-size:11px;color:var(--color-text-muted);">
                         Last seen meeting: ${esc(targetMemory.lastSeenMeetingId||'?')}<br/>
-                        (Topic not in current 200-record page)
+                        (Last-seen topic is outside the current topic snapshot)
                       </div>`}`;
                 })()
-                : `<div style="font-size:12px;color:var(--color-text-muted);">Target: <code style="font-size:10px;">${esc(m.proposedMatchMemoryId||'?')}</code><br/><span style="font-size:11px;">Not in current memory page (500 limit)</span></div>`}
+                : `<div style="font-size:12px;color:var(--color-text-muted);">Target: <code style="font-size:10px;">${esc(m.proposedMatchMemoryId||'?')}</code><br/><span style="font-size:11px;">Referenced target could not be loaded</span></div>`}
               </div>
             </div>
 
@@ -961,6 +986,7 @@ async function refreshLiveSnapshot() {
   state.topicMemory = topicMemory;
   state.topics = topics;
   state.reviewQueue = reviewQueue;
+  await hydrateProposedMatchTargets(reviewQueue);
   state.risksActions = {
     actions: Array.isArray(risksActions) ? risksActions : (risksActions?.actions || []),
     risks: deriveRisksFromTopics(topics, overview?.meetings),

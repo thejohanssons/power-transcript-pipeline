@@ -1,5 +1,7 @@
 # CEO/ExCo Cockpit — Coding-Agent Handoff
 
+> **Status and precedence notice — 2026-08-11:** This is the original implementation handoff, retained for historical implementation detail. The accepted two-view synthetic cockpit baseline and its continuation gates are defined in [`plans/exco-cockpit-session-state-2026-08-11.md`](exco-cockpit-session-state-2026-08-11.md). For repository-wide current status and restart instructions, read [`plans/STATUS.md`](STATUS.md) first. Where this handoff differs from either current status document, this handoff is superseded.
+
 ## 1. Purpose
 
 Build the smallest Cloudflare-hosted CEO/ExCo cockpit that lets reviewers assess the quality of the existing Cloudflare meeting-processing output. This is a synthetic-data, evidence-first POC. It is not a production governance system and must not change the Azure-to-SharePoint production pipeline.
