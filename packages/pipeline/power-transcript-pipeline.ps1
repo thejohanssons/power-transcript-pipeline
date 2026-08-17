@@ -1734,10 +1734,18 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     }
 
     # ── 15. BUILD & RETURN LOG ENTRY ──────────────────────────────
+    # A calendar run is complete only after both authoritative SharePoint artifacts
+    # have been uploaded.  Local fallback paths are diagnostics, not durable output:
+    # treating them as success caused the same meeting to be announced as processed
+    # again on every subsequent run because the Master Log completion guard failed.
     $now                 = [System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ssZ")
-    $effectiveStatus     = if ($uploadedTranscript -and -not $uploadedSummary -and $cls.summary) { "repair_needed" } else { "success" }
-    $effectiveAgentState = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { $AgentState }
-    $effectiveRetryCount = if ($repairAttempted) { 1 } else { 0 }
+    $hasPublishedTranscript = $null -ne $uploadedTranscript -and -not [string]::IsNullOrWhiteSpace($uploadedTranscript.webUrl)
+    $hasPublishedSummary    = $null -ne $uploadedSummary -and -not [string]::IsNullOrWhiteSpace($uploadedSummary.webUrl)
+    $publicationComplete    = $hasPublishedTranscript -and $hasPublishedSummary
+    $effectiveStatus        = if ($publicationComplete) { "success" } else { "repair_needed" }
+    $effectiveAgentState    = if ($effectiveStatus -eq "repair_needed") { "repair_pending" } else { $AgentState }
+    $effectiveRetryCount    = if ($repairAttempted -or -not $publicationComplete) { 1 } else { 0 }
+    $repairReason           = if ($publicationComplete) { $repairReason } elseif (-not $hasPublishedTranscript -and -not $hasPublishedSummary) { "Transcript and summary were not durably uploaded to SharePoint." } elseif (-not $hasPublishedTranscript) { "Transcript was not durably uploaded to SharePoint." } else { "Summary was not durably uploaded to SharePoint." }
 
     $logEntry = [pscustomobject]@{
         RunId                    = $RunId
@@ -1755,9 +1763,9 @@ BACK-LINK (MASTER LOG): $masterLogUrl
         ClassificationSource     = $modeResult.source
         PipelineVersion          = $PIPELINE_VERSION
         TopicRecords             = $topicRecords3D
-        HasTranscript            = ($null -ne $uploadedTranscript)
-        TranscriptFile           = if ($uploadedTranscript) { $uploadedTranscript.webUrl } else { $localFile }
-        SummaryFile              = if ($uploadedSummary) { $uploadedSummary.webUrl } else { $localSummaryFile }
+        HasTranscript            = $hasPublishedTranscript
+        TranscriptFile           = if ($hasPublishedTranscript) { $uploadedTranscript.webUrl } else { $null }
+        SummaryFile              = if ($hasPublishedSummary) { $uploadedSummary.webUrl } else { $null }
         ConfluenceMirror         = $confluenceUrl
         PeopleFile               = if ($uploadedPeopleFile) { $uploadedPeopleFile.webUrl } else { $null }
         Status                   = $effectiveStatus
@@ -3023,11 +3031,9 @@ function Upload-FileToSharePoint {
 
 function Get-MeetingLogId {
     param($EventDate, [string]$Subject)
-    # Ensure date is treated as UTC to prevent local timezone offsets in the ID
-    # We force UTC parsing to avoid dependency on the host machine's local timezone
+    # Ensure date is treated as UTC to prevent local timezone offsets in the ID.
     $dt = if ($EventDate -is [string]) {
         if ($EventDate -notmatch 'Z$|[+-]\d{2}:?\d{2}$') {
-            # No offset present? Treat as UTC (Standard for Graph API timestamps)
             [DateTime]::Parse($EventDate + "Z")
         } else {
             [DateTime]::Parse($EventDate).ToUniversalTime()
@@ -3038,6 +3044,83 @@ function Get-MeetingLogId {
     $datePart = $dt.ToString("yyyy-MM-dd_HHmm")
     $slugSubject = ($Subject -replace '[^a-zA-Z0-9]', '_').ToLower()
     return "$datePart`_$slugSubject"
+}
+
+function Get-MeetingSubjectKey {
+    param([string]$Subject)
+    if ([string]::IsNullOrWhiteSpace($Subject)) { return $null }
+    return (($Subject -replace '[^a-zA-Z0-9]', '_') -replace '_+', '_').Trim('_').ToLowerInvariant()
+}
+
+function Test-DurableMasterLogEntry {
+    param($Entry)
+    return $null -ne $Entry -and
+        $Entry.Status -eq 'success' -and
+        -not [string]::IsNullOrWhiteSpace([string]$Entry.TranscriptFile) -and
+        -not [string]::IsNullOrWhiteSpace([string]$Entry.SummaryFile)
+}
+
+function Find-MasterLogMeetingMatch {
+    param(
+        [object[]]$Meetings,
+        [string]$GraphEventId,
+        [string]$GraphICalUId,
+        [string]$LegacyMeetingId,
+        $EventDate,
+        [string]$Subject
+    )
+
+    $records = @($Meetings)
+    if ($GraphEventId) {
+        $match = $records | Where-Object { $_.GraphEventId -eq $GraphEventId } | Select-Object -First 1
+        if ($match) { return [pscustomobject]@{ Entry = $match; MatchType = 'graph_event_id' } }
+    }
+    if ($GraphICalUId) {
+        $match = $records | Where-Object { $_.GraphICalUId -eq $GraphICalUId } | Select-Object -First 1
+        if ($match) { return [pscustomobject]@{ Entry = $match; MatchType = 'graph_ical_uid' } }
+    }
+    if ($LegacyMeetingId) {
+        $match = $records | Where-Object {
+            $_.MeetingId -eq $LegacyMeetingId -or @($_.LegacyMeetingIds) -contains $LegacyMeetingId
+        } | Select-Object -First 1
+        if ($match) { return [pscustomobject]@{ Entry = $match; MatchType = 'legacy_meeting_id' } }
+    }
+
+    # One-time compatibility for records created before Graph identity was persisted.
+    # A unique subject/time record is enough to migrate its identity; the caller still
+    # requires durable artifacts before it skips processing. This lets the next run
+    # repair legacy records that were marked success but lost TranscriptFile.
+    $subjectKey = Get-MeetingSubjectKey -Subject $Subject
+    try { $targetUtc = ([datetime]$EventDate).ToUniversalTime() } catch { return $null }
+    $candidates = @($records | Where-Object {
+        if ((Get-MeetingSubjectKey -Subject $_.Subject) -ne $subjectKey) { return $false }
+        try {
+            [math]::Abs((([datetime]$_.EventDate).ToUniversalTime() - $targetUtc).TotalHours) -le 3
+        } catch { $false }
+    })
+    if ($candidates.Count -eq 1) {
+        return [pscustomobject]@{ Entry = $candidates[0]; MatchType = 'legacy_subject_time_window' }
+    }
+    return $null
+}
+
+function Add-CalendarIdentityToMasterLogEntry {
+    param(
+        $Entry,
+        [string]$GraphEventId,
+        [string]$GraphICalUId,
+        [string]$CanonicalMeetingId,
+        [string]$MatchType
+    )
+    if (-not $Entry) { return }
+    if ($GraphEventId) { $Entry | Add-Member -NotePropertyName GraphEventId -NotePropertyValue $GraphEventId -Force }
+    if ($GraphICalUId) { $Entry | Add-Member -NotePropertyName GraphICalUId -NotePropertyValue $GraphICalUId -Force }
+    if ($CanonicalMeetingId -and $Entry.MeetingId -ne $CanonicalMeetingId) {
+        $legacyIds = @($Entry.LegacyMeetingIds) + @($Entry.MeetingId) | Where-Object { $_ } | Select-Object -Unique
+        $Entry | Add-Member -NotePropertyName LegacyMeetingIds -NotePropertyValue @($legacyIds) -Force
+        $Entry | Add-Member -NotePropertyName MeetingId -NotePropertyValue $CanonicalMeetingId -Force
+    }
+    $Entry | Add-Member -NotePropertyName DedupeMigration -NotePropertyValue $MatchType -Force
 }
 
 function Get-StickyMasterLogValue {
@@ -3532,24 +3615,40 @@ foreach ($calendarEvent in $events) {
     # Ensure token is valid for this iteration
     Ensure-GraphToken
     
-    $subject   = $calendarEvent.subject
-    $joinUrl   = $calendarEvent.onlineMeeting.joinUrl
-    $organiser = $calendarEvent.organizer.emailAddress.address
-    $start     = $calendarEvent.start.dateTime
-    $end       = $calendarEvent.end.dateTime
+    $subject      = $calendarEvent.subject
+    $joinUrl      = $calendarEvent.onlineMeeting.joinUrl
+    $organiser    = $calendarEvent.organizer.emailAddress.address
+    $start        = $calendarEvent.start.dateTime
+    $end          = $calendarEvent.end.dateTime
+    $graphEventId = $calendarEvent.id
+    $graphICalUId = $calendarEvent.iCalUId
+    $mIdCheck     = Get-MeetingLogId -EventDate $start -Subject $subject
 
     Write-Host "--------------------------------------------------"
     Write-Host "Evaluating: $subject" -ForegroundColor Cyan
     Write-Host "  [DIAG] Date: $start"
     Write-Host "  [DIAG] Organiser: $organiser"
+    Write-Host "  [DIAG] Dedupe identity: GraphEventId=$graphEventId; GraphICalUId=$graphICalUId; LegacyMeetingId=$mIdCheck" -ForegroundColor Gray
 
     # --- SKIP SUCCESSFUL MEETINGS ---
     if (-not $ForceRerun) {
-        $mIdCheck = Get-MeetingLogId -EventDate $start -Subject $subject
-        $existing = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $mIdCheck }
-        if ($existing -and $existing.Status -eq "success" -and $existing.TranscriptFile -and $existing.SummaryFile) {
-            Write-Host "  [SKIP] Already processed successfully. Use -ForceRerun to re-evaluate." -ForegroundColor Gray
+        $dedupeMatch = Find-MasterLogMeetingMatch `
+            -Meetings $masterLogData.Meetings `
+            -GraphEventId $graphEventId `
+            -GraphICalUId $graphICalUId `
+            -LegacyMeetingId $mIdCheck `
+            -EventDate $start `
+            -Subject $subject
+        $existing = if ($dedupeMatch) { $dedupeMatch.Entry } else { $null }
+        if (Test-DurableMasterLogEntry -Entry $existing) {
+            Add-CalendarIdentityToMasterLogEntry -Entry $existing -GraphEventId $graphEventId -GraphICalUId $graphICalUId -CanonicalMeetingId $mIdCheck -MatchType $dedupeMatch.MatchType
+            Write-Host "  [SKIP] Already processed successfully (match: $($dedupeMatch.MatchType)). Use -ForceRerun to re-evaluate." -ForegroundColor Gray
             continue
+        }
+        if ($existing) {
+            Write-Host "  [DIAG] Existing Master Log record matched by $($dedupeMatch.MatchType), but is not durably complete; processing for repair." -ForegroundColor Yellow
+        } else {
+            Write-Host "  [DIAG] No Master Log record matched this meeting; processing." -ForegroundColor Gray
         }
     }
 
@@ -3871,6 +3970,10 @@ foreach ($calendarEvent in $events) {
             -RunId        $runId `
             -ForceRerun:$ForceRerun
 
+        # Persist the stable Graph identity with this processing result.
+        $result.LogEntry | Add-Member -NotePropertyName GraphEventId -NotePropertyValue $graphEventId -Force
+        $result.LogEntry | Add-Member -NotePropertyName GraphICalUId -NotePropertyValue $graphICalUId -Force
+        $result.LogEntry | Add-Member -NotePropertyName LegacyMeetingIds -NotePropertyValue @($mIdCheck) -Force
         $log += $result.LogEntry
     }
     catch {
@@ -3932,9 +4035,17 @@ $masterLogLocalPath = Join-Path $outDir $masterLogFileName
 # Merge current run results into Master Log
 $now = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
 foreach ($runEntry in $log) {
-    $meetingId = Get-MeetingLogId -EventDate $runEntry.EventDate -Subject $runEntry.Subject
-
-    $existingMatch = $masterLogData.Meetings | Where-Object { $_.MeetingId -eq $meetingId }
+    # Preserve the identity assigned by the processing path; recomputation here can
+    # reintroduce UTC/local timestamp drift.
+    $meetingId = if ($runEntry.MeetingId) { $runEntry.MeetingId } else { Get-MeetingLogId -EventDate $runEntry.EventDate -Subject $runEntry.Subject }
+    $existingDedupeMatch = Find-MasterLogMeetingMatch `
+        -Meetings $masterLogData.Meetings `
+        -GraphEventId $runEntry.GraphEventId `
+        -GraphICalUId $runEntry.GraphICalUId `
+        -LegacyMeetingId $meetingId `
+        -EventDate $runEntry.EventDate `
+        -Subject $runEntry.Subject
+    $existingMatch = if ($existingDedupeMatch) { $existingDedupeMatch.Entry } else { $null }
 
     # Success-Sticky Logic: Do not overwrite a successful record with an error/empty one
     $shouldUpdate = $true
@@ -3946,8 +4057,9 @@ foreach ($runEntry in $log) {
         continue
     }
 
-    # Preserve file URLs and topic data when re-run produces success but LLM/upload partial failure
-    $transcriptFile = Get-StickyMasterLogValue -NewValue $runEntry.File -ExistingEntry $existingMatch -PropertyName "TranscriptFile"
+    # Invoke-MeetingProcessing returns TranscriptFile, not File. Using File discarded
+    # a verified SharePoint URL and prevented all later success skips.
+    $transcriptFile = Get-StickyMasterLogValue -NewValue $runEntry.TranscriptFile -ExistingEntry $existingMatch -PropertyName "TranscriptFile"
     $summaryFile = Get-StickyMasterLogValue -NewValue $runEntry.SummaryFile -ExistingEntry $existingMatch -PropertyName "SummaryFile"
     $confMirror = Get-StickyMasterLogValue -NewValue $runEntry.ConfluenceMirror -ExistingEntry $existingMatch -PropertyName "ConfluenceMirror"
     $topicRecords = Get-StickyMasterLogValue -NewValue $runEntry.TopicRecords -ExistingEntry $existingMatch -PropertyName "TopicRecords"
@@ -3955,6 +4067,9 @@ foreach ($runEntry in $log) {
 
     $updatedEntry = @{
         MeetingId                = $meetingId
+        LegacyMeetingIds         = @($existingMatch.LegacyMeetingIds) + @($existingMatch.MeetingId, $runEntry.LegacyMeetingIds) | Where-Object { $_ -and $_ -ne $meetingId } | Select-Object -Unique
+        GraphEventId             = Get-StickyMasterLogValue -NewValue $runEntry.GraphEventId -ExistingEntry $existingMatch -PropertyName "GraphEventId"
+        GraphICalUId             = Get-StickyMasterLogValue -NewValue $runEntry.GraphICalUId -ExistingEntry $existingMatch -PropertyName "GraphICalUId"
         Subject                  = $runEntry.Subject
         Organiser                = $organiserValue
         EventDate                = $runEntry.EventDate
@@ -4055,11 +4170,15 @@ Upload-FileToSharePoint -DriveId $driveId -FolderId $rootFolderId -FilePath $mas
 if ($log -and $log.Count -gt 0) {
     Write-Host "Sending batch Teams notification..."
 
-    # Build run summary counts
-    $totalMeetings  = $log.Count
-    $newMeetings    = ($log | Where-Object { $_.AgentState -notin @("skipped", "error") } | Measure-Object).Count
-    $skippedMeetings= ($log | Where-Object { $_.AgentState -eq "skipped" }                | Measure-Object).Count
-    $errorMeetings  = ($log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" } | Measure-Object).Count
+    # Build run summary counts.  "Processed" means a newly completed, durably
+    # published meeting, never merely a processing attempt or a repair candidate.
+    $totalMeetings      = $log.Count
+    $processedEntries   = $log | Where-Object { $_.Status -eq "success" -and $_.AgentState -notin @("skipped", "error") -and $_.TranscriptFile -and $_.SummaryFile }
+    $repairEntries      = $log | Where-Object { $_.Status -eq "repair_needed" -or $_.AgentState -eq "repair_pending" }
+    $newMeetings        = ($processedEntries | Measure-Object).Count
+    $repairMeetings     = ($repairEntries | Measure-Object).Count
+    $skippedMeetings    = ($log | Where-Object { $_.AgentState -eq "skipped" } | Measure-Object).Count
+    $errorMeetings      = ($log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" } | Measure-Object).Count
     $dateRangeStr   = "$($FromDate.ToString('yyyy-MM-dd')) – $($ToDate.ToString('yyyy-MM-dd'))"
 
     # Collect pipeline errors from log
@@ -4080,12 +4199,11 @@ if ($log -and $log.Count -gt 0) {
     $batchMsg   = "$headerIcon EIP Pipeline — $runDate`n"
     $batchMsg  += "────────────────────────────────`n"
     $batchMsg  += "Period: $dateRangeStr`n"
-    $batchMsg  += "Meetings: $totalMeetings evaluated · $newMeetings processed · $skippedMeetings skipped · $errorMeetings errors`n"
+    $batchMsg  += "Meetings: $totalMeetings evaluated · $newMeetings processed · $repairMeetings require repair · $skippedMeetings skipped · $errorMeetings errors`n"
 
     # ── Per-meeting section ──────────────────────────────────────────────────
-    $processedEntries = $log | Where-Object { $_.AgentState -notin @("skipped", "error") -and $_.Status -ne "error" }
-    $errorEntries     = $log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" }
-    $skippedEntries   = $log | Where-Object { $_.AgentState -eq "skipped" }
+    $errorEntries   = $log | Where-Object { $_.AgentState -eq "error" -or $_.Status -eq "error" }
+    $skippedEntries = $log | Where-Object { $_.AgentState -eq "skipped" }
 
     if ($processedEntries) {
         $batchMsg += "`n✅ PROCESSED`n"
@@ -4104,6 +4222,16 @@ if ($log -and $log.Count -gt 0) {
             $reasonStr = if ($e.ErrorMessage) { " — $($e.ErrorMessage)" } elseif ($e.Notes) { " — $($e.Notes)" } else { "" }
             # Truncate reason to keep it concise
             if ($reasonStr.Length -gt 80) { $reasonStr = $reasonStr.Substring(0, 77) + "..." }
+            $batchMsg += "  $dateStr  $($e.Subject)$reasonStr`n"
+        }
+    }
+
+    if ($repairEntries) {
+        $batchMsg += "`n🔧 REQUIRES REPAIR`n"
+        foreach ($e in $repairEntries) {
+            $dateStr   = if ($e.EventDate) { ([datetime]$e.EventDate).ToString("MM-dd HH:mm") } else { "" }
+            $reasonStr = if ($e.RepairReason) { " — $($e.RepairReason)" } else { "" }
+            if ($reasonStr.Length -gt 100) { $reasonStr = $reasonStr.Substring(0, 97) + "..." }
             $batchMsg += "  $dateStr  $($e.Subject)$reasonStr`n"
         }
     }
