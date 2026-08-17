@@ -3,6 +3,8 @@
 # Current branch: main — fully pushed, clean working tree
 # Local checkout: `main`; historical branch notes below are not a current Git-state source.
 
+> **Status and precedence notice — 2026-08-11:** This file is a historical developer handover and chronological context log, not the repository master status. Start resumed work with [`plans/STATUS.md`](plans/STATUS.md), then follow its linked scope authority. In particular, the accepted synthetic CEO/ExCo cockpit state is recorded in [`plans/exco-cockpit-session-state-2026-08-11.md`](plans/exco-cockpit-session-state-2026-08-11.md). Where this historical log conflicts with those status documents, the status documents take precedence.
+
 ---
 
 ## Session Summary — 2026-08-07 to 2026-08-10

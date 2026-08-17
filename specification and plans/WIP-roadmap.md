@@ -5,6 +5,10 @@
 > **Authority:** This document is the binding source of truth for EIP product direction, scope, phase sequencing, target outcomes, and acceptance priorities. Where another workspace document conflicts with it, this roadmap prevails. The implementation plan in [`EIP_Implementation_Description_v1.7.7.md`](EIP_Implementation_Description_v1.7.7.md:1) is the canonical delivery plan and must implement this roadmap; it may describe current-state detail but cannot expand or redefine roadmap scope.
 >
 > **Vision:** "EIP is Salesforce for organisational memory: a configurable platform that converts scattered organisational activity into a living, persistent memory that executives, teams and AI systems can actually reason over."
+>
+> **Mission:** "EIP maintains an evidence-backed, longitudinal organisational memory that connects direction, commitments, activity, risk, mitigation, decisions, and outcomes. It detects material change and provides ExCo with timely, explainable visibility into execution, risk exposure, and required intervention."
+>
+> **Mandatory feature-direction test:** Every proposed feature, specification, implementation plan, and change request must state how it supports this mission or why it is necessary platform infrastructure for it. Features that only expose, summarise, or filter data without preserving evidence-backed organisational memory or improving execution, risk, mitigation, decision, or intervention awareness must not be treated as core EIP scope without an explicit roadmap decision.
  
 ## 0. Business Value & Scenario-Driven Outcomes
  
@@ -35,6 +39,32 @@ From a roadmap perspective, each phase must move these scenarios from narrative 
 - Scenario 3: requires durable **Topic/Decision/Ownership history** plus onboarding/offboarding views.
  
 ## 1. Strategic Objectives
+
+### 1.1 Product Boundary and Operating Model
+
+EIP is not only an organisational archive and the Cockpit is not the EIP product. They have distinct responsibilities:
+
+| Layer | Responsibility | Must not be reduced to |
+|---|---|---|
+| **Organisational memory** | Preserve immutable evidence and longitudinal, topic-centred context across people, decisions, commitments, activity, risks, mitigations, dependencies, and outcomes. | A meeting-summary repository or a flat collection of extracted records. |
+| **Execution and direction intelligence** | Interpret memory against intended outcomes, commitments, milestones, dependencies, risk exposure, mitigations, and current delivery evidence. | A project-management replacement or unsupported management inference. |
+| **ExCo visibility** | Present material execution movement, risk exposure, mitigation effectiveness, decisions, and required intervention at the appropriate executive altitude. | A raw intelligence browser or a security boundary. |
+| **Cockpit and repository surfaces** | Deliver, respectively, a curated attention view and a governed investigation view over the same EIP model. | The source of product semantics, escalation truth, or access control. |
+
+EIP must maintain the following traceable chain wherever the evidence permits it:
+
+```text
+Evidence
+  → Topic and signal
+    → Risk or opportunity
+      → Affected objective or commitment
+        → Mitigation decision
+          → Planned activity and milestone
+            → Progress evidence and residual exposure
+              → ExCo attention or decision
+```
+
+EIP may reference external systems of execution such as Jira, Planner, ERP, CRM, risk registers, and document repositories. It must not become a replacement task-management, project-management, or formal corporate-risk system unless the roadmap explicitly authorises that scope. Its responsibility is to retain the evidence-backed organisational memory and intelligence relationships that show whether commitments, activity, mitigations, and outcomes remain aligned.
 
 1. **Inform management about state and activity**
    - Provide reliable, topic-centric views of what is happening across the business.

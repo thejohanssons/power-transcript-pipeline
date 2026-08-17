@@ -1,0 +1,190 @@
+
+=== TOPIC MEMORY CARDS ===
+
+[1] Super Pen production beyond the initial 21 units depends on whole-unit fire testing, material recertification information, and confirmation of enclosure-compliance risk.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-1
+    ├─ Domain: Product Management | Type: Product
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[2] Super Pen unit packaging is finalized or awaiting final confirmation, while charge-hub and education-bundle packaging require completed specifications before supplier engagement.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-2
+    ├─ Domain: Supply Chain | Type: Service
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[3] Super Pen charge-hub prototype assembly depends on enclosure tooling samples and sufficient adapters, cables, connectors, and plugs.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-3
+    ├─ Domain: Supply Chain | Type: Product
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[4] Super Pen pilot allocation is at risk because a successful whole-class pilot requires at least 16 pens and two charging hubs per participating school, while compliance testing will destroy some of the planned units.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-4
+    ├─ Domain: Product Management | Type: Product
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[5] Exam Reader 3 release planning depends on confirmation of the hardware delivery date independently of continuing software development.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-5
+    ├─ Domain: Product Management | Type: Product
+    ├─ Status: open | Match: merged
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[6] The Exam Reader 2 Welsh user guide can be added as a digital translation without blocking production or requiring an immediate printed-guide revision.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-6
+    ├─ Domain: Product Management | Type: Product
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[7] Public communication of Exam Reader 3 5G and 2.4G compatibility is deferred until remaining pre-June stock across internal and reseller channels is confirmed.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-7
+    ├─ Domain: Product Management | Type: Product
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[8] M12 software is expected within the next week, and formal review of the release will determine the remaining M13 polishing work before pilot trials.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-8
+    ├─ Domain: Information Technology | Type: Project
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+[9] The 20K-word database generation cost may be materially reduced by a new GPT model, subject to several weeks of output verification.
+    ├─ Memory ID: 2026-08-11_1130_npi_stage_3___biweekly-memory-9
+    ├─ Domain: Finance | Type: Process
+    ├─ Status: open | Match: confirmed
+    ├─ Meetings: 1 | First seen: — | Last seen: 2026-08-11T11:30:00.0000000Z
+    ├─ Outcome: —
+    ├─ Disposition: — | Scope: —
+    └─ Last meeting: 2026-08-11_1130_npi_stage_3___biweekly
+
+=== ACTIONS BY OWNER ===
+
+Chloe Garner (3 actions)
+1. 2026-08-11_1130_npi_stage_3___biweekly-action-3 [open]
+  Action: Refine the charge-hub and education-bundle packaging mock-ups while the final packaging specifications are completed.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen unit packaging is finalized or awaiting final confirmation, while charge-hub and education-bundle packaging require completed specifications before supplier engagement.
+2. 2026-08-11_1130_npi_stage_3___biweekly-action-10 [open]
+  Action: Add Welsh translation to the Exam Reader 2 user guide for digital availability and avoid treating the translation as a production blocker.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: The Exam Reader 2 Welsh user guide can be added as a digital translation without blocking production or requiring an immediate printed-guide revision.
+3. 2026-08-11_1130_npi_stage_3___biweekly-action-12 [open]
+  Action: Contact Lilate to confirm that the Super Pen 360 brand kit, branding assets, and icon requirements are complete.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: M12 software is expected within the next week, and formal review of the release will determine the remaining M13 polishing work before pilot trials.
+
+Julia Clouter (1 action)
+1. 2026-08-11_1130_npi_stage_3___biweekly-action-15 [open]
+  Action: Confirm the first-week-of-November school-term date relevant to the Super Pen pilot start.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen pilot allocation is at risk because a successful whole-class pilot requires at least 16 pens and two charging hubs per participating school, while compliance testing will destroy some of the planned units.
+
+Nick Barnes (6 actions)
+1. 2026-08-11_1130_npi_stage_3___biweekly-action-1 [open]
+  Action: Gather the testing-house timeline, material recertification cost, and enclosure-compliance risk information needed to decide whether to produce Super Pen units beyond the initial 21.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen production beyond the initial 21 units depends on whole-unit fire testing, material recertification information, and confirmation of enclosure-compliance risk.
+2. 2026-08-11_1130_npi_stage_3___biweekly-action-4 [open]
+  Action: Set and communicate internal deadlines for the Super Pen packaging specifications and supplier lead-time assessment.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen unit packaging is finalized or awaiting final confirmation, while charge-hub and education-bundle packaging require completed specifications before supplier engagement.
+3. 2026-08-11_1130_npi_stage_3___biweekly-action-6 [open]
+  Action: Check availability of SD cards and other required materials to determine whether the next Super Pen batch can increase from 24 to 32 units.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen pilot allocation is at risk because a successful whole-class pilot requires at least 16 pens and two charging hubs per participating school, while compliance testing will destroy some of the planned units.
+4. 2026-08-11_1130_npi_stage_3___biweekly-action-7 [open]
+  Action: Ask Bruce to confirm the Exam Reader 3 hardware delivery date independently of the ongoing software-development status.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Exam Reader 3 release planning depends on confirmation of the hardware delivery date independently of continuing software development.
+5. 2026-08-11_1130_npi_stage_3___biweekly-action-9 [open]
+  Action: Review the Exam Reader 3 user guide and compliance content as an additional compliance check.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Exam Reader 3 release planning depends on confirmation of the hardware delivery date independently of continuing software development.
+6. 2026-08-11_1130_npi_stage_3___biweekly-action-11 [open]
+  Action: Investigate internal and reseller Exam Reader 3 inventory and sales history to confirm whether any pre-June hardware remains in stock.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Public communication of Exam Reader 3 5G and 2.4G compatibility is deferred until remaining pre-June stock across internal and reseller channels is confirmed.
+
+Peter Johansson (1 action)
+1. 2026-08-11_1130_npi_stage_3___biweekly-action-8 [open]
+  Action: Review the Exam Reader 3 user guide and compliance content as an additional compliance check.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Exam Reader 3 release planning depends on confirmation of the hardware delivery date independently of continuing software development.
+
+Theo Davies (4 actions)
+1. 2026-08-11_1130_npi_stage_3___biweekly-action-2 [open]
+  Action: Provide the charge-hub and education-bundle packaging specifications so they can be issued to suppliers and used to obtain pilot packaging lead times.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen unit packaging is finalized or awaiting final confirmation, while charge-hub and education-bundle packaging require completed specifications before supplier engagement.
+2. 2026-08-11_1130_npi_stage_3___biweekly-action-5 [open]
+  Action: Confirm the Super Pen charge-hub tooling supplier's response on whether anything prevents steel cutting and obtain the material recertification cost and timeframe.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: Super Pen charge-hub prototype assembly depends on enclosure tooling samples and sufficient adapters, cables, connectors, and plugs.
+3. 2026-08-11_1130_npi_stage_3___biweekly-action-13 [open]
+  Action: Complete the formal M12 software review after the release is available and identify the remaining M13 polishing work required before trials.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: M12 software is expected within the next week, and formal review of the release will determine the remaining M13 polishing work before pilot trials.
+4. 2026-08-11_1130_npi_stage_3___biweekly-action-14 [open]
+  Action: Verify the quality and cost estimate of the new GPT model using the current 3K-word generation work before committing to the 20K-word pilot database generation approach.
+  Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+  Topic: The 20K-word database generation cost may be materially reduced by a new GPT model, subject to several weeks of output verification.
+
+=== DECISIONS ===
+
+1. Proceed with production of the initial 21 Super Pen units for compliance testing. | Owner: Nick Barnes
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: Super Pen production beyond the initial 21 units depends on whole-unit fire testing, material recertification information, and confirmation of enclosure-compliance risk.
+   └─ Memory: —
+
+2. Defer the decision to produce the remaining Super Pen units until whole-unit verification, compliance timing, and enclosure-risk information have been assessed. | Owner: Peter Johansson
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: Super Pen production beyond the initial 21 units depends on whole-unit fire testing, material recertification information, and confirmation of enclosure-compliance risk.
+   └─ Memory: —
+
+3. Use a local supplier as a potential source of small-run Super Pen pilot packaging mock-ups if supplier lead times or minimum-order quantities make the primary supplier unsuitable. | Owner: Nick Barnes
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: Super Pen unit packaging is finalized or awaiting final confirmation, while charge-hub and education-bundle packaging require completed specifications before supplier engagement.
+   └─ Memory: —
+
+4. Treat the Welsh Exam Reader 2 user guide as a digital translation enhancement rather than a condition for production release. | Owner: Peter Johansson
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: The Exam Reader 2 Welsh user guide can be added as a digital translation without blocking production or requiring an immediate printed-guide revision.
+   └─ Memory: —
+
+5. Delay public communication of Exam Reader 3 5G and 2.4G compatibility until old inventory has been confirmed absent, while ensuring the sales team can answer customer questions. | Owner: Peter Johansson
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: Public communication of Exam Reader 3 5G and 2.4G compatibility is deferred until remaining pre-June stock across internal and reseller channels is confirmed.
+   └─ Memory: —
+
+6. Wait for the M12 software release rather than conducting broader testing of the current M11 software build. | Owner: Peter Johansson
+   ├─ Meeting: 2026-08-11_1130_npi_stage_3___biweekly
+   ├─ Topic: M12 software is expected within the next week, and formal review of the release will determine the remaining M13 polishing work before pilot trials.
+   └─ Memory: —
+
+=== RISKS ===
+(none)
