@@ -1551,6 +1551,7 @@ async function init() {
     state.topicMemory = topicMemory;
     state.topics = topics;
     state.reviewQueue = reviewQueue;
+    await hydrateProposedMatchTargets(reviewQueue);
 
     // risksActions currently returns a flat action array. Derive the canonical
     // Risk collection once from D1 topic classification plus risk assertions.
