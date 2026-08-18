@@ -28,7 +28,17 @@ param(
     [string]$VttFile,
 
     [Parameter(Mandatory=$false)]
-    [string]$Participant
+    [string]$Participant,
+
+    # Optional metadata for direct-file reruns when the filename has no date/subject.
+    [Parameter(Mandatory=$false)]
+    [string]$DirectSubject,
+
+    [Parameter(Mandatory=$false)]
+    [object]$DirectEventDate,
+
+    [Parameter(Mandatory=$false)]
+    [string]$DirectOrganiser
 )
 
 # =========================
@@ -190,6 +200,15 @@ function Resolve-ExecutionContext {
         }
     }
     return ""
+}
+
+# Product-context grounding is pure and configuration-driven. It must be loaded
+# before any transcript reaches the LLM classification path.
+$productContextModulePath = Join-Path $PSScriptRoot "ProductContext.ps1"
+if (Test-Path $productContextModulePath) {
+    . $productContextModulePath
+} else {
+    Write-Warning "ProductContext.ps1 not found — product grounding disabled"
 }
 
 if ($capabilitiesConfig -and $ownershipRulesConfig) {
@@ -1258,14 +1277,24 @@ function Invoke-MeetingProcessing {
     $cleanSubject = $Subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
     $masterLogUrl = "https://scanningpens.sharepoint.com/sites/Petersplace/Shared%20Documents/Exec%20Intel%20Insights/Meeting%20transcripts/master_log.txt"
 
-    # ── 1. CLASSIFY & SUMMARISE ──────────────────────────────────
+    # ── 1. PRODUCT CONTEXT, CLASSIFY & SUMMARISE ──────────────────
+    $productContext = Resolve-ProductContext `
+        -Subject $Subject -Organiser $Organiser -Transcript $PlainText `
+        -ExecutionContextsConfig $executionContextsConfig `
+        -PeopleConfig $peopleConfig -MappingRules $mappingRules
+    $productGroundingBlock = Get-ProductGroundingBlock -ProductContext $productContext
+    $selectedProductLabel = if ($productContext.SelectedProduct) { $productContext.SelectedProduct } else { "none" }
+    Write-Host "  [PRODUCT] Context: $($productContext.State) / $selectedProductLabel ($($productContext.Confidence))"
+
     $repairReason    = $null
     $repairAttempted = $false
-    $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser -transcriptContent $PlainText
+    $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser `
+        -transcriptContent $PlainText -ProductGrounding $productGroundingBlock
     if (-not $cls.summary) {
         Write-Warning "  [$PathLabel] Summary generation failed. Retrying once..."
         $repairAttempted = $true
-        $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser -transcriptContent $PlainText
+        $cls = Get-MeetingClassification -type $MeetingType -organiser $Organiser `
+            -transcriptContent $PlainText -ProductGrounding $productGroundingBlock
         if (-not $cls.summary) { $repairReason = "llm_summary_missing_after_retry" }
     }
 
@@ -1492,6 +1521,31 @@ BACK-LINK (MASTER LOG): $masterLogUrl
     if ($topicRecords3D.Count -lt $beforeCount) {
         Write-Host "  [NID] Topic record dedup: $beforeCount → $($topicRecords3D.Count) records (collapsed duplicate labels)"
     }
+
+    $productValidation = Test-ProductAttribution `
+        -ProductContext $productContext -Transcript $PlainText `
+        -Summary $summaryWithLinks -Records $topicRecords3D
+    if ($productValidation.State -eq "needs_review") {
+        Write-Warning "  [PRODUCT] Attribution requires review: $($productValidation.UnsupportedReferences.Count) unsupported reference(s)"
+        if ($global:PipelineWarnings) {
+            $global:PipelineWarnings.Add([pscustomobject]@{
+                Type = "ProductAttribution"
+                Severity = "High"
+                Detail = "Product context=$($productContext.State); validation=$($productValidation.State)"
+                MeetingId = $MeetingId
+                Subject = $Subject
+                EventDate = $EventDate
+            })
+        }
+    }
+    $header += @"
+PRODUCT_CONTEXT: $selectedProductLabel
+PRODUCT_CONTEXT_STATE: $($productContext.State)
+PRODUCT_CONTEXT_CONFIDENCE: $($productContext.Confidence)
+PRODUCT_CONTEXT_VALIDATION: $($productValidation.State)
+PRODUCT_CONTEXT_EVIDENCE: $((@($productContext.Evidence | ForEach-Object { $_.CueId }) -join ","))
+PRODUCT_CONTEXT_CONFIG_VERSION: $($productContext.ConfigVersion)
+"@
 
     $runtimeShadowTopicRecords = @()
     $runtimeShadowTranscript = $null
@@ -2437,7 +2491,12 @@ function Update-MasterPeopleLog {
 
 
 function Get-MeetingClassification {
-    param($type, $organiser, $transcriptContent)
+    param(
+        $type,
+        $organiser,
+        $transcriptContent,
+        [string]$ProductGrounding = ""
+    )
 
     # --- Case 1: Transcript exists - Use LLM with map-reduce chunking ---
     # Resolve LLM config: env vars take priority over classification_rules.json
@@ -2500,6 +2559,7 @@ function Get-MeetingClassification {
 You are summarising a section of a meeting transcript.
 Extract key points, decisions, actions, risks, and topics discussed in this section.
 Be concise but complete. Use plain text bullet points. Do not add headings or JSON.
+$ProductGrounding
 "@
             $chunkSummaries = @()
             $chunkNum = 0
@@ -2526,7 +2586,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                         $pair = $currentSummaries[$i]
                         if ($i+1 -lt $currentSummaries.Count) { $pair += "`n`n" + $currentSummaries[$i+1] }
                         
-                        $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail."
+                        $synthesisPrompt = "Synthesise the following two meeting segments into a single cohesive summary. Maintain all key facts, actions, and topic identifiers. Do not lose detail. $ProductGrounding"
                         $syn = Invoke-LLM -SystemPrompt $synthesisPrompt -UserContent $pair -FullUri $fullUri -Headers $llmHeaders -Model $llmModel -MaxTokens $synthesisMaxTok `
                                           -TimeoutSec $llmTimeoutSec -MaxRetries $llmMaxRetries -RetryBackoffSec $llmRetryBackoff
                         if ($syn) { $nextTier += $syn }
@@ -2549,7 +2609,7 @@ Be concise but complete. Use plain text bullet points. Do not add headings or JS
                 
                 # --- PASS 3: Decoupled Output Calls ---
                 Write-Host "  [LLM DIAG] Synthesising final Leadership Summary..." -ForegroundColor Gray
-                $summaryPrompt = $rules.LLMConfig.Prompt + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []. Respond with a JSON object."
+                $summaryPrompt = $rules.LLMConfig.Prompt + $ProductGrounding + "`n`nFOCUS: Generate only the 'classification', 'confidence', and 'summary' fields. Leave 'records' as an empty array []. Respond with a JSON object."
                 
                 $summaryRaw = Invoke-LLM -SystemPrompt $summaryPrompt `
                                          -UserContent $combinedSummaries `
@@ -2624,7 +2684,7 @@ FOCUS FOR THIS CALL
 - Do NOT truncate. Return all records.
 "@
 
-                    $recordsPrompt = $rules.LLMConfig.Prompt + $canonicalTopics + $recordsFocus + "`n`nRespond with a JSON object."
+                    $recordsPrompt = $rules.LLMConfig.Prompt + $ProductGrounding + $canonicalTopics + $recordsFocus + "`n`nRespond with a JSON object."
 
                     $recordsRaw = Invoke-LLM -SystemPrompt $recordsPrompt `
                                              -UserContent $combinedSummaries `
@@ -3473,36 +3533,54 @@ if ($VttFile) {
 
     Write-Host "VTT Mode: Processing file '$VttFile'"
 
-    # --- Parse filename for date and subject ---
-    # Supports: YYYY-MM-DD_HHMM-Meeting_Title.vtt  or  YYYY-MM-DD-Meeting_Title.vtt
+    # Read content before resolving identity so embedded MeetingIntelligence
+    # metadata can be used when direct-file filenames are not date-bearing.
+    $vttRaw = Get-Content -Path $VttFile -Raw -Encoding utf8
+    $embeddedMetadata = ConvertFrom-MeetingIntelTxt -Content $vttRaw
+
+    # --- Resolve direct-file date and subject ---
+    # Priority: explicit parameters > embedded Meeting:/Start: header > filename.
     $vttBaseName = [System.IO.Path]::GetFileNameWithoutExtension($VttFile)
     $eventDate   = $null
     $subject     = $null
 
-    if ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
+    if ($DirectEventDate) {
+        $eventDate = if ($DirectEventDate -is [datetime]) { $DirectEventDate } else { [datetime]::Parse([string]$DirectEventDate) }
+    } elseif ($embeddedMetadata.StartDate) {
+        $eventDate = $embeddedMetadata.StartDate
+    } elseif ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
         $eventDate = [datetime]::ParseExact("$($matches[1]) $($matches[2])", "yyyy-MM-dd HHmm", $null)
-        $subject   = $matches[3] -replace "_", " "
     } elseif ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})-(.+)$") {
         $eventDate = [datetime]::ParseExact($matches[1], "yyyy-MM-dd", $null)
-        $subject   = $matches[2] -replace "_", " "
     } else {
-        $eventDate = Get-Date
-        $subject   = $vttBaseName -replace "_", " "
-        Write-Warning "  [VTT] Could not parse date from filename. Using today: $($eventDate.ToString('yyyy-MM-dd'))"
+        throw "Direct VTT identity is incomplete: provide -DirectEventDate (ISO date/time) or use a date-bearing filename. No processing or upload was performed."
+    }
+
+    if ($DirectSubject) {
+        $subject = $DirectSubject
+    } elseif ($embeddedMetadata.Subject) {
+        $subject = $embeddedMetadata.Subject
+    } elseif ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})_(\d{4})-(.+)$") {
+        $subject = $matches[3] -replace "_", " "
+    } elseif ($vttBaseName -match "^(\d{4}-\d{2}-\d{2})-(.+)$") {
+        $subject = $matches[2] -replace "_", " "
+    } else {
+        throw "Direct VTT identity is incomplete: provide -DirectSubject or use a subject-bearing filename. No processing or upload was performed."
     }
 
     $timestamp    = $eventDate.ToString("yyyy-MM-dd_HHmm")
     $cleanSubject = $subject -replace '[^a-zA-Z0-9\s-]', '' -replace '\s+', '_'
     $mId          = Get-MeetingLogId -EventDate $eventDate -Subject $subject
-    $organiser    = if ($Participant) { $Participant } else { "Unknown" }
+    $organiser    = if ($DirectOrganiser) { $DirectOrganiser } elseif ($Participant) { $Participant } else { "Unknown" }
     $meetingType  = "Work"
+
+    Write-Host "  [VTT] Identity source: $(if ($DirectSubject -or $DirectEventDate -or $DirectOrganiser) { 'explicit direct metadata' } elseif ($embeddedMetadata.Subject -or $embeddedMetadata.StartDate) { 'embedded Meeting/Start metadata' } else { 'filename fallback' })"
 
     Write-Host "  [VTT] Subject    : $subject"
     Write-Host "  [VTT] Date       : $($eventDate.ToString('yyyy-MM-dd HH:mm'))"
     Write-Host "  [VTT] Participant: $organiser"
 
     # --- Convert VTT to plain text ---
-    $vttRaw    = Get-Content -Path $VttFile -Raw -Encoding utf8
     $plainText = ConvertFrom-Vtt -VttContent $vttRaw
     Write-Host "  [VTT] Transcript length: $($plainText.Length) chars"
 
