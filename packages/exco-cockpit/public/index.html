@@ -116,15 +116,20 @@
               placeholder="Search all content…" aria-label="Keyword search" />
           </div>
 
-          <!-- Clear all -->
-          <div class="filter-group" style="align-self:flex-end;">
-            <button class="btn-secondary" id="filter-clear" aria-label="Clear all filters">Clear all</button>
+          <!-- Filter actions -->
+          <div class="filter-group filter-actions">
+            <span class="filter-label" aria-hidden="true">Actions</span>
+            <div class="filter-action-buttons">
+              <button class="btn-secondary" id="filter-clear" aria-label="Clear all filters">Clear all</button>
+              <button class="btn-secondary" id="all-content-export" aria-label="Export filtered content as Markdown" disabled aria-disabled="true">Export</button>
+            </div>
           </div>
 
         </div>
 
-        <!-- Filter summary + result count -->
+        <!-- Filter summary + export status are deliberately separate live regions. -->
         <div class="filter-summary" id="filter-summary" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div class="export-status" id="all-content-export-status" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
 
       <!-- Results -->

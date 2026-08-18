@@ -1,0 +1,173 @@
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-17 15:40
+────────────────────────────────
+Period: 2026-08-12 – 2026-08-17
+Meetings: 12 evaluated · 10 processed · 0 require repair · 2 skipped · 0 errors
+✅ PROCESSED
+08-12 09:00  PPWR Discussion
+08-17 09:00  Weekly R&D update
+08-12 10:00  Marketing Call
+08-17 11:00  Compliance
+08-12 07:00  Mandar-Peter (channel meeting)
+08-13 12:00  ExCo discussion + lunch
+08-14 09:00  Weekly Progress- Pilot Readiness
+08-14 13:30  Wizcom Pilot Marketing/Education Material
+08-13 13:00  Theo-Peter 1-2-1
+08-12 11:30  WebKorps Weekly Updates
+⏭️ SKIPPED
+08-12 08:15  WebKorps: Daily Progress Update
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+Building AI agents or making data AI-ready? We help with Copilot, Azure AI & Power Platform. Let's talk! | Webhook Bot Support
+ 
+
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-17 15:12
+────────────────────────────────
+Period: 2026-08-12 – 2026-08-17
+Meetings: 12 evaluated · 10 processed · 2 skipped · 0 errors
+✅ PROCESSED
+08-12 09:00  PPWR Discussion
+08-12 07:00  Mandar-Peter (channel meeting)
+08-13 13:00  Theo-Peter 1-2-1
+08-13 12:00  ExCo discussion + lunch
+08-12 11:30  WebKorps Weekly Updates
+08-17 09:00  Weekly R&D update
+08-14 13:30  Wizcom Pilot Marketing/Education Material
+08-17 11:00  Compliance
+08-12 10:00  Marketing Call
+08-14 09:00  Weekly Progress- Pilot Readiness
+⏭️ SKIPPED
+08-12 08:15  WebKorps: Daily Progress Update
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+ 
+
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-17 02:08
+────────────────────────────────
+Period: 2026-08-12 – 2026-08-17
+Meetings: 10 evaluated · 8 processed · 2 skipped · 0 errors
+✅ PROCESSED
+08-13 13:00  Theo-Peter 1-2-1
+08-14 13:30  Wizcom Pilot Marketing/Education Material
+08-12 11:30  WebKorps Weekly Updates
+08-12 07:00  Mandar-Peter (channel meeting)
+08-14 09:00  Weekly Progress- Pilot Readiness
+08-12 09:00  PPWR Discussion
+08-12 10:00  Marketing Call
+08-13 12:00  ExCo discussion + lunch
+⏭️ SKIPPED
+08-12 08:15  WebKorps: Daily Progress Update
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+ 
+ 
+Executive Intelligence Update
+⚠️ EIP Pipeline — 2026-08-16 02:09
+────────────────────────────────
+Period: 2026-08-11 – 2026-08-16
+Meetings: 13 evaluated · 9 processed · 3 skipped · 1 errors
+✅ PROCESSED
+08-12 10:00  Marketing Call
+08-11 13:30  NPI Stage 3 - biweekly
+08-14 09:00  Weekly Progress- Pilot Readiness
+08-14 13:30  Wizcom Pilot Marketing/Education Material
+08-12 07:00  Mandar-Peter (channel meeting)
+08-11 14:30  Payment Strategy
+08-11 12:00  ExCo discussion + lunch
+08-13 13:00  Theo-Peter 1-2-1
+08-12 09:00  PPWR Discussion
+❌ ERRORS
+08-12 10:30  WebKorps Weekly Updates
+⏭️ SKIPPED
+08-11 09:30  Image scanning - catch up
+08-11 08:15  WebKorps: Daily Progress Update
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+ 
+ 
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-15 02:22
+────────────────────────────────
+Period: 2026-08-10 – 2026-08-15
+Meetings: 17 evaluated · 13 processed · 4 skipped · 0 errors
+✅ PROCESSED
+08-12 09:00  PPWR Discussion
+08-10 11:00  Confluence/Jira Setup Ops
+08-11 13:30  NPI Stage 3 - biweekly
+08-10 09:00  Weekly R&D update
+08-13 13:00  Theo-Peter 1-2-1
+08-10 13:00  NPI Stage 4 - once every 4 weeks
+08-14 09:00  Weekly Progress- Pilot Readiness
+08-14 13:30  Wizcom Pilot Marketing/Education Material
+08-11 14:30  Payment Strategy
+08-11 12:00  ExCo discussion + lunch
+08-12 10:00  Marketing Call
+08-12 07:00  Mandar-Peter (channel meeting)
+08-12 11:30  WebKorps Weekly Updates
+⏭️ SKIPPED
+08-11 09:30  Image scanning - catch up
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+08-10 06:00  Post-release workflows
+08-11 08:15  WebKorps: Daily Progress Update
+ 
+ 
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-14 02:11
+────────────────────────────────
+Period: 2026-08-09 – 2026-08-14
+Meetings: 15 evaluated · 11 processed · 4 skipped · 0 errors
+✅ PROCESSED
+08-11 12:00  ExCo discussion + lunch
+08-12 11:30  WebKorps Weekly Updates
+08-12 09:00  PPWR Discussion
+08-10 13:00  NPI Stage 4 - once every 4 weeks
+08-13 13:00  Theo-Peter 1-2-1
+08-10 11:00  Confluence/Jira Setup Ops
+08-11 14:30  Payment Strategy
+08-10 09:00  Weekly R&D update
+08-12 10:00  Marketing Call
+08-12 07:00  Mandar-Peter (channel meeting)
+08-11 13:30  NPI Stage 3 - biweekly
+⏭️ SKIPPED
+08-11 08:15  WebKorps: Daily Progress Update
+08-10 06:00  Post-release workflows
+08-11 09:30  Image scanning - catch up
+08-13 08:30  Wizcom and OSIE Weekly Meeting
+
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-13 02:10
+────────────────────────────────
+Period: 2026-08-08 – 2026-08-13
+Meetings: 13 evaluated · 10 processed · 3 skipped · 0 errors
+✅ PROCESSED
+08-10 11:00  Confluence/Jira Setup Ops
+08-11 12:00  ExCo discussion + lunch
+08-12 11:30  WebKorps Weekly Updates
+08-12 10:00  Marketing Call
+08-11 14:30  Payment Strategy
+08-10 09:00  Weekly R&D update
+08-11 13:30  NPI Stage 3 - biweekly
+08-10 13:00  NPI Stage 4 - once every 4 weeks
+08-12 09:00  PPWR Discussion
+08-12 07:00  Mandar-Peter (channel meeting)
+⏭️ SKIPPED
+08-10 06:00  Post-release workflows
+08-11 09:30  Image scanning - catch up
+08-11 08:15  WebKorps: Daily Progress Update
+ 
+Executive Intelligence Update
+✅ EIP Pipeline — 2026-08-12 02:08
+────────────────────────────────
+Period: 2026-08-07 – 2026-08-12
+Meetings: 10 evaluated · 7 processed · 3 skipped · 0 errors
+✅ PROCESSED
+08-11 14:30  Payment Strategy
+08-11 12:00  ExCo discussion + lunch
+08-10 11:00  Confluence/Jira Setup Ops
+08-07 09:00  Weekly Progress- Pilot Readiness
+08-11 13:30  NPI Stage 3 - biweekly
+08-10 09:00  Weekly R&D update
+08-10 13:00  NPI Stage 4 - once every 4 weeks
+⏭️ SKIPPED
+08-10 06:00  Post-release workflows
+08-07 08:15  WebKorps: Daily Progress Update
+08-11 09:30  Image scanning - catch up
+ 

@@ -390,6 +390,221 @@ function applyFilters(items) {
   });
 }
 
+function currentAllContentItems() {
+  const allItems = buildAllItems();
+  return { allItems, filteredItems: applyFilters(allItems) };
+}
+
+function markdownText(value) {
+  if (notExtracted(value)) return 'Not extracted';
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/([#*_{}\[\]<>])/g, '\\$1')
+    .replace(/\r?\n/g, '<br>');
+}
+
+function markdownCode(value) {
+  return `\`${String(notExtracted(value) ? 'Not extracted' : value).replace(/`/g, '\\`')}\``;
+}
+
+function markdownBullet(label, value) {
+  if (typeof value === 'string' && /^`[^`]*`$/.test(value)) return `- ${label}: ${value}`;
+  return `- ${label}: ${markdownText(value)}`;
+}
+
+function markdownList(label, values) {
+  const items = Array.isArray(values) ? values : [];
+  if (!items.length) return [markdownBullet(label, null)];
+  return [`- ${label}:`, ...items.map(value => `  - ${markdownText(typeof value === 'object' ? value?.text : value)}`)];
+}
+
+function markdownValidation(validation) {
+  if (!validation) return [markdownBullet('Validation', null)];
+  return [
+    '- Validation:',
+    markdownBullet('Status', validation.status).replace(/^- /, '  - '),
+    '  - Reasons:',
+    ...((validation.reasons || []).length ? validation.reasons : [null]).map(reason => `    - ${markdownText(reason)}`),
+  ];
+}
+
+function exportFilterMetadata() {
+  const meeting = (state.overview?.meetings || []).find(item => item.meetingId === state.filters.meeting);
+  const scopeLabels = {
+    multi_meeting: 'Multi-meeting trajectories',
+    standalone: 'Standalone one-meeting memories',
+    pending_review: 'Pending review memories',
+  };
+  return [
+    ['Type', state.filters.type || 'All types'],
+    ['Meeting', meeting ? `${meeting.subject} (${meeting.meetingId})` : 'All meetings'],
+    ['Domain', state.filters.domain || 'All domains'],
+    ['Entity family', state.filters.entityFamily || 'All entity types'],
+    ['Keyword', state.filters.keyword ? markdownCode(state.filters.keyword) : 'None'],
+    ['Topic Memory scope', scopeLabels[state.filters.trajectoryScope] || 'All Topic Memories'],
+    ['State', state._stateFilter || 'None'],
+  ];
+}
+
+function serializeMeeting(item) {
+  const meeting = item.data;
+  const counts = meetingAggregateCounts(meeting.meetingId);
+  return [
+    `### Meeting: ${markdownText(meeting.subject)}`,
+    '',
+    markdownBullet('ID', markdownCode(meeting.meetingId)),
+    markdownBullet('Organiser', meeting.organiser),
+    markdownBullet('Event date', meeting.eventDate),
+    markdownBullet('Topic count', counts.topicCount),
+    markdownBullet('Decision count', counts.decisionCount),
+    markdownBullet('Action count', counts.actionCount),
+    markdownBullet('Validation status', counts.validationStatus),
+  ];
+}
+
+function serializeTopic(item) {
+  const topic = item.data;
+  return [
+    `### Topic: ${markdownText(topic.topicStatement)}`,
+    '',
+    markdownBullet('ID', markdownCode(topic.topicId)), markdownBullet('Meeting ID', markdownCode(topic.meetingId)),
+    markdownBullet('Domain', topic.domain), markdownBullet('Entity type', topic.entityType), markdownBullet('Entity', topic.entity),
+    markdownBullet('Aspect', topic.aspect), markdownBullet('Outcome', topic.outcome), markdownBullet('Disposition', topic.disposition),
+    markdownBullet('Executive scope', topic.executiveScope), markdownBullet('Statement', topic.topicStatement), markdownBullet('Summary', topic.summary),
+    ...markdownList('Owners', topic.owners), markdownBullet('Accountable executive', topic.accountableExecutive), markdownBullet('Confidence', topic.confidence),
+    ...markdownValidation(topic.validation), ...markdownList('Key facts', topic.keyFacts), ...markdownList('Risk assertions', topic.risks),
+  ];
+}
+
+function serializeDecision(item) {
+  const decision = item.data;
+  return [
+    `### Decision: ${markdownText(decision.text)}`,
+    '',
+    markdownBullet('ID', markdownCode(decision.decisionId)), markdownBullet('Meeting ID', markdownCode(decision.meetingId)), markdownBullet('Topic ID', markdownCode(decision.topicId)),
+    markdownBullet('Owner', decision.owner), markdownBullet('Text', decision.text), markdownBullet('Meeting', decision.meetingSubject),
+    markdownBullet('Meeting date', decision.meetingEventDate), markdownBullet('Topic statement', decision.topicStatement),
+    markdownBullet('Domain', decision.topicDomain), markdownBullet('Entity type', decision.topicEntityType), markdownBullet('Entity', decision.topicEntity),
+    markdownBullet('Evidence context', decision.evidenceContext),
+  ];
+}
+
+function serializeAction(item) {
+  const action = item.data;
+  return [
+    `### Action: ${markdownText(action.text)}`,
+    '',
+    markdownBullet('ID', markdownCode(action.actionId)), markdownBullet('Meeting ID', markdownCode(action.meetingId)), markdownBullet('Topic ID', markdownCode(action.topicId)),
+    markdownBullet('Owner', action.owner), markdownBullet('Text', action.text), markdownBullet('Due date', action.dueDate), markdownBullet('Status', action.status),
+    markdownBullet('Meeting', action.meetingSubject), markdownBullet('Meeting date', action.meetingEventDate), markdownBullet('Topic statement', action.topicStatement),
+    markdownBullet('Domain', action.topicDomain), markdownBullet('Entity type', action.topicEntityType), markdownBullet('Entity', action.topicEntity),
+  ];
+}
+
+function serializeRisk(item) {
+  const risk = item.data;
+  return [
+    `### Risk: ${markdownText(risk.riskText)}`,
+    '',
+    markdownBullet('ID', markdownCode(risk.riskId)), markdownBullet('Meeting ID', markdownCode(risk.meetingId)), markdownBullet('Topic ID', markdownCode(risk.topicId)),
+    markdownBullet('Text', risk.riskText), markdownBullet('Topic statement', risk.topicStatement), markdownBullet('Owner', risk.owner),
+    markdownBullet('Domain', risk.topicDomain), markdownBullet('Entity type', risk.topicEntityType), markdownBullet('Entity', risk.topicEntity),
+    markdownBullet('Evidence label', risk.evidenceLabel), markdownBullet('Risk kind', risk.kind), ...markdownList('Supporting evidence assertions', risk.supportingEvidence),
+  ];
+}
+
+function serializeMemoryObservation(memory, nested) {
+  const prefix = nested ? '  ' : '';
+  const row = (label, value, code) => `${prefix}${nested ? '  -' : '-'} ${label}: ${code ? markdownCode(value) : markdownText(value)}`;
+  return [
+    row('Memory ID', memory.memoryId, true), row('Domain', memory.domain), row('Entity type', memory.entityType), row('Entity', memory.entity),
+    row('Aspect', memory.aspect), row('Canonical statement', memory.canonicalStatement), row('First meeting ID', memory.firstSeenMeetingId, true),
+    row('First seen date', memory.firstSeenDate), row('Last meeting ID', memory.lastSeenMeetingId, true), row('Last seen date', memory.lastSeenDate),
+    row('Meeting count', memory.meetingCount), row('Latest outcome', memory.latestOutcome), row('Disposition', memory.latestDisposition),
+    row('Executive scope', memory.latestExecutiveScope), row('Match status', memory.matchStatus), row('Proposed match statement', memory.proposedMatchStatement),
+    row('Proposed match ID', memory.proposedMatchMemoryId, true), row('Proposed match reason', memory.proposedMatchReason),
+    row('Merged into ID', memory.mergedIntoMemoryId, true), row('Review resolved at', memory.reviewResolvedAt), row('Review event ID', memory.reviewEventId, true),
+    row('Updated at', memory.updatedAt), row('Status', memory.status),
+  ];
+}
+
+function serializeTopicMemory(item) {
+  const memory = item.data;
+  const branches = Array.isArray(memory.trajectoryBranches) ? memory.trajectoryBranches : [];
+  return [
+    `### Topic Memory: ${markdownText(memory.canonicalStatement)}`,
+    '',
+    ...serializeMemoryObservation(memory, false),
+    ...(branches.length ? ['- Trajectory branches:', ...branches.flatMap(branch => serializeMemoryObservation(branch, true))] : []),
+  ];
+}
+
+const EXPORT_SERIALIZERS = { Meeting: serializeMeeting, Topic: serializeTopic, Decision: serializeDecision, Action: serializeAction, Risk: serializeRisk, 'Topic Memory': serializeTopicMemory };
+const EXPORT_TYPE_ORDER = ['Meeting', 'Topic', 'Topic Memory', 'Decision', 'Action', 'Risk'];
+
+function buildFilteredContentMarkdown(filteredItems, exportedAt) {
+  const metadata = exportFilterMetadata();
+  const lines = [
+    '# EIP ExCo Cockpit Content Export', '',
+    `- Exported at: ${exportedAt.toISOString()}`,
+    `- Results: ${filteredItems.length}`,
+    '- Active filters:',
+    ...metadata.map(([label, value]) => `  - ${label}: ${value}`),
+  ];
+  EXPORT_TYPE_ORDER.forEach(type => {
+    const items = filteredItems.filter(item => item._type === type);
+    if (!items.length) return;
+    lines.push('', `## ${type === 'Topic Memory' ? 'Topic Memories' : `${type}s`}`);
+    items.forEach(item => lines.push('', ...(EXPORT_SERIALIZERS[type](item))));
+  });
+  return lines.join('\n').trimEnd() + '\n';
+}
+
+function exportFilename(exportedAt) {
+  return `eip-exco-cockpit-export-${exportedAt.toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-')}.md`;
+}
+
+function announceExportStatus(message) {
+  const status = el('all-content-export-status');
+  if (status) status.textContent = message;
+}
+
+function updateAllContentExportState(filteredItems) {
+  const button = el('all-content-export');
+  if (!button) return;
+  const disabled = !Array.isArray(filteredItems) || filteredItems.length === 0;
+  button.disabled = disabled;
+  button.setAttribute('aria-disabled', String(disabled));
+}
+
+function exportAllContent() {
+  const { filteredItems } = currentAllContentItems();
+  if (!filteredItems.length) {
+    updateAllContentExportState(filteredItems);
+    return;
+  }
+  const exportedAt = new Date();
+  const filename = exportFilename(exportedAt);
+  let url;
+  try {
+    const markdown = buildFilteredContentMarkdown(filteredItems, exportedAt);
+    url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    announceExportStatus(`Exported ${filteredItems.length} item${filteredItems.length === 1 ? '' : 's'} as ${filename}.`);
+  } catch (error) {
+    console.error('All Content export failed', error);
+    announceExportStatus('Export failed. The current filtered results remain available.');
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+
 function populateFilterOptions() {
   const meetings = state.overview ? state.overview.meetings : [];
   const topics = state.topics || [];
@@ -459,9 +674,9 @@ function renderAllContent() {
   const resultsEl = el('all-content-results');
   if (!resultsEl) return;
 
-  const allItems = buildAllItems();
-  const filtered = applyFilters(allItems);
+  const { allItems, filteredItems: filtered } = currentAllContentItems();
   renderFilterSummary(filtered.length, allItems.length);
+  updateAllContentExportState(filtered);
 
   if (!filtered.length) {
     resultsEl.innerHTML = '<div class="empty-state">No items match the current filters. <button class="btn-secondary" onclick="clearFilters()">Clear all filters</button></div>';
@@ -1250,6 +1465,9 @@ function initFilters() {
 
   const clearBtn = el('filter-clear');
   if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+
+  const exportBtn = el('all-content-export');
+  if (exportBtn) exportBtn.addEventListener('click', exportAllContent);
 }
 
 // ── Evidence modal ────────────────────────────────────────

@@ -32,4 +32,11 @@ if ($env:MSI_SECRET) {
 # $env:FOUNDRY_API_KEY = "your-azure-openai-key-here"
 
 # LLM model selection — override the pipeline default (gpt-4o)
-$env:AZURE_OPENAI_MODEL = "gpt-5.6-terra"
+$env:AZURE_OPENAI_MODEL = "model-router"  # Use the model router for dynamic model selection
+# $env:AZURE_OPENAI_MODEL = "gpt-5.6-terra"
+
+$env:GRAPH_TENANT_ID = "f9e144a5-228f-4e5a-86c4-2cc253376402"
+$env:GRAPH_CLIENT_ID = "9cfcadb2-27c0-41e5-8c6e-c1305c4827e2"
+$env:GRAPH_USER_UPN = "peter@empoweringtech.com"
+
+$env:AZURE_OPENAI_ENDPOINT = "https://atlassian-rovo-forge.openai.azure.com"

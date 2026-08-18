@@ -1,0 +1,5303 @@
+WEBVTT
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/7-0
+00:00:06.456 --> 00:00:06.576
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/10-0
+00:00:16.216 --> 00:00:17.576
+<v Theo Davies>Hello, afternoon.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/11-0
+00:00:17.136 --> 00:00:17.856
+<v Peter Johansson>Hello.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/14-0
+00:00:22.656 --> 00:00:22.816
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/15-0
+00:00:31.456 --> 00:00:31.656
+<v Peter Johansson>No.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/16-0
+00:00:34.736 --> 00:00:35.296
+<v Peter Johansson>Ohh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/17-0
+00:00:38.016 --> 00:00:38.736
+<v Peter Johansson>Hey.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/20-0
+00:00:42.176 --> 00:00:43.856
+<v Peter Johansson>Do we know if...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/22-0
+00:00:44.896 --> 00:00:46.016
+<v Peter Johansson>Jack around.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/27-0
+00:00:52.896 --> 00:00:55.456
+<v Peter Johansson>He can join whenever he cans.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/32-0
+00:00:58.256 --> 00:00:59.456
+<v Peter Johansson>Whenever you're ready, Theo.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/34-0
+00:01:01.016 --> 00:01:02.056
+<v Theo Davies>Yeah, sure.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/36-0
+00:01:03.096 --> 00:01:03.736
+<v Theo Davies>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/40-0
+00:01:06.816 --> 00:01:08.696
+<v Theo Davies>There was a start with...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/41-0
+00:01:10.696 --> 00:01:10.896
+<v Theo Davies>The.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/50-0
+00:01:12.856 --> 00:01:17.976
+<v Theo Davies>Follow-up tasks from last week,
+and then I'll go into more detail.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/73-0
+00:01:20.696 --> 00:01:28.846
+<v Theo Davies>So the yeah, I'll go over hardware,
+pen and charge up and software readiness</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/73-1
+00:01:28.846 --> 00:01:34.033
+<v Theo Davies>today,
+including two pen application and 360 web</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/73-2
+00:01:34.033 --> 00:01:34.456
+<v Theo Davies>app.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/98-0
+00:01:37.336 --> 00:01:43.053
+<v Theo Davies>So yeah, when we last spoke,
+we spoke about assembling,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/98-1
+00:01:43.053 --> 00:01:49.690
+<v Theo Davies>so the verification of the plastics,
+those reviews are now done.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/98-2
+00:01:49.690 --> 00:01:55.816
+<v Theo Davies>We've got short term and long term
+solutions to some, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/124-0
+00:01:56.536 --> 00:02:02.469
+<v Theo Davies>relatively small issues that we came
+across with the with the plastics,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/109-0
+00:02:01.536 --> 00:02:01.736
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/124-1
+00:02:02.469 --> 00:02:09.225
+<v Theo Davies>but on the whole plastics are performing
+performing really well from a functional</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/124-2
+00:02:09.225 --> 00:02:13.016
+<v Theo Davies>perspective and yeah cosmetic perspective.
+So</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/131-0
+00:02:14.696 --> 00:02:20.136
+<v Theo Davies>Yeah,
+we've kicked off the 21 build with OSI.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/147-0
+00:02:22.776 --> 00:02:27.621
+<v Theo Davies>ready to, you know,
+to give us the units to go through this</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/147-1
+00:02:27.621 --> 00:02:31.336
+<v Theo Davies>more verification,
+go through pre-compliance.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/149-0
+00:02:33.576 --> 00:02:34.456
+<v Theo Davies>We.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/177-0
+00:02:35.736 --> 00:02:40.621
+<v Theo Davies>Have, yeah,
+given the green light on charge hub</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/177-1
+00:02:40.621 --> 00:02:47.847
+<v Theo Davies>tooling, charging hub tooling, yeah,
+finalising the the tolerances for</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/177-2
+00:02:47.847 --> 00:02:53.140
+<v Theo Davies>production.
+They've been given go ahead and they've</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/177-3
+00:02:53.140 --> 00:02:54.056
+<v Theo Davies>given us.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/205-0
+00:02:54.936 --> 00:02:58.653
+<v Theo Davies>Yeah,
+a time frame for those units and the T</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/205-1
+00:02:58.653 --> 00:03:02.782
+<v Theo Davies>zeros.
+We also specified the volume for T0 units,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/205-2
+00:03:02.782 --> 00:03:08.068
+<v Theo Davies>so those first shots of the charger hub
+that come off the tool.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/205-3
+00:03:08.068 --> 00:03:12.776
+<v Theo Davies>We've specified that volume,
+so that's all moving ahead.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/206-0
+00:03:15.336 --> 00:03:16.136
+<v Theo Davies>We.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/217-0
+00:03:18.456 --> 00:03:25.736
+<v Theo Davies>Yeah, we've had the M11 review.
+I've conducted a structured review of.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/249-0
+00:03:27.976 --> 00:03:31.975
+<v Theo Davies>Most of that now,
+I've got a few bits and pieces that I</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/249-1
+00:03:31.975 --> 00:03:36.188
+<v Theo Davies>need to finish up.
+The bulk of that is done now and in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/249-2
+00:03:36.188 --> 00:03:38.616
+<v Theo Davies>process of feeding that back to...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/251-0
+00:03:41.176 --> 00:03:41.976
+<v Theo Davies>To the team.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/271-0
+00:03:43.336 --> 00:03:49.007
+<v Theo Davies>I'll share some of that new functionality
+in this course so you can see what some</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/271-1
+00:03:49.007 --> 00:03:54.056
+<v Theo Davies>of those updates look like and to you
+know what they mean for our users.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/264-0
+00:03:49.616 --> 00:03:49.776
+<v Peter Johansson>Ohh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/298-0
+00:03:56.056 --> 00:04:04.180
+<v Theo Davies>And in terms of the packaging specs,
+they progressed to about, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/276-0
+00:04:01.256 --> 00:04:01.416
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/298-1
+00:04:04.180 --> 00:04:13.529
+<v Theo Davies>30% done. But once the software reviewed,
+I'll be able to focus and focus some more</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/298-2
+00:04:13.529 --> 00:04:14.976
+<v Theo Davies>time on that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/312-0
+00:04:15.056 --> 00:04:20.313
+<v Theo Davies>And in terms of process and ownership,
+that's, yeah, very close,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/312-1
+00:04:20.313 --> 00:04:26.056
+<v Theo Davies>close conversation with Nick and Chloe
+about ownership and priorities.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/313-0
+00:04:27.176 --> 00:04:27.656
+<v Theo Davies>Those.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/315-0
+00:04:29.896 --> 00:04:31.696
+<v Theo Davies>Sing and.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/320-0
+00:04:32.696 --> 00:04:34.616
+<v Theo Davies>Yeah, dig in a little bit more.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/324-0
+00:04:35.816 --> 00:04:37.096
+<v Theo Davies>Into a bit more detail.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/323-0
+00:04:36.256 --> 00:04:36.616
+<v Peter Johansson>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/325-0
+00:04:38.216 --> 00:04:38.456
+<v Theo Davies>And.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/327-0
+00:04:40.296 --> 00:04:40.936
+<v Theo Davies>B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/338-0
+00:04:43.136 --> 00:04:50.208
+<v Theo Davies>Here, we've gone through verification,
+functional verification of these</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/338-1
+00:04:50.208 --> 00:04:51.976
+<v Theo Davies>enclosures, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/339-0
+00:04:53.576 --> 00:04:54.456
+<v Theo Davies>There were.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/374-0
+00:04:57.176 --> 00:05:03.935
+<v Theo Davies>There was one issue of bosses cracking,
+so when you drive the screw in one or two</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/374-1
+00:05:03.935 --> 00:05:09.458
+<v Theo Davies>of the bosses were cracking,
+so we've got a short-term solution to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/374-2
+00:05:09.458 --> 00:05:13.415
+<v Theo Davies>that,
+which is to bore out the bore out the box</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/374-3
+00:05:13.415 --> 00:05:14.816
+<v Theo Davies>in a down to the.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/410-0
+00:05:16.376 --> 00:05:19.867
+<v Theo Davies>Long term solution is to is to tweak the
+tooling.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/410-1
+00:05:19.867 --> 00:05:25.243
+<v Theo Davies>So as I have been given short term
+instructions and Bang and now and I had a</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/410-2
+00:05:25.243 --> 00:05:30.689
+<v Theo Davies>meeting with Bang last week and so long
+term solutions which effectively just</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/410-3
+00:05:30.689 --> 00:05:35.576
+<v Theo Davies>reduce any post will remove post any post
+processing that's required.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/441-0
+00:05:36.256 --> 00:05:40.610
+<v Theo Davies>to ensure that the units,
+the bosses aren't cracking,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/441-1
+00:05:40.610 --> 00:05:47.302
+<v Theo Davies>the units going to get up with as little
+hands-on time as possible, basically. So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/441-2
+00:05:47.302 --> 00:05:51.736
+<v Theo Davies>that was the that was the main one. Yeah,
+another one.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/458-0
+00:05:53.256 --> 00:05:58.836
+<v Theo Davies>that we had was the side buttons,
+they were functioning well.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/458-1
+00:05:58.836 --> 00:06:03.336
+<v Theo Davies>The plastic is a little bit stiffer than
+the MGF.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/486-0
+00:06:05.976 --> 00:06:09.101
+<v Theo Davies>So in terms of the three buttons on the
+side here,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/463-0
+00:06:07.816 --> 00:06:08.136
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/486-1
+00:06:09.101 --> 00:06:13.391
+<v Theo Davies>this button is a little bit stiffer than
+these two. So we have, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/486-2
+00:06:13.391 --> 00:06:17.497
+<v Theo Davies>which is the power button.
+So the power button is slightly stiffer</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/486-3
+00:06:17.497 --> 00:06:19.336
+<v Theo Davies>than the volume buttons, which</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/487-0
+00:06:22.576 --> 00:06:22.776
+<v Theo Davies>It.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/523-0
+00:06:25.336 --> 00:06:31.003
+<v Theo Davies>I don't think it's going to pose a
+usability issue at all. And the end,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/523-1
+00:06:31.003 --> 00:06:35.331
+<v Theo Davies>so from a functional,
+from a perception point of view,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/523-2
+00:06:35.331 --> 00:06:39.660
+<v Theo Davies>it doesn't feel wrong because these two
+feel the same.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/523-3
+00:06:39.660 --> 00:06:44.776
+<v Theo Davies>This one feels slightly different and it
+has different function.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/539-0
+00:06:45.576 --> 00:06:50.689
+<v Theo Davies>So it's slightly stiffer.
+So not too concerned about that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/539-1
+00:06:50.689 --> 00:06:54.936
+<v Theo Davies>This button feels very similar to these
+buttons.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/544-0
+00:06:56.296 --> 00:07:00.856
+<v Theo Davies>Um, cosmetically, um, yeah, enclosures.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/550-0
+00:07:02.216 --> 00:07:06.296
+<v Theo Davies>Looking and feeling good.
+There's a little bit of...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/586-0
+00:07:07.576 --> 00:07:11.681
+<v Theo Davies>It's very hard to,
+you have to get the pen in the right</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/586-1
+00:07:11.681 --> 00:07:16.739
+<v Theo Davies>light to be able to see it,
+but there's a little bit of a difference</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/586-2
+00:07:16.739 --> 00:07:22.750
+<v Theo Davies>in surface finish along this edge here.
+So I'm investigating different how we can</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/586-3
+00:07:22.750 --> 00:07:24.216
+<v Theo Davies>get that cleaned up.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/607-0
+00:07:26.456 --> 00:07:29.677
+<v Theo Davies>But it's, yeah,
+you need to get it in the right lines.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/607-1
+00:07:29.677 --> 00:07:33.367
+<v Theo Davies>It's not a very obvious thing,
+but it is something I'd like to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/607-2
+00:07:33.367 --> 00:07:36.296
+<v Theo Davies>investigate if we can,
+if we can neaten up a bit.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/605-0
+00:07:36.336 --> 00:07:36.616
+<v Peter Johansson>Micro.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/609-0
+00:07:38.576 --> 00:07:40.176
+<v Theo Davies>So, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/613-0
+00:07:39.736 --> 00:07:42.696
+<v Sharmella Kirby>What's the two orange bands, Theo?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/636-0
+00:07:42.856 --> 00:07:47.112
+<v Theo Davies>I just haven't glued this display on,
+yeah, yeah, so it's masking,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/644-0
+00:07:44.296 --> 00:07:48.025
+<v Sharmella Kirby>Oh, fine. Okay.
+They happen to look like part of the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/636-1
+00:07:47.112 --> 00:07:48.256
+<v Theo Davies>it's masking tape.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/633-0
+00:07:47.216 --> 00:07:48.096
+<v Peter Johansson>It's.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/644-1
+00:07:48.025 --> 00:07:50.136
+<v Sharmella Kirby>design because they're orange.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/645-0
+00:07:49.656 --> 00:07:51.656
+<v Theo Davies>Yeah, yeah, I know, English.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/647-0
+00:07:50.816 --> 00:07:54.656
+<v Peter Johansson>They're mandatory, Sharmella.
+I have to be there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/649-0
+00:07:55.336 --> 00:07:55.736
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/671-0
+00:07:55.576 --> 00:07:59.087
+<v Sharmella Kirby>They look good. It looks good, Theo.
+It looks good.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/653-0
+00:07:57.016 --> 00:07:57.336
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/663-0
+00:07:58.216 --> 00:07:59.816
+<v Theo Davies>Thanks. Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/671-1
+00:07:59.087 --> 00:08:02.936
+<v Sharmella Kirby>The black and white looks good.
+With the orange buttons.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/665-0
+00:07:59.696 --> 00:07:59.896
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/669-0
+00:08:01.816 --> 00:08:02.216
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/676-0
+00:08:03.496 --> 00:08:05.896
+<v Theo Davies>Yeah, colour. Yeah, everything's.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/684-0
+00:08:05.616 --> 00:08:07.336
+<v Sharmella Kirby>Or yellow, I don't know what.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/697-0
+00:08:06.936 --> 00:08:09.358
+<v Theo Davies>Everything's, yeah,
+it's a very warm yellow,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/697-1
+00:08:09.358 --> 00:08:12.696
+<v Theo Davies>so it's about as close to orange as you
+can get for a yellow.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/690-0
+00:08:10.176 --> 00:08:10.296
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/692-0
+00:08:10.536 --> 00:08:10.856
+<v Sharmella Kirby>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/698-0
+00:08:13.136 --> 00:08:14.136
+<v Sharmella Kirby>Yeah, it looks nice.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/725-0
+00:08:13.736 --> 00:08:18.514
+<v Theo Davies>So, yeah, yeah, that's just my,
+it's just 'cause I haven't glued this</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/711-0
+00:08:18.216 --> 00:08:18.696
+<v Sharmella Kirby>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/725-1
+00:08:18.514 --> 00:08:23.496
+<v Theo Davies>display on while some doing reviews,
+but it's very thin, it's very thin.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/722-0
+00:08:23.256 --> 00:08:24.336
+<v Peter Johansson>Talk in menu on.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/729-0
+00:08:27.816 --> 00:08:29.256
+<v Theo Davies>Yeah, and there's a little bit of a...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/738-0
+00:08:30.416 --> 00:08:33.816
+<v Theo Davies>You try, yeah, it's difficult to see,
+but there's a little bit of...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/740-0
+00:08:36.856 --> 00:08:38.936
+<v Theo Davies>Surface finish, so.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/743-0
+00:08:39.616 --> 00:08:40.296
+<v Peter Johansson>Introduction.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/748-0
+00:08:40.296 --> 00:08:43.416
+<v Theo Davies>Interfection on the inside of the window
+here as well, which...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/755-0
+00:08:44.936 --> 00:08:46.256
+<v Theo Davies>It kind of losing a finger.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/764-0
+00:08:45.336 --> 00:08:47.920
+<v Sharmella Kirby>But these are cosmetic things,
+aren't they,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/764-1
+00:08:47.920 --> 00:08:49.976
+<v Sharmella Kirby>as opposed to functionality issues.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/776-0
+00:08:50.456 --> 00:08:53.416
+<v Theo Davies>Yeah, yeah, exactly, yeah, so.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/770-0
+00:08:51.096 --> 00:08:51.976
+<v Sharmella Kirby>Is that correct?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/769-0
+00:08:51.616 --> 00:08:52.016
+<v Toby Sutton OBE (Empowering Tech)>Helps.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/778-0
+00:08:52.856 --> 00:08:55.336
+<v Toby Sutton OBE (Empowering Tech)>How pretty does it look around the camera
+area?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/781-0
+00:08:56.456 --> 00:08:57.336
+<v Theo Davies>Inside of here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/783-0
+00:08:57.816 --> 00:08:58.296
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/798-0
+00:08:59.336 --> 00:09:03.021
+<v Theo Davies>I'm really happy with how it looks in the
+end.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/798-1
+00:09:03.021 --> 00:09:07.176
+<v Theo Davies>Let me switch cameras so I can give you
+better view.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/799-0
+00:09:08.936 --> 00:09:09.056
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/802-0
+00:09:14.736 --> 00:09:16.856
+<v Theo Davies>We see in here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/804-0
+00:09:17.576 --> 00:09:18.776
+<v Toby Sutton OBE (Empowering Tech)>Yeah, it looks neat, doesn't it?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/807-0
+00:09:19.176 --> 00:09:19.296
+<v Peter Johansson>Boome.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/820-0
+00:09:19.336 --> 00:09:23.549
+<v Theo Davies>Yeah, it's going neat. Yeah,
+alignment's looking good for the camera.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/820-1
+00:09:23.549 --> 00:09:25.656
+<v Theo Davies>There's no, you know, there's no...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/825-0
+00:09:28.616 --> 00:09:31.096
+<v Theo Davies>holes or anything, yeah. A lot of...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/830-0
+00:09:33.096 --> 00:09:35.416
+<v Theo Davies>But what?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/831-0
+00:09:33.096 --> 00:09:37.896
+<v Toby Sutton OBE (Empowering Tech)>and you're happy with all the button
+pushes that they are.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/835-0
+00:09:40.376 --> 00:09:41.496
+<v Theo Davies>Yeah, there was.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/850-0
+00:09:41.816 --> 00:09:46.696
+<v Toby Sutton OBE (Empowering Tech)>Are they Apple quality or are they not
+Apple quality? Do they feel good to push?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/857-0
+00:09:47.456 --> 00:09:49.816
+<v Toby Sutton OBE (Empowering Tech)>What do they feel? Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/873-0
+00:09:47.656 --> 00:09:54.181
+<v Theo Davies>Yeah, they feel good to push. Yeah,
+they are, yeah, yeah, they're feeling,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/873-1
+00:09:54.181 --> 00:09:59.576
+<v Theo Davies>they're feeling tactile.
+They're feeling tactile in assembly.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/883-0
+00:10:03.256 --> 00:10:07.336
+<v Theo Davies>There is some screw I've added in an
+additional assembly step.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/885-0
+00:10:08.216 --> 00:10:09.656
+<v Theo Davies>To.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/891-0
+00:10:10.856 --> 00:10:12.856
+<v Theo Davies>To cheque the tactile field before.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/922-0
+00:10:13.896 --> 00:10:18.973
+<v Theo Davies>going to the next assembly step,
+because you can actually adjust the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/922-1
+00:10:18.973 --> 00:10:24.418
+<v Theo Davies>feeling slightly by talking the talking
+some internal screws differently.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/922-2
+00:10:24.418 --> 00:10:25.816
+<v Theo Davies>So in the 21 units.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/919-0
+00:10:25.016 --> 00:10:26.536
+<v Toby Sutton OBE (Empowering Tech)>But you think it feels good?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/959-0
+00:10:27.176 --> 00:10:33.390
+<v Theo Davies>It feels good, yeah. Yeah, I can show you.
+Yeah, the side buttons feel good.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/931-0
+00:10:28.456 --> 00:10:29.976
+<v Toby Sutton OBE (Empowering Tech)>And what about the side buttons?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/959-1
+00:10:33.390 --> 00:10:37.667
+<v Theo Davies>Like I say,
+this one is slightly stiffer than these.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/959-2
+00:10:37.667 --> 00:10:43.396
+<v Theo Davies>It doesn't feel wrong because it's a
+different function and power has,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/959-3
+00:10:43.396 --> 00:10:45.656
+<v Theo Davies>you know, power is more like</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/992-0
+00:10:46.776 --> 00:10:51.408
+<v Theo Davies>definitive kind of thing,
+action to take as opposed to volume and</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/992-1
+00:10:51.408 --> 00:10:56.953
+<v Theo Davies>it's, you know, it's visually separated.
+There will be icons on the side here,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/992-2
+00:10:56.953 --> 00:11:01.656
+<v Theo Davies>but they're not etched onto this unit to
+distinguish the function.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/995-0
+00:11:03.696 --> 00:11:07.576
+<v Toby Sutton OBE (Empowering Tech)>And that button is just your pen or that
+button is all Pens will feel different.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/993-0
+00:11:04.136 --> 00:11:04.456
+<v Theo Davies>B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/999-0
+00:11:08.376 --> 00:11:09.736
+<v Theo Davies>But yeah, all Pens will feel different.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1000-0
+00:11:10.376 --> 00:11:10.856
+<v Toby Sutton OBE (Empowering Tech)>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1002-0
+00:11:11.696 --> 00:11:11.976
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1004-0
+00:11:13.576 --> 00:11:14.856
+<v Theo Davies>Yeah, so.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1013-0
+00:11:16.856 --> 00:11:20.456
+<v Theo Davies>When we get the 20, yeah,
+with the 21 build, we'll...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1016-0
+00:11:21.656 --> 00:11:22.616
+<v Theo Davies>Understand.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1015-0
+00:11:22.456 --> 00:11:22.616
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1029-0
+00:11:25.176 --> 00:11:29.088
+<v Theo Davies>You know, within these subjective points,
+we can get a bit more,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1029-1
+00:11:29.088 --> 00:11:31.736
+<v Theo Davies>get a bit more feedback,
+but how they feel.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1037-0
+00:11:33.176 --> 00:11:36.186
+<v Theo Davies>So, yeah, I can,
+I can pile this and I can show you the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1037-1
+00:11:36.186 --> 00:11:36.616
+<v Theo Davies>buttons.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1040-0
+00:11:38.056 --> 00:11:38.936
+<v Theo Davies>The button's working.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1052-0
+00:11:40.056 --> 00:11:44.859
+<v Theo Davies>Firmware-wise, when it powers on,
+we've reduced the frequency and, um,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1052-1
+00:11:44.859 --> 00:11:45.536
+<v Theo Davies>and the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1056-0
+00:11:47.736 --> 00:11:49.376
+<v Theo Davies>Length of time that the.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1085-0
+00:11:51.336 --> 00:11:56.331
+<v Theo Davies>Then, buzzes for,
+so it feels more friendly than quite as</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1085-1
+00:11:56.331 --> 00:12:01.929
+<v Theo Davies>intense, which is nice.
+You can see we've still got that initial</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1085-2
+00:12:01.929 --> 00:12:07.096
+<v Theo Davies>stretched logo that comes up.
+That's the one he's removing.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1094-0
+00:12:09.376 --> 00:12:12.744
+<v Theo Davies>but we've got a nicer transition that's
+still skewed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1094-1
+00:12:12.744 --> 00:12:14.616
+<v Theo Davies>We do have a nicer transition.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1096-0
+00:12:15.896 --> 00:12:17.016
+<v Theo Davies>I can show you.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1135-0
+00:12:19.176 --> 00:12:22.674
+<v Theo Davies>Yeah,
+I can show you some more developments for</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1135-1
+00:12:22.674 --> 00:12:28.503
+<v Theo Davies>software in terms of usability and then I
+can come on and sort of show you some</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1135-2
+00:12:28.503 --> 00:12:32.074
+<v Theo Davies>other, you know,
+hardware related functionality.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1135-3
+00:12:32.074 --> 00:12:37.976
+<v Theo Davies>But we've got QR code login working and
+we've got an updated student login code.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1147-0
+00:12:39.176 --> 00:12:43.951
+<v Theo Davies>approach.
+So I can show you that if I find myself</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1147-1
+00:12:43.951 --> 00:12:48.536
+<v Theo Davies>here.
+We've got this DaVinci Code scroll wheel.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1148-0
+00:12:49.176 --> 00:12:50.216
+<v Toby Sutton OBE (Empowering Tech)>That's much better.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1150-0
+00:12:50.296 --> 00:12:50.776
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1152-0
+00:12:51.936 --> 00:12:52.696
+<v Theo Davies>Which is?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1155-0
+00:12:53.736 --> 00:12:54.816
+<v Theo Davies>Much more usable.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1156-0
+00:12:55.896 --> 00:12:56.376
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1161-0
+00:12:58.136 --> 00:13:02.176
+<v Theo Davies>Yeah, which is great, then if I log out.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1166-0
+00:13:03.576 --> 00:13:05.976
+<v Theo Davies>Then I can also show you the QR.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1168-0
+00:13:07.176 --> 00:13:07.736
+<v Theo Davies>Login.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1174-0
+00:13:10.296 --> 00:13:13.176
+<v Theo Davies>So if I go to 360.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1177-0
+00:13:14.536 --> 00:13:16.216
+<v Theo Davies>Generate my.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1178-0
+00:13:17.776 --> 00:13:17.896
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1203-0
+00:13:22.416 --> 00:13:26.600
+<v Theo Davies>You can see there's a little lag between
+pressing and the camera opening.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1203-1
+00:13:26.600 --> 00:13:31.294
+<v Theo Davies>So that's the usability point I'd like to
+improve because there isn't a loader for</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1203-2
+00:13:31.294 --> 00:13:33.838
+<v Theo Davies>that.
+I'm just going to share screen as well</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1203-3
+00:13:33.838 --> 00:13:34.856
+<v Theo Davies>for a second here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1215-0
+00:13:39.576 --> 00:13:45.736
+<v Theo Davies>So I'm here in 360 and I can go to, oh,
+give me a second.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1220-0
+00:13:54.856 --> 00:13:56.616
+<v Theo Davies>So, this is where my...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1224-0
+00:13:57.656 --> 00:13:59.496
+<v Theo Davies>Login would be.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1225-0
+00:14:00.616 --> 00:14:01.096
+<v Theo Davies>Theo.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1234-0
+00:14:11.576 --> 00:14:15.392
+<v Theo Davies>This is what we'd have group called group
+printouts,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1234-1
+00:14:15.392 --> 00:14:18.056
+<v Theo Davies>so you can see this PDF is generated.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1253-0
+00:14:22.216 --> 00:14:26.000
+<v Theo Davies>This has just got me on it,
+but this would have blocks for each</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1253-1
+00:14:26.000 --> 00:14:29.016
+<v Theo Davies>student.
+So then I'm just going to hold up my pen.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1256-0
+00:14:30.216 --> 00:14:31.736
+<v Theo Davies>To that QR code.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1260-0
+00:14:33.576 --> 00:14:34.936
+<v Theo Davies>See on the camera at the moment.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1279-0
+00:14:37.736 --> 00:14:40.876
+<v Theo Davies>There's a bit of a lag in the camera at
+the moment,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1279-1
+00:14:40.876 --> 00:14:45.406
+<v Theo Davies>which is something I'm feeding back on,
+just doing this from the screen as</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1279-2
+00:14:45.406 --> 00:14:46.976
+<v Theo Davies>opposed to from a printer.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1280-0
+00:14:55.376 --> 00:14:57.276
+<v Toby Sutton OBE (Empowering Tech)>I know when I tried to do this a few
+months ago,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1280-1
+00:14:57.276 --> 00:15:00.456
+<v Toby Sutton OBE (Empowering Tech)>it didn't work from the screen and I had
+to print it out. Is that still the case?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1281-0
+00:15:01.656 --> 00:15:06.776
+<v Theo Davies>I got it to work from,
+I got it to work from the screen earlier.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1282-0
+00:15:08.256 --> 00:15:08.456
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1286-0
+00:15:09.736 --> 00:15:12.056
+<v Theo Davies>It was in a playable, man.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1287-0
+00:15:13.496 --> 00:15:13.656
+<v Theo Davies>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1288-0
+00:15:15.896 --> 00:15:16.456
+<v Theo Davies>Trying.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1289-0
+00:15:24.136 --> 00:15:26.216
+<v Theo Davies>Yeah, so I'm just gonna try this game,
+so I get...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1292-0
+00:15:27.416 --> 00:15:28.696
+<v Theo Davies>Scanning QR code.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1305-0
+00:15:33.176 --> 00:15:37.976
+<v Theo Davies>We want we want to introduce a loader
+here, so you know when.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1322-0
+00:15:39.696 --> 00:15:43.614
+<v Theo Davies>When it's thinking about it,
+opens the viewfinder,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1308-0
+00:15:40.136 --> 00:15:40.416
+<v Peter Johansson>Max.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1310-0
+00:15:42.296 --> 00:15:42.576
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1322-1
+00:15:43.614 --> 00:15:48.148
+<v Theo Davies>so there's a bit of a lag on the
+viewfinder at the moment,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1322-2
+00:15:48.148 --> 00:15:50.376
+<v Theo Davies>something we're looking into.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1328-0
+00:16:15.496 --> 00:16:15.816
+<v Theo Davies>Bang.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1329-0
+00:16:22.536 --> 00:16:24.338
+<v Theo Davies>Okay,
+I couldn't get that to work for some</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1329-1
+00:16:24.338 --> 00:16:26.056
+<v Theo Davies>reason; the second camera wasn't working.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1360-0
+00:16:27.256 --> 00:16:30.638
+<v Theo Davies>A bit frustrating. I can't show you.
+I got, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1360-1
+00:16:30.638 --> 00:16:36.185
+<v Theo Davies>it was the first time I got to work just
+now and obviously now I'm trying to show</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1360-2
+00:16:36.185 --> 00:16:40.514
+<v Theo Davies>people. It isn't working for me.
+So just log in this way first.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1360-3
+00:16:40.514 --> 00:16:43.896
+<v Theo Davies>I log in this way to show you the other
+features.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1361-0
+00:16:46.056 --> 00:16:46.456
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1364-0
+00:16:47.976 --> 00:16:49.096
+<v Theo Davies>Yeah, so you can see.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1367-0
+00:16:49.976 --> 00:16:50.736
+<v Theo Davies>We've got the.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1379-0
+00:17:00.216 --> 00:17:04.159
+<v Toby Sutton OBE (Empowering Tech)>Do you want to move that back onto the
+main screen, Theo? I tried to spotlight,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1380-0
+00:17:03.016 --> 00:17:06.296
+<v Theo Davies>Ohh yeah, sorry, sorry, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1379-1
+00:17:04.159 --> 00:17:05.096
+<v Toby Sutton OBE (Empowering Tech)>but it didn't work.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1382-0
+00:17:08.296 --> 00:17:08.936
+<v Theo Davies>Claudine.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1399-0
+00:17:14.616 --> 00:17:20.180
+<v Theo Davies>So I think the second camera opening
+sometimes is causing is causing crashes.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1399-1
+00:17:20.180 --> 00:17:23.176
+<v Theo Davies>I've just had to I've just had to restart.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1409-0
+00:17:22.296 --> 00:17:25.502
+<v Peter Johansson>Yeah,
+there is a bug with memory allocation</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1409-1
+00:17:25.502 --> 00:17:29.873
+<v Peter Johansson>with a second camera.
+They are working on fixing until this</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1409-2
+00:17:29.873 --> 00:17:30.456
+<v Peter Johansson>morning.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1410-0
+00:17:31.656 --> 00:17:32.056
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1423-0
+00:17:35.416 --> 00:17:38.032
+<v Theo Davies>So when I just open the second camera
+there and then try to log in, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1414-0
+00:17:36.256 --> 00:17:36.376
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1420-0
+00:17:37.776 --> 00:17:37.936
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1423-1
+00:17:38.032 --> 00:17:38.456
+<v Theo Davies>it's just...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1427-0
+00:17:39.616 --> 00:17:41.416
+<v Theo Davies>It's just crashed, so I'm just restarting.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1433-0
+00:17:42.696 --> 00:17:45.496
+<v Theo Davies>It's a known, known bug, it says.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1441-0
+00:18:14.856 --> 00:18:16.056
+<v Theo Davies>Theo Higgins.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1451-0
+00:18:18.296 --> 00:18:22.264
+<v Theo Davies>So, yeah,
+you can see with the navigation buttons,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1451-1
+00:18:22.264 --> 00:18:23.976
+<v Theo Davies>um, yeah, we've got...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1454-0
+00:18:26.056 --> 00:18:28.296
+<v Toby Sutton OBE (Empowering Tech)>Are they now working? That's nice.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1452-0
+00:18:28.296 --> 00:18:28.456
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1470-0
+00:18:28.416 --> 00:18:32.204
+<v Theo Davies>Those map, they just they map nicely,
+you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1470-1
+00:18:32.204 --> 00:18:37.096
+<v Theo Davies>we're not getting any false positives or
+or like non presses.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1504-0
+00:18:40.136 --> 00:18:45.230
+<v Theo Davies>I've just gone into read mode.
+You can see we've got the scanning</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1504-1
+00:18:45.230 --> 00:18:49.398
+<v Theo Davies>illustration,
+the sequential scanning illustration in</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1504-2
+00:18:49.398 --> 00:18:52.948
+<v Theo Davies>place now.
+So non-text based instructions for</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1494-0
+00:18:52.416 --> 00:18:52.936
+<v Jack Churchill>Nice.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1504-3
+00:18:52.948 --> 00:18:57.270
+<v Theo Davies>scanning. Yeah,
+you can see it's a little bit stretched</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1504-4
+00:18:57.270 --> 00:18:57.656
+<v Theo Davies>here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1506-0
+00:18:59.576 --> 00:19:00.776
+<v Theo Davies>Yeah, that's one of my...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1541-0
+00:19:02.056 --> 00:19:06.454
+<v Theo Davies>On modes of feedback, which, yeah,
+actually it just needs to be,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1541-1
+00:19:06.454 --> 00:19:10.988
+<v Theo Davies>it's been stretched out, and you can see,
+yeah, if I go back here,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1541-2
+00:19:10.988 --> 00:19:15.996
+<v Theo Davies>I use the buttons, so, but yeah,
+buttons are working for top-level menus,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1541-3
+00:19:15.996 --> 00:19:20.056
+<v Theo Davies>they're not functional for some of the
+menus at the moment.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1580-0
+00:19:22.936 --> 00:19:27.579
+<v Theo Davies>Can you hear the,
+can you hear it speaking to me? Yeah. So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1547-0
+00:19:25.936 --> 00:19:26.296
+<v Toby Sutton OBE (Empowering Tech)>Yep.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1548-0
+00:19:27.416 --> 00:19:27.576
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1580-1
+00:19:27.579 --> 00:19:32.685
+<v Theo Davies>so the talking menu, you know,
+it makes sense with the navigation</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1580-2
+00:19:32.685 --> 00:19:37.638
+<v Theo Davies>buttons and you can see those both
+working together nicely. So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1580-3
+00:19:37.638 --> 00:19:41.816
+<v Theo Davies>I'm able to do a lot of navigation
+without having to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1584-0
+00:19:42.856 --> 00:19:45.376
+<v Theo Davies>Basically, what happened to, you know,
+really engage with the screen.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1603-0
+00:19:47.136 --> 00:19:52.664
+<v Theo Davies>Another thing we've got functioning at
+the moment, we've got functioning now is,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1603-1
+00:19:52.664 --> 00:19:55.736
+<v Theo Davies>you know,
+we've got visibility on the tools.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1631-0
+00:19:56.696 --> 00:20:02.706
+<v Theo Davies>within that mode before you engage with
+any text. So yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1631-1
+00:20:02.706 --> 00:20:09.734
+<v Theo Davies>when you enter a mode and you're looking
+for a tool, so with intent,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1631-2
+00:20:09.734 --> 00:20:13.096
+<v Theo Davies>you're able to be able to explore</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1632-0
+00:20:13.336 --> 00:20:13.576
+<v Peter Johansson>Ed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1640-0
+00:20:14.296 --> 00:20:17.717
+<v Theo Davies>The pen and find your tool before you
+actually start Scanning anything,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1640-1
+00:20:17.717 --> 00:20:20.616
+<v Theo Davies>which is was something we didn't have we
+didn't have before.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1641-0
+00:20:21.816 --> 00:20:22.296
+<v Theo Davies>And.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1646-0
+00:20:23.456 --> 00:20:25.096
+<v Theo Davies>Which is nice, it just gives us more.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1650-0
+00:20:48.216 --> 00:20:50.456
+<v Theo Davies>So yeah, we've got here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1678-0
+00:20:51.496 --> 00:20:56.922
+<v Theo Davies>All the words I just scanned in and we've
+got the GTS button here,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1678-1
+00:20:56.922 --> 00:21:02.753
+<v Theo Davies>so I want to listen to landing.
+I can press that if I want to listen to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1678-2
+00:21:02.753 --> 00:21:04.616
+<v Theo Davies>spot. I listen to spot.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1679-0
+00:21:04.056 --> 00:21:07.336
+<v Toby Sutton OBE (Empowering Tech)>I thought you had expanded the database
+to 6000 words.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1690-0
+00:21:08.136 --> 00:21:12.936
+<v Theo Davies>Uh, 3000 at the moment,
+so landing and spot on on in there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1691-0
+00:21:12.616 --> 00:21:16.136
+<v Toby Sutton OBE (Empowering Tech)>I still not in the 1st 3000 words. Okay,
+fair enough.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1700-0
+00:21:18.376 --> 00:21:20.778
+<v Theo Davies>Yeah, uh,
+we've got below is horizon in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1696-0
+00:21:20.056 --> 00:21:20.136
+<v Peter Johansson>The.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1700-1
+00:21:20.778 --> 00:21:21.816
+<v Theo Davies>horizon's in there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1720-0
+00:21:24.216 --> 00:21:28.214
+<v Theo Davies>But yeah,
+we've got TGS access to each of those,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1720-1
+00:21:28.214 --> 00:21:34.008
+<v Theo Davies>so you're able to, you know,
+visually see the split with the syllables</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1720-2
+00:21:34.008 --> 00:21:36.456
+<v Theo Davies>and hear at the same time. And</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1721-0
+00:21:36.736 --> 00:21:38.856
+<v Toby Sutton OBE (Empowering Tech)>What's it saying? Horizon, one word.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1743-0
+00:21:40.136 --> 00:21:44.181
+<v Theo Davies>Yeah, it reads this word,
+so it doesn't read. Yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1733-0
+00:21:42.456 --> 00:21:43.616
+<v Toby Sutton OBE (Empowering Tech)>The yellow word, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1743-1
+00:21:44.181 --> 00:21:48.616
+<v Theo Davies>it just reads as it is there.
+And same for graphemes, we</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1745-0
+00:21:51.896 --> 00:21:52.696
+<v Theo Davies>We have.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1747-0
+00:21:55.656 --> 00:21:56.696
+<v Theo Davies>Yeah, the TTS.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1759-0
+00:21:58.136 --> 00:22:02.510
+<v Theo Davies>Functioning from this button,
+I'd be able to draw to draw a comparison</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1759-1
+00:22:02.510 --> 00:22:03.496
+<v Theo Davies>between the two.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1762-0
+00:22:04.976 --> 00:22:06.056
+<v Theo Davies>We also have.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1764-0
+00:22:09.256 --> 00:22:10.216
+<v Theo Davies>Verizon.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1767-0
+00:22:12.456 --> 00:22:14.296
+<v Theo Davies>We've got some nicer.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1769-0
+00:22:15.896 --> 00:22:17.096
+<v Theo Davies>Nice icons.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1789-0
+00:22:18.296 --> 00:22:22.476
+<v Theo Davies>In place now, so yeah,
+lots of these icons have been sorted out,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1789-1
+00:22:22.476 --> 00:22:27.363
+<v Theo Davies>so you know they were sort of stretched
+stretched for access to to set text</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1789-2
+00:22:27.363 --> 00:22:28.456
+<v Theo Davies>settings in here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1791-0
+00:22:31.976 --> 00:22:32.776
+<v Theo Davies>We can.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1794-0
+00:22:34.136 --> 00:22:36.456
+<v Theo Davies>Favourite words we can.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1813-0
+00:22:39.696 --> 00:22:43.084
+<v Theo Davies>And we've also got, yeah,
+second camera functionality working.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1813-1
+00:22:43.084 --> 00:22:45.719
+<v Theo Davies>It may crash then, but I'll just,
+I'll show you,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1813-2
+00:22:45.719 --> 00:22:47.816
+<v Theo Davies>I'll show you what that's looking like.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1821-0
+00:22:51.256 --> 00:22:54.216
+<v Toby Sutton OBE (Empowering Tech)>There's no explore button.
+What happened to the explore button?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1823-0
+00:22:54.696 --> 00:23:01.190
+<v Theo Davies>I think it's I think it's only functional
+in the read mode app at the in read mode</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1822-0
+00:22:58.176 --> 00:22:58.336
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1823-1
+00:23:01.190 --> 00:23:04.632
+<v Theo Davies>at the moment, which which it should,
+yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1823-2
+00:23:04.632 --> 00:23:09.561
+<v Theo Davies>it should be available in all of them,
+so I'll show you, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1823-3
+00:23:09.561 --> 00:23:12.456
+<v Theo Davies>I should be able to show you explore.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1832-0
+00:23:14.936 --> 00:23:18.460
+<v Theo Davies>from read mode shortly.
+So I'm just lining up for the second</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1832-1
+00:23:18.460 --> 00:23:19.096
+<v Theo Davies>camera now.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1833-0
+00:23:30.376 --> 00:23:31.496
+<v Theo Davies>So yeah, there's a few.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1839-0
+00:23:33.216 --> 00:23:36.056
+<v Theo Davies>There's a few, a fair few usability.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1840-0
+00:23:37.376 --> 00:23:37.576
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1855-0
+00:23:39.496 --> 00:23:41.964
+<v Theo Davies>Enhancements that are required for the
+second camera.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1855-1
+00:23:41.964 --> 00:23:44.799
+<v Theo Davies>I'm not happy with that image,
+so I'm going to take it again.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1855-2
+00:23:44.799 --> 00:23:45.576
+<v Theo Davies>It's a bit fuzzy.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1856-0
+00:23:47.976 --> 00:23:48.336
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1859-0
+00:23:49.336 --> 00:23:50.936
+<v Theo Davies>So much you can see.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1870-0
+00:24:16.536 --> 00:24:18.776
+<v Theo Davies>It looks, it looks a bit fuzzy.
+I'm going to...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1871-0
+00:24:24.376 --> 00:24:24.856
+<v Theo Davies>It's.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1873-0
+00:24:35.656 --> 00:24:35.896
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1880-0
+00:24:39.096 --> 00:24:41.896
+<v Theo Davies>Okay, yes,
+image is a bit fuzzy at the time.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1886-0
+00:24:43.576 --> 00:24:45.416
+<v Theo Davies>Yeah, let me go back to read mode.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1895-0
+00:24:47.256 --> 00:24:51.899
+<v Theo Davies>I'll show you the explore functionality
+and then I'll have another go at a second</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1895-1
+00:24:51.899 --> 00:24:52.296
+<v Theo Davies>camera.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1896-0
+00:24:54.056 --> 00:24:54.176
+<v Theo Davies>And.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1902-0
+00:24:55.776 --> 00:24:58.816
+<v Theo Davies>Fine, got some good words in there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1908-0
+00:25:21.256 --> 00:25:23.176
+<v Theo Davies>Landing spot below the horizon.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1909-0
+00:25:24.256 --> 00:25:24.696
+<v Theo Davies>Aditya.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1910-0
+00:25:26.216 --> 00:25:28.136
+<v Theo Davies>There was no place to die to get.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1912-0
+00:25:30.936 --> 00:25:36.177
+<v Toby Sutton OBE (Empowering Tech)>The accent still sounds American.
+Have we done any work with multiple</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1912-1
+00:25:36.177 --> 00:25:36.776
+<v Toby Sutton OBE (Empowering Tech)>accents?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1911-0
+00:25:37.096 --> 00:25:37.336
+<v Peter Johansson>Baban.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1935-0
+00:25:38.056 --> 00:25:41.422
+<v Theo Davies>It's pending, so it's a, yeah,
+it's something,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1935-1
+00:25:41.422 --> 00:25:46.936
+<v Theo Davies>it's something for a to have an English,
+yeah, to have an English accent is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1932-0
+00:25:47.336 --> 00:25:47.816
+<v Peter Johansson>Oh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1949-0
+00:25:47.896 --> 00:25:52.933
+<v Theo Davies>Yeah, part of the the pre-pilot scope,
+so it's still it's still in the in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1948-0
+00:25:52.176 --> 00:25:52.696
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1949-1
+00:25:52.933 --> 00:25:53.256
+<v Theo Davies>list.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1959-0
+00:25:56.856 --> 00:26:00.590
+<v Theo Davies>So, yeah,
+just showing the explore explore function,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1959-1
+00:26:00.590 --> 00:26:01.576
+<v Theo Davies>so it carries.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1962-0
+00:26:03.496 --> 00:26:04.616
+<v Theo Davies>It carries the words.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1974-0
+00:26:06.456 --> 00:26:09.180
+<v Theo Davies>It carries the first portion of the words
+here,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1974-1
+00:26:09.180 --> 00:26:11.336
+<v Theo Davies>so I can take all of these through to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1979-0
+00:26:15.656 --> 00:26:18.136
+<v Theo Davies>To the other modes and tools.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1987-0
+00:26:18.456 --> 00:26:22.056
+<v Toby Sutton OBE (Empowering Tech)>And how does it select what words it's
+going to keep?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1988-0
+00:26:23.696 --> 00:26:24.616
+<v Theo Davies>It's the first.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1995-0
+00:26:25.976 --> 00:26:29.256
+<v Theo Davies>is the first set of words that will fit.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/1990-0
+00:26:26.296 --> 00:26:26.536
+<v Peter Johansson>Hmm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2004-0
+00:26:32.136 --> 00:26:34.376
+<v Toby Sutton OBE (Empowering Tech)>So, it will only take a maximum of 1 line.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2002-0
+00:26:32.616 --> 00:26:33.256
+<v Peter Johansson>You can.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2010-0
+00:26:35.256 --> 00:26:37.936
+<v Peter Johansson>You can tap and select counter.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2013-0
+00:26:41.656 --> 00:26:45.096
+<v Theo Davies>You can, you can, yeah, so you can, um,
+you can take one at a time,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2011-0
+00:26:43.656 --> 00:26:44.136
+<v Peter Johansson>Mhm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2013-1
+00:26:45.096 --> 00:26:48.536
+<v Theo Davies>so I just wanted to take difficult,
+I can press difficult, explore.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2012-0
+00:26:47.656 --> 00:26:47.896
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2014-0
+00:26:50.016 --> 00:26:50.136
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2018-0
+00:26:50.856 --> 00:26:51.976
+<v Theo Davies>And explore difficult.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2043-0
+00:26:54.216 --> 00:26:57.208
+<v Theo Davies>So, it's just taking difficult there;
+you can see,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2029-0
+00:26:56.696 --> 00:26:57.016
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2043-1
+00:26:57.208 --> 00:27:01.256
+<v Theo Davies>but if I don't select anything,
+it selects the first, um, first one.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2048-0
+00:26:59.816 --> 00:27:03.085
+<v Toby Sutton OBE (Empowering Tech)>And if I wanted difficult plus the next
+word, so 2 words,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2048-1
+00:27:03.085 --> 00:27:04.776
+<v Toby Sutton OBE (Empowering Tech)>how do you how do you do that?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2045-0
+00:27:03.216 --> 00:27:03.336
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2056-0
+00:27:05.896 --> 00:27:09.416
+<v Theo Davies>You can you can select multiple words
+like this, it's not.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2061-0
+00:27:10.776 --> 00:27:12.976
+<v Toby Sutton OBE (Empowering Tech)>So, it's still a bit rubbish, but...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2059-0
+00:27:12.456 --> 00:27:13.256
+<v Theo Davies>Yes, no.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2060-0
+00:27:13.096 --> 00:27:13.256
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2066-0
+00:27:14.216 --> 00:27:17.576
+<v Theo Davies>It's not that usable,
+because we don't have the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2083-0
+00:27:19.256 --> 00:27:23.761
+<v Theo Davies>So yeah, it's taking me 3 or 10s,
+but I can't get to it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2071-0
+00:27:19.696 --> 00:27:19.976
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2083-1
+00:27:23.761 --> 00:27:25.816
+<v Theo Davies>Some big handles would be.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2081-0
+00:27:24.296 --> 00:27:25.496
+<v Peter Johansson>But there's an 8.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2126-0
+00:27:26.816 --> 00:27:32.023
+<v Peter Johansson>There's an issue with a touch selection
+because when you tap one word,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2126-1
+00:27:32.023 --> 00:27:35.616
+<v Peter Johansson>select the full word,
+but when you tap and drag,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2126-2
+00:27:35.616 --> 00:27:41.409
+<v Peter Johansson>it moves down into character resolution
+rather than keeping a word resolution.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2126-3
+00:27:41.409 --> 00:27:46.616
+<v Peter Johansson>So that's a fix that needs to be done to
+be able to select full words.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2128-0
+00:27:46.656 --> 00:27:47.496
+<v Peter Johansson>multiple ones.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2129-0
+00:27:49.776 --> 00:27:51.176
+<v Toby Sutton OBE (Empowering Tech)>Yeah, OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2132-0
+00:27:57.016 --> 00:27:58.296
+<v Theo Davies>Horizon in there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2137-0
+00:28:00.056 --> 00:28:02.096
+<v Theo Davies>Is in London.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2134-0
+00:28:01.096 --> 00:28:01.376
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2142-0
+00:28:12.696 --> 00:28:13.496
+<v Theo Davies>Nothing's in there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2143-0
+00:28:21.176 --> 00:28:22.056
+<v Theo Davies>Yeah, so...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2155-0
+00:28:22.976 --> 00:28:26.816
+<v Toby Sutton OBE (Empowering Tech)>If I wanted to take all that text,
+could I take all that text and explore or</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2147-0
+00:28:23.256 --> 00:28:23.736
+<v Theo Davies>We.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2152-0
+00:28:25.176 --> 00:28:25.216
+<v Peter Johansson>I.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2155-1
+00:28:26.816 --> 00:28:27.016
+<v Toby Sutton OBE (Empowering Tech)>not?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2191-0
+00:28:27.976 --> 00:28:31.266
+<v Theo Davies>No, no, it will crop,
+it will crop off the first,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2191-1
+00:28:31.266 --> 00:28:34.425
+<v Theo Davies>it will crop off the last bit,
+so it will take,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2191-2
+00:28:34.425 --> 00:28:38.966
+<v Theo Davies>it will take what it can fit into the
+text bar on the explore, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2181-0
+00:28:37.256 --> 00:28:38.616
+<v Toby Sutton OBE (Empowering Tech)>Into a single line.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2191-3
+00:28:38.966 --> 00:28:40.216
+<v Theo Davies>onto a single line.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2185-0
+00:28:39.496 --> 00:28:39.976
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2190-0
+00:28:40.656 --> 00:28:41.816
+<v Peter Johansson>No, you can take all.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2198-0
+00:28:42.976 --> 00:28:46.776
+<v Peter Johansson>But I selected everything I had on the
+screen, and it brought everything over.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2199-0
+00:28:51.816 --> 00:28:52.376
+<v Theo Davies>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2200-0
+00:28:55.976 --> 00:28:56.216
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2223-0
+00:29:00.456 --> 00:29:05.328
+<v Theo Davies>Okay, yeah, I'm wrong then. It was,
+I think it's just if you don't select,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2223-1
+00:29:05.328 --> 00:29:09.096
+<v Theo Davies>if you don't do a selection,
+it just takes a single line.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2217-0
+00:29:07.096 --> 00:29:07.336
+<v Peter Johansson>Ed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2234-0
+00:29:09.896 --> 00:29:12.979
+<v Theo Davies>But as Peter said, if you take,
+if you select all of it,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2234-1
+00:29:12.979 --> 00:29:14.656
+<v Theo Davies>you can carry all of that over.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2235-0
+00:29:23.816 --> 00:29:23.976
+<v Toby Sutton OBE (Empowering Tech)>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2240-0
+00:29:24.096 --> 00:29:25.936
+<v Theo Davies>Although that's not working for me, Peter.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2242-0
+00:29:27.816 --> 00:29:28.536
+<v Peter Johansson>Isn't.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2243-0
+00:29:28.936 --> 00:29:29.416
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2251-0
+00:29:30.056 --> 00:29:33.336
+<v Peter Johansson>Okay, let's try again.
+I got full screen and text.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2247-0
+00:29:30.536 --> 00:29:30.776
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2254-0
+00:29:38.056 --> 00:29:39.256
+<v Peter Johansson>Selected it all.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2261-0
+00:29:46.416 --> 00:29:49.576
+<v Peter Johansson>Brought it all over, see the top line,
+got everything.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2273-0
+00:29:54.296 --> 00:29:56.410
+<v Theo Davies>Okay,
+I think I think I know what might have</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2266-0
+00:29:54.456 --> 00:29:55.016
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2273-1
+00:29:56.410 --> 00:29:57.256
+<v Theo Davies>happened actually.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2280-0
+00:29:56.696 --> 00:30:00.908
+<v Peter Johansson>Then I,
+and I got have every all the words here</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2280-1
+00:30:00.908 --> 00:30:02.136
+<v Peter Johansson>and more ones.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2281-0
+00:30:03.216 --> 00:30:03.656
+<v Peter Johansson>Beyond.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2282-0
+00:30:05.096 --> 00:30:05.896
+<v Peter Johansson>Right, then.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2286-0
+00:30:06.776 --> 00:30:07.336
+<v Peter Johansson>So it's...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2288-0
+00:30:07.136 --> 00:30:09.256
+<v Theo Davies>Think what happened is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2290-0
+00:30:11.976 --> 00:30:12.256
+<v Theo Davies>B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2289-0
+00:30:12.056 --> 00:30:12.216
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2302-0
+00:30:15.096 --> 00:30:19.752
+<v Theo Davies>Because I've got a pend on,
+I think it split those two entries that I</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2302-1
+00:30:19.752 --> 00:30:21.016
+<v Theo Davies>scanned separately.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2304-0
+00:30:33.816 --> 00:30:33.856
+<v Theo Davies>I.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2314-0
+00:30:48.776 --> 00:30:51.656
+<v Theo Davies>Yeah, OK. Anyways, it's something I'll,
+it's something.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2316-0
+00:30:52.856 --> 00:30:53.816
+<v Theo Davies>I'll look into...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2321-0
+00:31:21.656 --> 00:31:27.403
+<v Toby Sutton OBE (Empowering Tech)>Have they fixed the left hand navigation
+button? So back, home,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2320-0
+00:31:22.856 --> 00:31:22.936
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2321-1
+00:31:27.403 --> 00:31:30.456
+<v Toby Sutton OBE (Empowering Tech)>do they work in all locations now?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2322-0
+00:31:31.416 --> 00:31:31.816
+<v Theo Davies>Explore.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2330-0
+00:31:34.936 --> 00:31:37.656
+<v Theo Davies>I haven't been able to find a place where
+they don't work. Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2334-0
+00:31:38.936 --> 00:31:39.496
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2340-0
+00:31:39.336 --> 00:31:42.536
+<v Theo Davies>So yeah, they seem to be working.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2343-0
+00:31:44.376 --> 00:31:46.616
+<v Theo Davies>As they should, much more.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2346-0
+00:31:48.376 --> 00:31:49.736
+<v Theo Davies>Turn talking menu.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2347-0
+00:31:55.096 --> 00:31:55.216
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2351-0
+00:32:06.136 --> 00:32:08.216
+<v Theo Davies>I love talking menu.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2352-0
+00:32:09.896 --> 00:32:10.216
+<v Theo Davies>Ohh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-0
+00:32:11.936 --> 00:32:16.026
+<v Toby Sutton OBE (Empowering Tech)>What about the bottom of the,
+it seems pretty responsive with your</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-1
+00:32:16.026 --> 00:32:19.871
+<v Toby Sutton OBE (Empowering Tech)>finger touching the screen now.
+Does it generally feel better?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2366-0
+00:32:16.536 --> 00:32:16.936
+<v Theo Davies>Bang.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2379-0
+00:32:18.456 --> 00:32:19.976
+<v Theo Davies>Talking menu selected.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2376-0
+00:32:19.176 --> 00:32:19.336
+<v Peter Johansson>Heh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-2
+00:32:19.871 --> 00:32:23.289
+<v Toby Sutton OBE (Empowering Tech)>The bottom of the screen was a bit worse
+before. Again,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2383-0
+00:32:21.096 --> 00:32:21.256
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2387-0
+00:32:22.296 --> 00:32:22.536
+<v Peter Johansson>Ed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-3
+00:32:23.289 --> 00:32:28.172
+<v Toby Sutton OBE (Empowering Tech)>this is going back a couple of months.
+Does it feel, does it feel okay now? So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2397-0
+00:32:25.176 --> 00:32:26.256
+<v Theo Davies>Yeah, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-4
+00:32:28.172 --> 00:32:31.163
+<v Toby Sutton OBE (Empowering Tech)>you know,
+the place I really noticed it was when</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2416-5
+00:32:31.163 --> 00:32:31.896
+<v Toby Sutton OBE (Empowering Tech)>you did the,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2433-0
+00:32:32.456 --> 00:32:39.180
+<v Toby Sutton OBE (Empowering Tech)>expanded navigation button and then you
+were trying to press the explore or the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2433-1
+00:32:39.180 --> 00:32:45.736
+<v Toby Sutton OBE (Empowering Tech)>favourite or all those types of buttons.
+Do you feel that they feel okay now?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2436-0
+00:32:46.856 --> 00:32:51.199
+<v Theo Davies>There's still room for improvement. Yeah,
+I think, yeah, it feels,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2435-0
+00:32:49.056 --> 00:32:49.416
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2436-1
+00:32:51.199 --> 00:32:56.515
+<v Theo Davies>it does feel better in some places, touch,
+but there, yeah, it's still sometimes,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2436-2
+00:32:56.515 --> 00:33:01.701
+<v Theo Davies>yeah, you have to get 2 taps or, yeah,
+for those lower ones you sort of need to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2436-3
+00:33:01.701 --> 00:33:05.656
+<v Theo Davies>hit the hit the button slightly,
+slightly higher, so that's.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2437-0
+00:33:06.816 --> 00:33:07.336
+<v Theo Davies>That's.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2438-0
+00:33:08.856 --> 00:33:09.416
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2446-0
+00:33:09.576 --> 00:33:12.696
+<v Theo Davies>That's yeah,
+that's still still on the list, basically.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2450-0
+00:33:14.496 --> 00:33:16.856
+<v Theo Davies>Yeah, we've got File Manager.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2452-0
+00:33:19.256 --> 00:33:20.136
+<v Theo Davies>Functioning.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2472-0
+00:33:22.496 --> 00:33:29.899
+<v Theo Davies>So we've got, yeah, saved words in here.
+Actually checked the starred words. So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2472-1
+00:33:29.899 --> 00:33:35.931
+<v Theo Davies>easier I start landing earlier.
+That's in here now against a red,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2473-0
+00:33:35.816 --> 00:33:40.480
+<v Toby Sutton OBE (Empowering Tech)>And what can you do with that landing?
+Can you send it somewhere or is it just</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2472-2
+00:33:35.931 --> 00:33:36.936
+<v Theo Davies>a red star.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2473-1
+00:33:40.480 --> 00:33:45.085
+<v Toby Sutton OBE (Empowering Tech)>landing and you can't do anything with it?
+You can't hear it or explore it or</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2473-2
+00:33:45.085 --> 00:33:45.616
+<v Toby Sutton OBE (Empowering Tech)>whatever.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2477-0
+00:33:46.776 --> 00:33:50.544
+<v Theo Davies>Yeah,
+you can just you can just see it for now.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2476-0
+00:33:50.536 --> 00:33:51.856
+<v Toby Sutton OBE (Empowering Tech)>Yeah, OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2477-1
+00:33:50.544 --> 00:33:55.411
+<v Theo Davies>And the idea is that you can access these
+in Inspire as well.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2477-2
+00:33:55.411 --> 00:34:02.084
+<v Theo Davies>I haven't checked the access from Inspire,
+but you know it's safe against my student</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2477-3
+00:34:02.084 --> 00:34:03.576
+<v Theo Davies>account, basically.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2478-0
+00:34:08.216 --> 00:34:08.936
+<v Theo Davies>You can.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2482-0
+00:34:10.936 --> 00:34:13.576
+<v Theo Davies>Yeah, you are able to, but we've saved.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2484-0
+00:34:12.976 --> 00:34:15.816
+<v Toby Sutton OBE (Empowering Tech)>What does the what does the keyboard look
+like?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2483-0
+00:34:14.576 --> 00:34:14.936
+<v Theo Davies>Helps.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2490-0
+00:34:17.016 --> 00:34:19.496
+<v Theo Davies>The keyboard,
+the keyboard still looks the same.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2491-0
+00:34:21.816 --> 00:34:22.216
+<v Theo Davies>Look.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2492-0
+00:34:27.856 --> 00:34:30.776
+<v Sharmella Kirby>That was an American spelling of
+favourite, right?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2493-0
+00:34:32.296 --> 00:34:32.616
+<v Peter Johansson>Ohh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2500-0
+00:34:35.856 --> 00:34:38.376
+<v Toby Sutton OBE (Empowering Tech)>And how successfully can you tap on that
+keyboard?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2501-0
+00:34:39.976 --> 00:34:41.096
+<v Theo Davies>I can.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2506-0
+00:34:43.096 --> 00:34:44.536
+<v Toby Sutton OBE (Empowering Tech)>Write your name, for instance.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2510-0
+00:35:02.216 --> 00:35:03.336
+<v Theo Davies>I got the Peter on.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2513-0
+00:35:04.496 --> 00:35:07.096
+<v Theo Davies>OK, as you can see with them.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2528-0
+00:35:08.376 --> 00:35:12.880
+<v Theo Davies>Yeah, I'm not sure we can see that.
+Sharmella, to answer your question,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2528-1
+00:35:12.880 --> 00:35:16.383
+<v Theo Davies>I don't know,
+but I'll make a note and I'll have a look</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2528-2
+00:35:16.383 --> 00:35:16.696
+<v Theo Davies>back.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2529-0
+00:35:24.456 --> 00:35:31.816
+<v Theo Davies>We've got a we've got a pipeline item
+task which is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2537-0
+00:35:32.816 --> 00:35:37.016
+<v Theo Davies>which is renaming,
+like a branding slash renaming.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2539-0
+00:35:37.896 --> 00:35:38.776
+<v Theo Davies>So, from...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2542-0
+00:35:39.976 --> 00:35:41.176
+<v Theo Davies>Polishing, basically.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2548-0
+00:35:42.336 --> 00:35:45.256
+<v Theo Davies>So yeah,
+good support on the American spelling.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2551-0
+00:35:48.696 --> 00:35:49.976
+<v Theo Davies>But that's the sort of thing.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2552-0
+00:35:51.096 --> 00:35:51.416
+<v Theo Davies>Will.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2557-0
+00:35:52.616 --> 00:35:55.256
+<v Theo Davies>Catching in that in that polishing.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2559-0
+00:36:02.536 --> 00:36:06.136
+<v Toby Sutton OBE (Empowering Tech)>But just from that little look there,
+Theo, quick demo there. So.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2558-0
+00:36:06.296 --> 00:36:06.696
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2584-0
+00:36:07.496 --> 00:36:09.714
+<v Toby Sutton OBE (Empowering Tech)>Yeah,
+truly essential things that need to be</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2584-1
+00:36:09.714 --> 00:36:12.525
+<v Toby Sutton OBE (Empowering Tech)>working for the polishing, you know,
+the startup screen,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2572-0
+00:36:11.696 --> 00:36:11.816
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2584-2
+00:36:12.525 --> 00:36:15.976
+<v Toby Sutton OBE (Empowering Tech)>but I imagine that's relatively simple,
+I would hope. Text selection.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2578-0
+00:36:13.976 --> 00:36:14.376
+<v Theo Davies>B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2595-0
+00:36:17.056 --> 00:36:20.538
+<v Toby Sutton OBE (Empowering Tech)>You know, having that sort of nailed down,
+that's really important, isn't it?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2587-0
+00:36:17.816 --> 00:36:18.136
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2595-1
+00:36:20.538 --> 00:36:22.056
+<v Toby Sutton OBE (Empowering Tech)>Second camera is really important.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2600-0
+00:36:24.056 --> 00:36:24.376
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2641-0
+00:36:24.136 --> 00:36:28.320
+<v Toby Sutton OBE (Empowering Tech)>UK voice is really important.
+Touch improvements are really important.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2641-1
+00:36:28.320 --> 00:36:32.033
+<v Toby Sutton OBE (Empowering Tech)>You know, the more words,
+I guess that's quite straightforward</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2641-2
+00:36:32.033 --> 00:36:34.921
+<v Toby Sutton OBE (Empowering Tech)>anyway.
+The QR logging is not quite as important</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2641-3
+00:36:34.921 --> 00:36:38.810
+<v Toby Sutton OBE (Empowering Tech)>as some of the other things,
+but because we could just remove it,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2641-4
+00:36:38.810 --> 00:36:41.816
+<v Toby Sutton OBE (Empowering Tech)>I guess.
+But it would be nice to get that working.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2660-0
+00:36:42.536 --> 00:36:45.317
+<v Toby Sutton OBE (Empowering Tech)>But yeah,
+just thinking about text selection,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2660-1
+00:36:45.317 --> 00:36:48.219
+<v Toby Sutton OBE (Empowering Tech)>second camera,
+UK voice and touch improvements,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2660-2
+00:36:48.219 --> 00:36:50.456
+<v Toby Sutton OBE (Empowering Tech)>those four things there are really...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2657-0
+00:36:51.336 --> 00:36:51.656
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2691-0
+00:36:52.576 --> 00:36:57.229
+<v Toby Sutton OBE (Empowering Tech)>Are really biggies, aren't they? You know,
+do we have do we have any idea of sort of</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2662-0
+00:36:52.816 --> 00:36:53.016
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2665-0
+00:36:54.056 --> 00:36:54.576
+<v Peter Johansson>Yeah, yeah, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2669-0
+00:36:54.776 --> 00:36:55.416
+<v Theo Davies>Yes.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2691-1
+00:36:57.229 --> 00:37:01.719
+<v Toby Sutton OBE (Empowering Tech)>the time scales for these types of things?
+Is it is it realistic that they're all</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2691-2
+00:37:01.719 --> 00:37:04.456
+<v Toby Sutton OBE (Empowering Tech)>going to be fixed in the next 4 weeks,
+six weeks?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2692-0
+00:37:06.536 --> 00:37:06.776
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2695-0
+00:37:07.976 --> 00:37:09.256
+<v Theo Davies>Those 4.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2711-0
+00:37:10.776 --> 00:37:16.228
+<v Theo Davies>I believe,
+are all in the service project as</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2711-1
+00:37:16.228 --> 00:37:19.136
+<v Theo Davies>enhancements, and the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2712-0
+00:37:19.096 --> 00:37:21.576
+<v Toby Sutton OBE (Empowering Tech)>They're not really enhancements though,
+are they?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2714-0
+00:37:23.416 --> 00:37:24.136
+<v Theo Davies>The UK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2715-0
+00:37:23.736 --> 00:37:26.056
+<v Peter Johansson>In this terminology, it is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2720-0
+00:37:29.176 --> 00:37:30.616
+<v Peter Johansson>I don't mind about that, but no.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2718-0
+00:37:29.416 --> 00:37:29.856
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2724-0
+00:37:29.896 --> 00:37:34.736
+<v Theo Davies>Yeah, ignoring semantics. Yeah, I, I,
+yeah, I'd agree with you, Tony,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2722-0
+00:37:31.896 --> 00:37:32.616
+<v Peter Johansson>Yeah, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2724-1
+00:37:34.736 --> 00:37:39.576
+<v Theo Davies>but we'd have different items called
+different things, so yeah, that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2723-0
+00:37:36.336 --> 00:37:36.696
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2728-0
+00:37:41.696 --> 00:37:43.776
+<v Theo Davies>All those four items that you just
+described.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2736-0
+00:37:41.896 --> 00:37:46.528
+<v Toby Sutton OBE (Empowering Tech)>But the text selection for it,
+just so I understand about enhancement,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2730-0
+00:37:44.696 --> 00:37:45.016
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2736-1
+00:37:46.528 --> 00:37:50.899
+<v Toby Sutton OBE (Empowering Tech)>to me an enhancement is something to make
+it better in the future.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2731-0
+00:37:46.776 --> 00:37:46.936
+<v Theo Davies>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2732-0
+00:37:49.616 --> 00:37:49.776
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2736-2
+00:37:50.899 --> 00:37:56.249
+<v Toby Sutton OBE (Empowering Tech)>But the text selection, unless that works,
+we're not letting anybody external see</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2736-3
+00:37:56.249 --> 00:37:59.576
+<v Toby Sutton OBE (Empowering Tech)>the pen. So to me, that's polishing.
+You know, and</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2740-0
+00:38:00.536 --> 00:38:02.296
+<v Toby Sutton OBE (Empowering Tech)>Yeah, UK voice that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2787-0
+00:38:00.856 --> 00:38:07.789
+<v Peter Johansson>But it's Toby, yeah, Toby, it's semantics.
+If the ticket is completed and closed and</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2787-1
+00:38:07.789 --> 00:38:12.030
+<v Peter Johansson>marked as done,
+it's input as an enhancement in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2787-2
+00:38:12.030 --> 00:38:16.271
+<v Peter Johansson>service project.
+So it's not a change of something,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2787-3
+00:38:16.271 --> 00:38:21.736
+<v Peter Johansson>it's improving what's already on the pen
+in this existing release.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2817-0
+00:38:21.976 --> 00:38:28.088
+<v Peter Johansson>So it has nothing it has nothing to do
+with what we'll release publicly.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2783-0
+00:38:22.136 --> 00:38:22.456
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2797-0
+00:38:27.816 --> 00:38:28.296
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2817-1
+00:38:28.088 --> 00:38:34.787
+<v Peter Johansson>It's just within the workflows of how
+different things are defined depending on</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2817-2
+00:38:34.787 --> 00:38:38.136
+<v Peter Johansson>the state of the previous original task.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2818-0
+00:38:38.696 --> 00:38:41.055
+<v Toby Sutton OBE (Empowering Tech)>Okay,
+but do we think they're going to be fixed</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2818-1
+00:38:41.055 --> 00:38:42.136
+<v Toby Sutton OBE (Empowering Tech)>in the next six weeks?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2822-0
+00:38:42.696 --> 00:38:44.376
+<v Peter Johansson>I would say yes.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2823-0
+00:38:45.336 --> 00:38:45.816
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2826-0
+00:38:46.896 --> 00:38:50.012
+<v Theo Davies>Yes, so yeah, they're on the list that,
+yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2826-1
+00:38:50.012 --> 00:38:55.566
+<v Theo Davies>Mangesh has done his planning against,
+you know, already the ones that are, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2826-2
+00:38:55.566 --> 00:38:59.766
+<v Theo Davies>these aren't new ones that have cropped
+up in the M11 review,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2824-0
+00:38:57.176 --> 00:38:57.336
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2825-0
+00:38:59.016 --> 00:38:59.536
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2826-3
+00:38:59.766 --> 00:39:04.440
+<v Theo Davies>so they're already in the,
+they're already in the, yeah, backlog as,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2826-4
+00:39:04.440 --> 00:39:05.456
+<v Theo Davies>you know, as...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2828-0
+00:39:05.576 --> 00:39:06.376
+<v Theo Davies>Enhancements.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2829-0
+00:39:08.176 --> 00:39:09.256
+<v Toby Sutton OBE (Empowering Tech)>Yeah, fine.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2830-0
+00:39:09.336 --> 00:39:09.496
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2832-0
+00:39:11.816 --> 00:39:12.696
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2836-0
+00:39:15.776 --> 00:39:17.256
+<v Toby Sutton OBE (Empowering Tech)>Are you about to show us an activity?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2855-0
+00:39:18.456 --> 00:39:22.763
+<v Theo Davies>Yeah, I can share your activity. I can't.
+I thought I might have shown your</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2855-1
+00:39:22.763 --> 00:39:25.256
+<v Theo Davies>activity before,
+but I can go through here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2872-0
+00:39:27.496 --> 00:39:30.670
+<v Theo Davies>So is the listener match,
+listener match game.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2872-1
+00:39:30.670 --> 00:39:35.736
+<v Theo Davies>So I've just heard the word juicy.
+You can see we're using like similarly.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2887-0
+00:39:37.656 --> 00:39:42.516
+<v Theo Davies>some similar,
+some words with similarities in the way</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2887-1
+00:39:42.516 --> 00:39:47.016
+<v Theo Davies>that they're spelled,
+got one XP for that behind.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2889-0
+00:39:48.776 --> 00:39:49.816
+<v Theo Davies>Darkened.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2906-0
+00:39:52.056 --> 00:39:56.235
+<v Theo Davies>Least, I'm gonna press the wrong one,
+so you can see what happens. Uh,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2906-1
+00:39:56.235 --> 00:39:59.825
+<v Theo Davies>if I went for light,
+you can see I lost three seconds there,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2906-2
+00:39:59.825 --> 00:40:00.296
+<v Theo Davies>stepped.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2907-0
+00:40:01.656 --> 00:40:01.976
+<v Theo Davies>Thanks.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2911-0
+00:40:02.976 --> 00:40:05.096
+<v Theo Davies>Patterns of the previous.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2915-0
+00:40:08.296 --> 00:40:11.016
+<v Theo Davies>got repetition there easily.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2917-0
+00:40:12.776 --> 00:40:13.896
+<v Theo Davies>This again.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2918-0
+00:40:16.616 --> 00:40:18.136
+<v Toby Sutton OBE (Empowering Tech)>I think that looks like a fun game.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2921-0
+00:40:20.336 --> 00:40:20.776
+<v Toby Sutton OBE (Empowering Tech)>Like that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2920-0
+00:40:20.496 --> 00:40:20.696
+<v Theo Davies>S.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2932-0
+00:40:23.936 --> 00:40:28.203
+<v Theo Davies>Yeah, so it's quite rapid.
+You get sort of instant feedback as you</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2932-1
+00:40:28.203 --> 00:40:28.776
+<v Theo Davies>go along.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2937-0
+00:40:29.016 --> 00:40:29.736
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2941-0
+00:40:30.856 --> 00:40:32.136
+<v Theo Davies>Shows you what you've won.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2936-0
+00:40:31.976 --> 00:40:32.256
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2944-0
+00:40:33.576 --> 00:40:34.456
+<v Theo Davies>At the end of it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2963-0
+00:40:35.656 --> 00:40:40.764
+<v Theo Davies>I can view all the answers here so I can
+see what got wrong, what was right,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2963-1
+00:40:40.764 --> 00:40:43.816
+<v Theo Davies>and then hit listen to it being spoken
+again.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2964-0
+00:40:54.736 --> 00:40:57.976
+<v Theo Davies>And if I continue takes you back to you,
+I can I can start another one.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2967-0
+00:40:59.056 --> 00:40:59.976
+<v Theo Davies>And there's a...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2995-0
+00:41:01.256 --> 00:41:08.193
+<v Theo Davies>Each of the words that you saw there is
+grouped into a reading difficulty score</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2995-1
+00:41:08.193 --> 00:41:12.875
+<v Theo Davies>that we've defined.
+And there's a formula for how you</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/2995-2
+00:41:12.875 --> 00:41:13.656
+<v Theo Davies>progress.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3014-0
+00:41:15.016 --> 00:41:22.103
+<v Theo Davies>To take you to the next, the next stage,
+and we are building in a, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3014-1
+00:41:22.103 --> 00:41:25.416
+<v Theo Davies>visibility of those levels into 360.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3012-0
+00:41:25.656 --> 00:41:25.736
+<v Peter Johansson>The.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3016-0
+00:41:26.576 --> 00:41:27.336
+<v Theo Davies>As well, so...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3021-0
+00:41:29.016 --> 00:41:29.816
+<v Theo Davies>Eventually.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3022-0
+00:41:29.096 --> 00:41:30.456
+<v Toby Sutton OBE (Empowering Tech)>And where do you start?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3026-0
+00:41:32.376 --> 00:41:35.016
+<v Theo Davies>Uh, you start easy, so...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3027-0
+00:41:36.136 --> 00:41:37.016
+<v Theo Davies>You.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3029-0
+00:41:39.816 --> 00:41:40.456
+<v Theo Davies>We.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3031-0
+00:41:42.656 --> 00:41:43.496
+<v Theo Davies>We mapped.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3036-0
+00:41:45.496 --> 00:41:49.176
+<v Theo Davies>You might be in difficulty against ages.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3061-0
+00:41:50.456 --> 00:41:53.494
+<v Theo Davies>So take the age of the student based on
+their,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3061-1
+00:41:53.494 --> 00:41:57.307
+<v Theo Davies>I can't remember if we used year or date
+of birth, but we,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3061-2
+00:41:57.307 --> 00:42:00.216
+<v Theo Davies>and then we went like a few, a few down.
+So.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3066-0
+00:42:01.496 --> 00:42:04.696
+<v Theo Davies>In most cases,
+they're not just going to be getting...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3112-0
+00:42:05.816 --> 00:42:09.487
+<v Theo Davies>They're not going to find it really hard
+and find it frustrating.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3112-1
+00:42:09.487 --> 00:42:13.047
+<v Theo Davies>They'll find it easy.
+They'll win a few levels and then they'll</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3112-2
+00:42:13.047 --> 00:42:17.051
+<v Theo Davies>and then they'll move up and progress.
+Or if they're really far behind,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3112-3
+00:42:17.051 --> 00:42:21.279
+<v Theo Davies>they're not going to start and be like,
+you know, it's not going to be way,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3112-4
+00:42:21.279 --> 00:42:24.616
+<v Theo Davies>way off for them.
+So it starts based on their age and then.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3134-0
+00:42:24.776 --> 00:42:30.124
+<v Theo Davies>be good. Yeah, we've taken it down,
+down a couple of pegs. And then you can,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3134-1
+00:42:30.124 --> 00:42:35.055
+<v Theo Davies>you can, if you do really well,
+then you can build up quite quickly to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3134-2
+00:42:35.055 --> 00:42:40.056
+<v Theo Davies>get to the right sort of level that's
+challenging, challenging for you.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3135-0
+00:42:39.096 --> 00:42:44.314
+<v Toby Sutton OBE (Empowering Tech)>And where can I can I see my XP anywhere
+on the pen or do I have to wait and see</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3135-1
+00:42:44.314 --> 00:42:45.216
+<v Toby Sutton OBE (Empowering Tech)>it in Inspire?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3136-0
+00:42:46.056 --> 00:42:49.938
+<v Theo Davies>There's no at the moment you can see it
+on your pen.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3136-1
+00:42:49.938 --> 00:42:52.136
+<v Theo Davies>You have to see it in Inspire.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3144-0
+00:42:54.216 --> 00:42:57.416
+<v Theo Davies>So eventually the idea is that it would
+be in here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3145-0
+00:42:58.096 --> 00:42:58.456
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3155-0
+00:42:58.536 --> 00:43:03.816
+<v Theo Davies>So, yeah,
+the only thing you've got is avatar.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3165-0
+00:43:05.016 --> 00:43:08.422
+<v Theo Davies>Customization in here at the moment,
+but yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3165-1
+00:43:08.422 --> 00:43:11.176
+<v Theo Davies>I will have the gamification elements.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3167-0
+00:43:12.456 --> 00:43:12.816
+<v Theo Davies>In there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3174-0
+00:43:18.776 --> 00:43:22.536
+<v Theo Davies>Yeah,
+just moving away from pen for a minute.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3182-0
+00:43:24.776 --> 00:43:29.016
+<v Theo Davies>I'll just show you a couple of things,
+couple of new things in.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3186-0
+00:43:32.536 --> 00:43:34.376
+<v Theo Davies>In 360, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3189-0
+00:43:33.016 --> 00:43:37.084
+<v Toby Sutton OBE (Empowering Tech)>But before you go on, Theo,
+that looks really quite good now,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3189-1
+00:43:37.084 --> 00:43:40.758
+<v Toby Sutton OBE (Empowering Tech)>apart from those things that I put in
+bold in the chat.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3189-2
+00:43:40.758 --> 00:43:45.416
+<v Toby Sutton OBE (Empowering Tech)>Are there many other things on Theo's
+list that you're not happy with?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3187-0
+00:43:41.136 --> 00:43:41.416
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3188-0
+00:43:41.456 --> 00:43:41.736
+<v Peter Johansson>Ed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3190-0
+00:43:47.416 --> 00:43:48.056
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3196-0
+00:43:50.256 --> 00:43:52.376
+<v Theo Davies>Yeah, yeah, there's quite a few.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3197-0
+00:43:53.896 --> 00:43:54.296
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3198-0
+00:44:00.696 --> 00:44:03.416
+<v Theo Davies>And it might vary in.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3219-0
+00:44:05.096 --> 00:44:09.762
+<v Theo Davies>nitpicky, you know,
+what I'd say essentially usability for</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3219-1
+00:44:09.762 --> 00:44:15.456
+<v Theo Davies>you to nitpicky. So I'm just processing,
+processing them at the moment.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3244-0
+00:44:15.656 --> 00:44:20.119
+<v Toby Sutton OBE (Empowering Tech)>But again, based on Theo, not India's say,
+Theo say, how far off,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3244-1
+00:44:20.119 --> 00:44:25.461
+<v Toby Sutton OBE (Empowering Tech)>do you still realistically think that
+these things are going to be done in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3228-0
+00:44:20.216 --> 00:44:20.536
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3238-0
+00:44:23.616 --> 00:44:23.896
+<v Peter Johansson>Ed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3244-2
+00:44:25.461 --> 00:44:27.016
+<v Toby Sutton OBE (Empowering Tech)>next four to six weeks?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3245-0
+00:44:28.936 --> 00:44:29.496
+<v Theo Davies>Theo.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3258-0
+00:44:30.376 --> 00:44:33.380
+<v Theo Davies>They're all fairly small, um,
+so it doesn't, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3258-1
+00:44:33.380 --> 00:44:36.856
+<v Theo Davies>definitely doesn't feel outside the
+realms of possibility.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3259-0
+00:44:37.896 --> 00:44:38.216
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3269-0
+00:44:40.216 --> 00:44:43.802
+<v Theo Davies>But I've got, yeah,
+we've got a meeting with Mangesh tomorrow</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3269-1
+00:44:43.802 --> 00:44:43.976
+<v Theo Davies>to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3279-0
+00:44:47.656 --> 00:44:51.896
+<v Theo Davies>Talk through them and how you how they
+how bending relates to plans.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3273-0
+00:44:47.976 --> 00:44:48.536
+<v Toby Sutton OBE (Empowering Tech)>Brighton.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3280-0
+00:44:53.176 --> 00:44:56.723
+<v Peter Johansson>Do you know which one of those that are
+in the next?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3280-1
+00:44:56.723 --> 00:45:00.806
+<v Peter Johansson>There is another release coming up pretty
+soon. So this one,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3280-2
+00:45:00.806 --> 00:45:03.416
+<v Peter Johansson>this release here is 3 to 4 weeks back.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3303-0
+00:45:04.496 --> 00:45:08.146
+<v Peter Johansson>But the next one is next,
+I think they said this this week,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3282-0
+00:45:05.736 --> 00:45:06.056
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3303-1
+00:45:08.146 --> 00:45:10.883
+<v Peter Johansson>but let's say next week,
+just hold on a sec,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3303-2
+00:45:10.883 --> 00:45:13.256
+<v Peter Johansson>do you know which of your comments are?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3313-0
+00:45:14.216 --> 00:45:19.576
+<v Peter Johansson>Already in the upcoming release,
+and how many are beyond?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3319-0
+00:45:20.536 --> 00:45:22.616
+<v Peter Johansson>The next one we'll we'll get.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3333-0
+00:45:24.136 --> 00:45:29.656
+<v Theo Davies>I haven't mapped them yet, so no,
+I don't know at the moment. Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3334-0
+00:45:28.056 --> 00:45:30.536
+<v Peter Johansson>Okay, let's catch up tomorrow.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3341-0
+00:45:32.056 --> 00:45:33.896
+<v Theo Davies>Yeah, I know, I know lots, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3352-0
+00:45:35.256 --> 00:45:41.607
+<v Theo Davies>Those of them are already in service
+projects in planning on the pre-pilot.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3352-1
+00:45:41.607 --> 00:45:43.696
+<v Theo Davies>Yeah, the pre-pilot part.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3353-0
+00:45:47.176 --> 00:45:47.416
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3370-0
+00:45:56.136 --> 00:45:59.245
+<v Toby Sutton OBE (Empowering Tech)>Another way of asking the same question
+then,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3361-0
+00:45:58.736 --> 00:45:58.856
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3370-1
+00:45:59.245 --> 00:46:03.976
+<v Toby Sutton OBE (Empowering Tech)>how excited are you by the thought that
+this may be ready in October?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3379-0
+00:46:09.656 --> 00:46:13.696
+<v Theo Davies>How excited am I at the thought of this
+being ready in October?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3394-0
+00:46:19.656 --> 00:46:25.816
+<v Theo Davies>Yes, yeah, it's exciting. I don't know,
+do I need to give you one at 1 to 10?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3396-0
+00:46:27.656 --> 00:46:28.296
+<v Theo Davies>I think, um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-0
+00:46:27.656 --> 00:46:32.385
+<v Toby Sutton OBE (Empowering Tech)>Well, it's like, you know, this is really,
+I'm excited. It's going to be out there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-1
+00:46:32.385 --> 00:46:35.143
+<v Toby Sutton OBE (Empowering Tech)>This is,
+people are going to be experiencing it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-2
+00:46:35.143 --> 00:46:38.521
+<v Toby Sutton OBE (Empowering Tech)>I'm really proud of it.
+I think they're going to think it's</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3411-0
+00:46:35.336 --> 00:46:35.816
+<v Peter Johansson>Ohh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-3
+00:46:38.521 --> 00:46:41.054
+<v Toby Sutton OBE (Empowering Tech)>awesome.
+Or are you still at the point where</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-4
+00:46:41.054 --> 00:46:44.038
+<v Toby Sutton OBE (Empowering Tech)>you're thinking, well, okay,
+I think this is a rush.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3441-5
+00:46:44.038 --> 00:46:45.896
+<v Toby Sutton OBE (Empowering Tech)>They're going to be disappointed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3455-0
+00:46:45.936 --> 00:46:49.165
+<v Toby Sutton OBE (Empowering Tech)>Pointed, we're not gonna hit our targets.
+Yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3455-1
+00:46:49.165 --> 00:46:53.336
+<v Toby Sutton OBE (Empowering Tech)>that that's just that sort of emotional
+feeling of, you know.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3454-0
+00:46:51.496 --> 00:46:52.936
+<v Theo Davies>Okay, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3467-0
+00:46:56.456 --> 00:47:00.856
+<v Theo Davies>There's there's a load of there's a load
+of polish in this latest.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3475-0
+00:47:01.896 --> 00:47:05.736
+<v Theo Davies>in the M11 release,
+which is making it feel...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3485-0
+00:47:08.296 --> 00:47:12.296
+<v Theo Davies>Like, I'll be, yeah,
+I'm feeling much happier about going out.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-0
+00:47:15.816 --> 00:47:18.772
+<v Theo Davies>Based, yeah, based on this M11 release,
+yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-1
+00:47:18.772 --> 00:47:21.857
+<v Theo Davies>there's still there's still a few
+fundamentals.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-2
+00:47:21.857 --> 00:47:26.484
+<v Theo Davies>Those aren't new fundamentals,
+they're stuff that's been in the service</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-3
+00:47:26.484 --> 00:47:31.368
+<v Theo Davies>projects in the pipeline for a while,
+so they're part of the planning that,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-4
+00:47:31.368 --> 00:47:34.325
+<v Theo Davies>yeah,
+but the timeline and planning work that</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3525-5
+00:47:34.325 --> 00:47:35.096
+<v Theo Davies>my guess is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3527-0
+00:47:35.736 --> 00:47:37.336
+<v Theo Davies>The step back on, so...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3530-0
+00:47:40.216 --> 00:47:40.776
+<v Theo Davies>There is.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3532-0
+00:47:40.216 --> 00:47:43.896
+<v Toby Sutton OBE (Empowering Tech)>So cautiously optimistic,
+but not super excited yet.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3531-0
+00:47:42.216 --> 00:47:42.696
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3534-0
+00:47:45.096 --> 00:47:45.416
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3540-0
+00:47:46.296 --> 00:47:49.256
+<v Theo Davies>Yeah,
+I'll only I'll only be super excited once.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3552-0
+00:47:50.456 --> 00:47:53.873
+<v Theo Davies>Once I, yeah,
+once the things that have been in the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3543-0
+00:47:50.776 --> 00:47:51.416
+<v Toby Sutton OBE (Empowering Tech)>Is done.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3552-1
+00:47:53.873 --> 00:47:55.976
+<v Theo Davies>backlog for a while have been...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3555-0
+00:47:56.936 --> 00:47:58.536
+<v Theo Davies>Been resolved, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3556-0
+00:48:00.616 --> 00:48:00.896
+<v Toby Sutton OBE (Empowering Tech)>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3562-0
+00:48:01.656 --> 00:48:04.794
+<v Theo Davies>And yeah,
+according to Mangesh is planning, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3562-1
+00:48:04.794 --> 00:48:05.736
+<v Theo Davies>they should be.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3567-0
+00:48:07.736 --> 00:48:08.656
+<v Theo Davies>Should be resolved.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3568-0
+00:48:10.696 --> 00:48:11.016
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3576-0
+00:48:12.296 --> 00:48:14.936
+<v Theo Davies>Listen, yeah, listen the dates given, so..
+.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3584-0
+00:48:17.496 --> 00:48:19.816
+<v Theo Davies>I'm feeling a lot happier in a lot of
+areas.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3595-0
+00:48:23.416 --> 00:48:25.047
+<v Theo Davies>But yeah, there's still,
+there's still a few,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3595-1
+00:48:25.047 --> 00:48:26.536
+<v Theo Davies>there's still a few fundamentals of which.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3604-0
+00:48:27.376 --> 00:48:32.296
+<v Theo Davies>which are long-standing,
+long-standing ones. There's nothing.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3607-0
+00:48:33.816 --> 00:48:35.896
+<v Theo Davies>Something new, really, that's coming up.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3620-0
+00:48:38.216 --> 00:48:43.416
+<v Theo Davies>That's that's concerning, so yeah,
+in terms of new functionality.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3610-0
+00:48:38.696 --> 00:48:39.056
+<v Toby Sutton OBE (Empowering Tech)>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3629-0
+00:48:45.736 --> 00:48:50.296
+<v Theo Davies>Yeah, basically, there isn't much,
+there's not much at all from the latest.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3655-0
+00:48:52.056 --> 00:48:54.524
+<v Theo Davies>review that throws off the existing
+planning.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3655-1
+00:48:54.524 --> 00:48:56.938
+<v Theo Davies>That's probably the best way to describe
+it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3655-2
+00:48:56.938 --> 00:49:01.176
+<v Theo Davies>Because that was that was one of the sort
+of, you know, risk factors was that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3665-0
+00:49:02.776 --> 00:49:07.158
+<v Theo Davies>Based on the fact, we've got more,
+you've got a new functionality, um,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3665-1
+00:49:07.158 --> 00:49:09.256
+<v Theo Davies>and more reviews before, you know.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3677-0
+00:49:10.936 --> 00:49:20.696
+<v Theo Davies>pending before Mangesh gave the, yeah,
+did the planning and gave a time frame.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3682-0
+00:49:23.736 --> 00:49:25.896
+<v Theo Davies>There's nothing from a recent review
+which...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3691-0
+00:49:27.176 --> 00:49:32.536
+<v Theo Davies>Which expands that big in a significant
+way, so I'm...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3709-0
+00:49:35.096 --> 00:49:38.332
+<v Theo Davies>I'm not too, I'm not,
+I'm not the latest review hasn't scared</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3709-1
+00:49:38.332 --> 00:49:42.456
+<v Theo Davies>me by anything. Does that make sense?
+Does that kind of reminds your question?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3731-0
+00:49:42.936 --> 00:49:45.264
+<v Toby Sutton OBE (Empowering Tech)>Yeah,
+I'm going to go with your cautiously</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3731-1
+00:49:45.264 --> 00:49:47.647
+<v Toby Sutton OBE (Empowering Tech)>optimistic,
+but just not super excited yet.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3731-2
+00:49:47.647 --> 00:49:51.816
+<v Toby Sutton OBE (Empowering Tech)>I think I'll stick with my thoughts that
+that's what you're where you're at.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3723-0
+00:49:48.056 --> 00:49:48.376
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3730-0
+00:49:51.256 --> 00:49:52.776
+<v Theo Davies>Yeah, yeah, yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3761-0
+00:49:52.736 --> 00:49:56.288
+<v Sharmella Kirby>I don't think in all the years Theo has
+been with us,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3761-1
+00:49:56.288 --> 00:49:59.314
+<v Sharmella Kirby>I've seen Theo super excited though.
+I don't,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3756-0
+00:49:58.776 --> 00:50:02.296
+<v Toby Sutton OBE (Empowering Tech)>Funnily enough, Sharmella, I was about...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3761-2
+00:49:59.314 --> 00:50:03.656
+<v Sharmella Kirby>I wouldn't even know what super excited
+for Theo would look like.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3753-0
+00:50:01.496 --> 00:50:01.736
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3765-0
+00:50:04.456 --> 00:50:06.416
+<v Toby Sutton OBE (Empowering Tech)>I, I was about to add that as well.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3762-0
+00:50:04.496 --> 00:50:04.656
+<v Sharmella Kirby>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3784-0
+00:50:07.616 --> 00:50:10.094
+<v Toby Sutton OBE (Empowering Tech)>I was about to add,
+I'm kind of looking forward to seeing</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3774-0
+00:50:09.376 --> 00:50:09.496
+<v Sharmella Kirby>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3784-1
+00:50:10.094 --> 00:50:13.256
+<v Toby Sutton OBE (Empowering Tech)>there in this sort of more animated. Yes,
+we've done it in sort of stage.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3780-0
+00:50:11.536 --> 00:50:11.656
+<v Peter Johansson>The.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3782-0
+00:50:11.816 --> 00:50:12.056
+<v Theo Davies>No.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3783-0
+00:50:12.976 --> 00:50:13.216
+<v Sharmella Kirby>But.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3785-0
+00:50:15.016 --> 00:50:15.496
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3801-0
+00:50:17.816 --> 00:50:21.775
+<v Theo Davies>Yeah,
+you were now at the at the school trials,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3787-0
+00:50:18.656 --> 00:50:18.856
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3801-1
+00:50:21.775 --> 00:50:25.816
+<v Theo Davies>and I think that's when I felt probably
+excited.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3811-0
+00:50:27.416 --> 00:50:31.269
+<v Theo Davies>and maybe shown and maybe shown it
+slightly when the, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3807-0
+00:50:30.856 --> 00:50:31.016
+<v Toby Sutton OBE (Empowering Tech)>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3811-1
+00:50:31.269 --> 00:50:33.136
+<v Theo Davies>when the kids were working out.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3816-0
+00:50:35.416 --> 00:50:37.936
+<v Theo Davies>what they needed from the pen.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3823-0
+00:50:39.136 --> 00:50:42.416
+<v Theo Davies>Um, yeah, you know,
+two kids are very different stages.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3824-0
+00:50:42.736 --> 00:50:42.976
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3843-0
+00:50:43.536 --> 00:50:46.889
+<v Theo Davies>in the same year,
+being able to use the pen for like to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3843-1
+00:50:46.889 --> 00:50:51.140
+<v Theo Davies>meet their needs in the same in the same
+session. That was like, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3843-2
+00:50:51.140 --> 00:50:53.056
+<v Theo Davies>that was very cool. That was it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3848-0
+00:50:54.096 --> 00:50:57.056
+<v Theo Davies>A good, that was a good day.
+I felt excited today.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3850-0
+00:50:58.056 --> 00:50:58.816
+<v Toby Sutton OBE (Empowering Tech)>Actually spit.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3852-0
+00:50:59.696 --> 00:51:00.096
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3853-0
+00:51:01.256 --> 00:51:01.536
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3891-0
+00:51:02.656 --> 00:51:06.787
+<v Theo Davies>And just, yeah, not knocking down,
+just trying to knock down barriers to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3858-0
+00:51:03.856 --> 00:51:04.096
+<v Peter Johansson>Hey.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3891-1
+00:51:06.787 --> 00:51:11.315
+<v Theo Davies>make it as easier for kids as possible to
+get to that point. This is the thing,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3891-2
+00:51:11.315 --> 00:51:14.144
+<v Theo Davies>you know,
+is the is the challenge we've got up to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3891-3
+00:51:14.144 --> 00:51:17.936
+<v Theo Davies>pre-pilot, which is, you know,
+all this polishing usability stuff.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3914-0
+00:51:20.336 --> 00:51:24.821
+<v Theo Davies>Yeah, to make sure, you know,
+to get to that point where they can</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3914-1
+00:51:24.821 --> 00:51:29.986
+<v Theo Davies>access those functions and they can
+explore things and they're not going to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3914-2
+00:51:29.986 --> 00:51:32.976
+<v Theo Davies>be getting frustrated with usability
+stuff.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3916-0
+00:51:33.976 --> 00:51:35.056
+<v Theo Davies>And performance stuff.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3918-0
+00:51:36.176 --> 00:51:36.496
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3924-0
+00:51:40.096 --> 00:51:41.216
+<v Theo Davies>That's task, basically.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3927-0
+00:51:44.416 --> 00:51:50.432
+<v Sharmella Kirby>The pilots Quin have set up are there for
+little little people or bigger little</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3925-0
+00:51:45.576 --> 00:51:46.096
+<v Peter Johansson>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3926-0
+00:51:49.656 --> 00:51:49.776
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3927-1
+00:51:50.432 --> 00:51:51.936
+<v Sharmella Kirby>people that we know.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3932-0
+00:51:53.936 --> 00:51:56.096
+<v Theo Davies>Primary, so.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3939-0
+00:51:55.696 --> 00:51:58.096
+<v Sharmella Kirby>Primaries are little people. OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3936-0
+00:51:57.176 --> 00:51:57.296
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3935-0
+00:51:57.296 --> 00:51:57.776
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3937-0
+00:51:57.456 --> 00:51:58.496
+<v Toby Sutton OBE (Empowering Tech)>And the primary.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3938-0
+00:51:59.056 --> 00:51:59.216
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3941-0
+00:52:00.016 --> 00:52:01.216
+<v Theo Davies>Yeah, so B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3944-0
+00:52:01.936 --> 00:52:03.696
+<v Toby Sutton OBE (Empowering Tech)>Well, no, 10, 11.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3947-0
+00:52:04.016 --> 00:52:07.416
+<v Theo Davies>Ten 11, yeah, believe, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3948-0
+00:52:07.536 --> 00:52:09.456
+<v Peter Johansson>So, so small, but not tiny.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3949-0
+00:52:10.336 --> 00:52:10.736
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3950-0
+00:52:10.416 --> 00:52:10.816
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3952-0
+00:52:12.176 --> 00:52:12.576
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3953-0
+00:52:14.736 --> 00:52:15.136
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3958-0
+00:52:17.536 --> 00:52:19.616
+<v Theo Davies>Yes, a couple of things to show you in.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3960-0
+00:52:20.696 --> 00:52:21.616
+<v Theo Davies>360.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3962-0
+00:52:22.736 --> 00:52:23.856
+<v Theo Davies>So, it's like a...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4004-0
+00:52:27.696 --> 00:52:32.356
+<v Theo Davies>Here, you can see I've got, you know,
+my the ability to move between</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4004-1
+00:52:32.356 --> 00:52:35.396
+<v Theo Davies>organisations that I'm that I belong to
+now,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3978-0
+00:52:34.256 --> 00:52:34.456
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4004-2
+00:52:35.396 --> 00:52:39.651
+<v Theo Davies>and we've got this little icon so you can
+tell the difference,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/3980-0
+00:52:35.776 --> 00:52:36.256
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4004-3
+00:52:39.651 --> 00:52:44.379
+<v Theo Davies>so I can swap between Springfield
+Elementary here and Empowering Tech</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4004-4
+00:52:44.379 --> 00:52:47.216
+<v Theo Davies>Internal, which is what we set up to test.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4038-0
+00:52:47.736 --> 00:52:51.331
+<v Theo Davies>best things.
+I can move between between those</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4038-1
+00:52:51.331 --> 00:52:56.411
+<v Theo Davies>different Pens students and admins
+between the both of them. So,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4038-2
+00:52:56.411 --> 00:53:02.351
+<v Theo Davies>that's quite a significant structural
+change. It doesn't look that massive,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4038-3
+00:53:02.351 --> 00:53:02.976
+<v Theo Davies>but it's</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4043-0
+00:53:04.896 --> 00:53:07.136
+<v Theo Davies>It's an important, important one.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4044-0
+00:53:08.976 --> 00:53:09.456
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4047-0
+00:53:15.096 --> 00:53:18.313
+<v Toby Sutton OBE (Empowering Tech)>What about the reports?
+Have we got reports built by that third</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4047-1
+00:53:18.313 --> 00:53:18.816
+<v Toby Sutton OBE (Empowering Tech)>party yet?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4048-0
+00:53:19.616 --> 00:53:20.056
+<v Peter Johansson>Payable.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4054-0
+00:53:19.696 --> 00:53:23.486
+<v Theo Davies>Yes, so reports are functional. Yeah,
+actually, so yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4054-1
+00:53:23.486 --> 00:53:26.677
+<v Theo Davies>thanks for reminding me.
+I've got a few things,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4054-2
+00:53:26.677 --> 00:53:29.736
+<v Theo Davies>so you can see here,
+so here's this is the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4057-0
+00:53:31.536 --> 00:53:32.176
+<v Theo Davies>Embedded.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4101-0
+00:53:33.896 --> 00:53:39.150
+<v Theo Davies>Power BI home page reporting.
+We've got the two dashboards here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4101-1
+00:53:39.150 --> 00:53:42.706
+<v Theo Davies>There will also be a custom reports
+button.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4101-2
+00:53:42.706 --> 00:53:49.254
+<v Theo Davies>So custom reports under development at
+the moment and there's polishing going on</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4101-3
+00:53:49.254 --> 00:53:53.376
+<v Theo Davies>of the dashboards at the moment.
+So I'll show you.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4107-0
+00:53:53.936 --> 00:53:58.576
+<v Theo Davies>Through the dashboards, this is all lie,
+you know, real data.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4109-0
+00:54:06.256 --> 00:54:10.544
+<v Theo Davies>This, this, yes,
+in the back end at the moment,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4109-1
+00:54:10.544 --> 00:54:11.616
+<v Theo Davies>you can see.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4114-0
+00:54:12.976 --> 00:54:14.736
+<v Theo Davies>In terms of like visually.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4136-0
+00:54:15.936 --> 00:54:18.497
+<v Theo Davies>This important,
+this important thing that's needing this</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4136-1
+00:54:18.497 --> 00:54:22.092
+<v Theo Davies>important thing that's going going on,
+so we've we've fed back on that and then</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4136-2
+00:54:22.092 --> 00:54:23.216
+<v Theo Davies>doing they're doing that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4146-0
+00:54:24.496 --> 00:54:28.623
+<v Theo Davies>That work,
+which is to make it look more obvious,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4146-1
+00:54:28.623 --> 00:54:29.696
+<v Theo Davies>that's right.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4163-0
+00:54:30.656 --> 00:54:33.853
+<v Theo Davies>to make the information that's being
+displayed more obvious,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4163-1
+00:54:33.853 --> 00:54:36.736
+<v Theo Davies>what it is and a bit more engaging,
+it's a little bit.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4182-0
+00:54:39.456 --> 00:54:44.885
+<v Theo Davies>generic at the moment.
+This is the pen dashboard. The dashboards,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4182-1
+00:54:44.885 --> 00:54:48.176
+<v Theo Davies>in short, the dashboards are more about.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4185-0
+00:54:49.256 --> 00:54:51.136
+<v Theo Davies>The top-level implementation.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4189-0
+00:54:52.576 --> 00:54:54.496
+<v Theo Davies>Stats, so it's more about...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4195-0
+00:54:55.616 --> 00:54:58.176
+<v Theo Davies>They're more for those people who are
+interested in how.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4220-0
+00:54:59.376 --> 00:55:03.591
+<v Theo Davies>How the ecosystem has been implemented
+into and taken up,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4220-1
+00:55:03.591 --> 00:55:09.696
+<v Theo Davies>so we've got stuff like most active years,
+so out of the years of students that are</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4220-2
+00:55:09.696 --> 00:55:10.496
+<v Theo Davies>registered.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4251-0
+00:55:11.896 --> 00:55:18.159
+<v Theo Davies>which years are the most active.
+So it is of fine tuning a formula at the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4251-1
+00:55:18.159 --> 00:55:24.677
+<v Theo Davies>moment which defines how a student,
+how we define what active means and it's</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4251-2
+00:55:24.677 --> 00:55:30.856
+<v Theo Davies>a combination between, you know,
+number of sessions, length of sessions,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4267-0
+00:55:30.976 --> 00:55:35.896
+<v Theo Davies>number of actions within that session.
+So we've got a formula that we're</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4267-1
+00:55:35.896 --> 00:55:40.816
+<v Theo Davies>fine-tuning and which defines that and we
+define the averages from that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4289-0
+00:55:43.976 --> 00:55:48.687
+<v Theo Davies>Then we've got information here,
+like which tools are most frequently used</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4289-1
+00:55:48.687 --> 00:55:51.576
+<v Theo Davies>by the students. So, for example,
+is there...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4290-0
+00:55:50.816 --> 00:55:53.136
+<v Toby Sutton OBE (Empowering Tech)>We don't see anything there.
+Is there data there?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4321-0
+00:55:54.736 --> 00:55:59.694
+<v Theo Davies>No, you will, yeah, you will,
+you will see that there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4321-1
+00:55:59.694 --> 00:56:05.463
+<v Theo Davies>So I think we have the top,
+I think we have the top three here.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4321-2
+00:56:05.463 --> 00:56:09.880
+<v Theo Davies>So it will say, you know,
+it might be graphemes,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4321-3
+00:56:09.880 --> 00:56:13.216
+<v Theo Davies>morphemes and syllables, for example.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4325-0
+00:56:13.976 --> 00:56:17.776
+<v Theo Davies>Um, you know,
+to give you sort of top-level view on.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4328-0
+00:56:19.976 --> 00:56:21.616
+<v Theo Davies>What's the value of?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4347-0
+00:56:23.376 --> 00:56:26.981
+<v Theo Davies>How are students getting the most use out
+of these tools?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4347-1
+00:56:26.981 --> 00:56:32.016
+<v Theo Davies>What's the value that they're getting
+from interacting with it in terms of like?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4368-0
+00:56:34.416 --> 00:56:37.760
+<v Theo Davies>Is it to do with, yeah,
+breaking down of words, decoding,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4368-1
+00:56:37.760 --> 00:56:42.430
+<v Theo Davies>and is it more to do with the enrichment
+suite of tools that gives you a flavour</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4368-2
+00:56:42.430 --> 00:56:42.776
+<v Theo Davies>about?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4370-0
+00:56:43.776 --> 00:56:45.296
+<v Theo Davies>How they're how they're being used?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4394-0
+00:56:50.816 --> 00:56:55.364
+<v Theo Davies>So this is interesting sort of
+implementation statistics,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4394-1
+00:56:55.364 --> 00:57:00.305
+<v Theo Davies>then the custom dashboards being in
+development at the moment,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4394-2
+00:57:00.305 --> 00:57:02.736
+<v Theo Davies>which is more for the teachers.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4395-0
+00:57:03.856 --> 00:57:05.216
+<v Theo Davies>So, like...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4409-0
+00:57:06.416 --> 00:57:11.963
+<v Theo Davies>That enables you a much more granular,
+a much more granular level of reporting</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4409-1
+00:57:11.963 --> 00:57:12.736
+<v Theo Davies>stuff like.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4419-0
+00:57:14.816 --> 00:57:21.056
+<v Theo Davies>most commonly scanned words for this
+group of students, you know.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4422-0
+00:57:22.656 --> 00:57:24.016
+<v Theo Davies>Words listen to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4464-0
+00:57:25.856 --> 00:57:30.314
+<v Theo Davies>by these students in this amount of time
+or by the student.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4464-1
+00:57:30.314 --> 00:57:36.482
+<v Theo Davies>So it's more educator focused basically.
+So the dashboards give the top level view</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4464-2
+00:57:36.482 --> 00:57:41.906
+<v Theo Davies>more relevant for those implement,
+those interested in how the product's</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4464-3
+00:57:41.906 --> 00:57:45.696
+<v Theo Davies>been implemented.
+And then the custom reporting is</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4473-0
+00:57:45.776 --> 00:57:52.016
+<v Theo Davies>Is more about educational insights into
+different students, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4474-0
+00:57:53.536 --> 00:57:54.176
+<v Theo Davies>Really?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4478-0
+00:57:55.296 --> 00:57:56.656
+<v Theo Davies>Yeah, we're in the purse of...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4479-0
+00:57:57.776 --> 00:57:58.016
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4488-0
+00:58:02.376 --> 00:58:06.106
+<v Theo Davies>Yeah,
+the developing the UIs to be implemented</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4488-1
+00:58:06.106 --> 00:58:07.296
+<v Theo Davies>in here, and...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4498-0
+00:58:08.656 --> 00:58:13.776
+<v Theo Davies>Exactly which KPIs are included in that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4509-0
+00:58:14.936 --> 00:58:17.516
+<v Theo Davies>Um,
+based on based on the amount of data that</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4509-1
+00:58:17.516 --> 00:58:19.536
+<v Theo Davies>we're collecting in in the back end.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4528-0
+00:58:20.656 --> 00:58:25.623
+<v Theo Davies>So, yeah, it doesn't, it's not looking,
+it's not looking that great at the moment,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4528-1
+00:58:25.623 --> 00:58:28.376
+<v Theo Davies>but it's functioning, and there's there's.
+..</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4536-0
+00:58:29.376 --> 00:58:33.391
+<v Theo Davies>Yeah,
+polishing work that's going on at moment</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4536-1
+00:58:33.391 --> 00:58:34.416
+<v Theo Davies>to make the.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4551-0
+00:58:35.616 --> 00:58:39.816
+<v Theo Davies>Information more visible, more obvious,
+and more engaged.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4594-0
+00:58:38.096 --> 00:58:41.677
+<v Toby Sutton OBE (Empowering Tech)>And we're certain that we're capturing
+all the information at the moment.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4594-1
+00:58:41.677 --> 00:58:45.741
+<v Toby Sutton OBE (Empowering Tech)>So we're capturing what mode they're in,
+how long they're in there, what, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4594-2
+00:58:45.741 --> 00:58:49.564
+<v Toby Sutton OBE (Empowering Tech)>the length of time, you know, who it is,
+you know, the words they're scanning,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4571-0
+00:58:47.496 --> 00:58:47.616
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4594-3
+00:58:49.564 --> 00:58:53.435
+<v Toby Sutton OBE (Empowering Tech)>they're listing, the button. You know,
+we are capturing all that information of</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4594-4
+00:58:53.435 --> 00:58:56.096
+<v Toby Sutton OBE (Empowering Tech)>interaction on a pen and writing it into
+the database.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4591-0
+00:58:54.816 --> 00:58:55.296
+<v Theo Davies>Yes.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4593-0
+00:58:56.816 --> 00:58:58.176
+<v Theo Davies>Yes, there we are.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4595-0
+00:58:58.416 --> 00:58:58.736
+<v Toby Sutton OBE (Empowering Tech)>But.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4608-0
+00:59:02.016 --> 00:59:05.160
+<v Theo Davies>Yeah, so that's reporting.
+I'll just cheque.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4608-1
+00:59:05.160 --> 00:59:07.536
+<v Theo Davies>I don't think I had anything else.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4611-0
+00:59:09.416 --> 00:59:10.656
+<v Theo Davies>On 360.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4613-0
+00:59:23.696 --> 00:59:23.856
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4619-0
+00:59:26.256 --> 00:59:28.176
+<v Theo Davies>Yeah, nothing else on 360, so.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4621-0
+00:59:31.216 --> 00:59:33.056
+<v Theo Davies>Yeah, to summarise.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4622-0
+00:59:33.376 --> 00:59:35.016
+<v Toby Sutton OBE (Empowering Tech)>Has anything happened on Inspire?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4638-0
+00:59:37.056 --> 00:59:44.616
+<v Theo Davies>Nothing recently on Inspire I can report
+on. I need to complete the.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4682-0
+00:59:46.416 --> 00:59:51.998
+<v Theo Davies>I need to, I need to complete the review.
+Last time I last time I checked in on</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4682-1
+00:59:51.998 --> 00:59:55.418
+<v Theo Davies>Inspire,
+there was if there was a few things not</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4682-2
+00:59:55.418 --> 00:59:59.046
+<v Theo Davies>not mapping and a few bugs,
+so I need to cheque in.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4682-3
+00:59:59.046 --> 01:00:02.396
+<v Theo Davies>I need to cheque in on that before I can,
+yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4682-4
+01:00:02.396 --> 01:00:05.536
+<v Theo Davies>before I can really comment on on states
+of.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4684-0
+01:00:05.936 --> 01:00:06.816
+<v Theo Davies>Of inspire.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4685-0
+01:00:08.096 --> 01:00:08.336
+<v Theo Davies>Um...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4691-0
+01:00:12.616 --> 01:00:17.376
+<v Theo Davies>And then the last thing, words database,
+which is...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4694-0
+01:00:19.456 --> 01:00:20.056
+<v Theo Davies>Yeah, with.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4708-0
+01:00:21.616 --> 01:00:28.656
+<v Theo Davies>We generated 3K, yeah, 3K words.
+We've just re...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4707-0
+01:00:27.816 --> 01:00:29.136
+<v Toby Sutton OBE (Empowering Tech)>Reminders how much that cost.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4712-0
+01:00:32.096 --> 01:00:34.896
+<v Theo Davies>Find my spreadsheet.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4727-0
+01:00:50.176 --> 01:00:55.708
+<v Toby Sutton OBE (Empowering Tech)>And did it go as well when you went up
+from up to 3000 words? Did it?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4727-1
+01:00:55.708 --> 01:00:56.656
+<v Toby Sutton OBE (Empowering Tech)>Was it easy?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4736-0
+01:00:59.456 --> 01:01:02.496
+<v Toby Sutton OBE (Empowering Tech)>Was it just a case of saying 3000 and
+then it did it?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4735-0
+01:01:02.496 --> 01:01:02.656
+<v Theo Davies>B.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4745-0
+01:01:05.376 --> 01:01:07.496
+<v Theo Davies>Yeah, generation-wise, there's no...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4754-0
+01:01:08.456 --> 01:01:11.136
+<v Theo Davies>No different, it takes, yeah,
+it takes more time.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4759-0
+01:01:14.096 --> 01:01:16.576
+<v Toby Sutton OBE (Empowering Tech)>So it costs 6000 US dollars, is that?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4756-0
+01:01:14.256 --> 01:01:14.856
+<v Theo Davies>Intensive.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4774-0
+01:01:21.056 --> 01:01:23.416
+<v Toby Sutton OBE (Empowering Tech)>Ohh, to get to 20K. OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4778-0
+01:01:23.456 --> 01:01:23.816
+<v Theo Davies>P.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4777-0
+01:01:24.616 --> 01:01:24.936
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4788-0
+01:01:26.616 --> 01:01:32.616
+<v Theo Davies>So, yeah, 3K was around...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4789-0
+01:01:32.696 --> 01:01:33.656
+<v Toby Sutton OBE (Empowering Tech)>Fifteen 100.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4797-0
+01:01:35.496 --> 01:01:39.896
+<v Theo Davies>Yeah, around less, yeah,
+less is less than 1500.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4802-0
+01:01:41.096 --> 01:01:43.016
+<v Theo Davies>It was 3K, not 5K.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4810-0
+01:01:44.296 --> 01:01:48.856
+<v Theo Davies>But the new,
+the new model we just generated across.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4816-0
+01:01:50.776 --> 01:01:53.056
+<v Theo Davies>is about 10%.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4817-0
+01:01:54.696 --> 01:01:55.256
+<v Theo Davies>Of that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4825-0
+01:01:57.496 --> 01:02:00.216
+<v Theo Davies>So the way that we're conducting the test.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4835-0
+01:02:01.976 --> 01:02:06.776
+<v Theo Davies>The test that went,
+we're reviewing the cheaper model.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4844-0
+01:02:08.696 --> 01:02:12.856
+<v Theo Davies>and defining which LOCs we can use are
+suitable.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4845-0
+01:02:14.056 --> 01:02:14.176
+<v Theo Davies>The...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4853-0
+01:02:17.976 --> 01:02:20.696
+<v Theo Davies>you know,
+give us the quality that we need.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4856-0
+01:02:22.696 --> 01:02:23.936
+<v Theo Davies>Against each LOC.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4861-0
+01:02:24.696 --> 01:02:26.776
+<v Theo Davies>So what we'll end up with is it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4878-0
+01:02:27.656 --> 01:02:33.028
+<v Theo Davies>For us, you know,
+somewhere in between for MVP,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4878-1
+01:02:33.028 --> 01:02:37.616
+<v Theo Davies>somewhere in between 6K dollars and $500.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4883-0
+01:02:41.736 --> 01:02:44.136
+<v Theo Davies>Depending on sort of complexity, so...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4884-0
+01:02:43.416 --> 01:02:44.936
+<v Toby Sutton OBE (Empowering Tech)>It's quite a big difference, isn't it?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4890-0
+01:02:45.336 --> 01:02:47.016
+<v Theo Davies>Massive difference, yeah, massive.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4889-0
+01:02:46.856 --> 01:02:47.176
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4897-0
+01:02:49.496 --> 01:02:51.736
+<v Theo Davies>And yeah,
+it makes a huge difference as we scale.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4914-0
+01:02:53.376 --> 01:02:56.594
+<v Theo Davies>Um, you know,
+you start to get full dictionary, yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4904-0
+01:02:55.096 --> 01:02:55.576
+<v Peter Johansson>Back there.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4914-1
+01:02:56.594 --> 01:02:59.336
+<v Theo Davies>makes makes a huge, a huge difference, so.
+..</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4910-0
+01:02:59.616 --> 01:02:59.736
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4918-0
+01:03:00.616 --> 01:03:01.336
+<v Theo Davies>Yeah, with.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4916-0
+01:03:00.936 --> 01:03:01.256
+<v Peter Johansson>Oh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4920-0
+01:03:02.776 --> 01:03:03.896
+<v Theo Davies>Starting.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4922-0
+01:03:04.776 --> 01:03:05.816
+<v Theo Davies>The reviews.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4931-0
+01:03:07.056 --> 01:03:12.856
+<v Theo Davies>of the 3K based on the cheaper LLM.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4951-0
+01:03:14.216 --> 01:03:19.336
+<v Theo Davies>And then, if we need, if we need to,
+then we can refer back to this first.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4935-0
+01:03:14.296 --> 01:03:14.936
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4961-0
+01:03:18.696 --> 01:03:22.924
+<v Toby Sutton OBE (Empowering Tech)>And how did you get on with the safety
+features? Let's say, call it that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4961-1
+01:03:22.924 --> 01:03:25.896
+<v Toby Sutton OBE (Empowering Tech)>Were you happy with what what the what
+you've done?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4966-0
+01:03:28.376 --> 01:03:34.220
+<v Theo Davies>There's, yeah, 3 levels of safeguards.
+Part of the review of what's going on</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4966-1
+01:03:34.220 --> 01:03:38.547
+<v Theo Davies>here will tell us how well,
+tell us how well we've done,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4966-2
+01:03:38.547 --> 01:03:43.025
+<v Theo Davies>because part of what we're reviewing for
+the 3K, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4966-3
+01:03:43.025 --> 01:03:46.896
+<v Theo Davies>based on this new LLM and the older LLM
+that we've</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4972-0
+01:03:48.936 --> 01:03:51.936
+<v Theo Davies>Been working with part of that is about.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/4981-0
+01:03:52.776 --> 01:03:57.576
+<v Theo Davies>you know, by the safety of those words,
+of the content generated.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5015-0
+01:04:00.216 --> 01:04:04.754
+<v Theo Davies>The first,
+the first level is tagging offensive</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5015-1
+01:04:04.754 --> 01:04:12.034
+<v Theo Davies>words and sensitive words. You know,
+our current strategy is not to generate</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5015-2
+01:04:12.034 --> 01:04:18.936
+<v Theo Davies>anything against the sensitive,
+against the offensive words, so we've...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5029-0
+01:04:19.016 --> 01:04:22.447
+<v Theo Davies>Got a list of words that we we tagged
+from our, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5029-1
+01:04:22.447 --> 01:04:26.056
+<v Theo Davies>hundreds of thousands of words,
+and now we provide you list.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5034-0
+01:04:27.896 --> 01:04:29.816
+<v Theo Davies>So,
+we can we can revisit them when we know.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5045-0
+01:04:32.216 --> 01:04:34.907
+<v Theo Davies>how to handle them,
+basically what we should do with them</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5045-1
+01:04:34.907 --> 01:04:36.856
+<v Theo Davies>from an educational ethical point of view.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5052-0
+01:04:39.176 --> 01:04:41.976
+<v Theo Davies>So, that's the first bit that that worked,
+that worked.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5083-0
+01:04:43.096 --> 01:04:46.025
+<v Theo Davies>Quite well,
+it was a little overzealous in some</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5083-1
+01:04:46.025 --> 01:04:48.954
+<v Theo Davies>places,
+which I spoke about in a previous call,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5083-2
+01:04:48.954 --> 01:04:52.616
+<v Theo Davies>like flagging Assassin,
+'cause there's a couple of ***** in</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5083-3
+01:04:52.616 --> 01:04:56.216
+<v Theo Davies>Assassin, so it was a little,
+it was a little overzealous.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5092-0
+01:05:00.656 --> 01:05:06.096
+<v Theo Davies>Then into, and then the next, yeah,
+the next safeguard is in terms of the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5106-0
+01:05:07.736 --> 01:05:12.807
+<v Theo Davies>generation.
+So the LLMs have their own built-in</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5106-1
+01:05:12.807 --> 01:05:15.976
+<v Theo Davies>content generation safeguards.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5134-0
+01:05:17.016 --> 01:05:21.987
+<v Theo Davies>So, that's the next one,
+and then the next one after that is us</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5134-1
+01:05:21.987 --> 01:05:26.726
+<v Theo Davies>checking the content,
+checking samples of the content that's</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5134-2
+01:05:26.726 --> 01:05:31.232
+<v Theo Davies>been generated. So,
+in our next set of reviews, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5134-3
+01:05:31.232 --> 01:05:33.096
+<v Theo Davies>we've got words which...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5135-0
+01:05:33.976 --> 01:05:34.096
+<v Theo Davies>And...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5138-0
+01:05:37.896 --> 01:05:38.856
+<v Theo Davies>We've got words.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5169-0
+01:05:42.456 --> 01:05:47.244
+<v Theo Davies>that have like a, you know,
+a secondary meaning for something that</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5169-1
+01:05:47.244 --> 01:05:51.389
+<v Theo Davies>could be offensive.
+So we're reviewing them. For example,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5169-2
+01:05:51.389 --> 01:05:56.106
+<v Theo Davies>something like bulls, right?
+So creating examples and definitions</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5169-3
+01:05:56.106 --> 01:05:58.536
+<v Theo Davies>against against a word like bulls.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5173-0
+01:06:01.096 --> 01:06:03.776
+<v Theo Davies>Yeah, we're checking whether it's...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5178-0
+01:06:05.096 --> 01:06:06.696
+<v Theo Davies>Generated a meaning.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5196-0
+01:06:09.096 --> 01:06:14.427
+<v Theo Davies>generated the meaning,
+which could be described as, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5196-1
+01:06:14.427 --> 01:06:18.296
+<v Theo Davies>like crude or offensive.
+And then if it has,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5198-0
+01:06:20.456 --> 01:06:22.056
+<v Theo Davies>How does that? How does that?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5214-0
+01:06:23.736 --> 01:06:27.797
+<v Theo Davies>What the exact,
+how sensitivity has it has it done that?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5214-1
+01:06:27.797 --> 01:06:32.856
+<v Theo Davies>Does it say something like a word used to
+describe an anatomical part?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5230-0
+01:06:34.376 --> 01:06:37.436
+<v Theo Davies>And then,
+and then the examples that come from that</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5230-1
+01:06:37.436 --> 01:06:40.320
+<v Theo Davies>ExCo, which is,
+which is one of the risky areas,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5230-2
+01:06:40.320 --> 01:06:42.616
+<v Theo Davies>the examples are one of the risk areas.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5231-0
+01:06:46.696 --> 01:06:47.176
+<v Theo Davies>So.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5241-0
+01:06:48.856 --> 01:06:53.748
+<v Theo Davies>Yeah, the first layer is working,
+working quite well,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5241-1
+01:06:53.748 --> 01:06:56.376
+<v Theo Davies>is a little over overzealous.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5246-0
+01:06:58.136 --> 01:07:00.136
+<v Theo Davies>And we're reviewing the next two.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5274-0
+01:07:01.216 --> 01:07:06.774
+<v Theo Davies>layers of safeguards in our latest review
+by pulling out the words, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5274-1
+01:07:06.774 --> 01:07:11.264
+<v Theo Davies>that may have the double meanings.
+And we get, we've got them,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5274-2
+01:07:11.264 --> 01:07:15.896
+<v Theo Davies>we've got sample lists for each of those,
+each of those defined.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5275-0
+01:07:17.176 --> 01:07:17.736
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5300-0
+01:07:21.056 --> 01:07:25.282
+<v Theo Davies>So yeah,
+first level is working well and to answer</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5300-1
+01:07:25.282 --> 01:07:30.336
+<v Theo Davies>your question, yeah,
+the first level is working well and the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5300-2
+01:07:30.336 --> 01:07:36.136
+<v Theo Davies>next two layers are under review.
+Basically what we've got, we've got</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5303-0
+01:07:39.456 --> 01:07:40.616
+<v Theo Davies>We've got Jacks in place.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5319-0
+01:07:41.976 --> 01:07:44.685
+<v Theo Davies>So,
+I can I can update you once we've once</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5319-1
+01:07:44.685 --> 01:07:49.976
+<v Theo Davies>you've gone through it through that that
+process and show you what that looks like.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5323-0
+01:08:01.336 --> 01:08:07.543
+<v Toby Sutton OBE (Empowering Tech)>Stuff. Sorry, another question for me,
+sort of going off sort of where you're at,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5322-0
+01:08:04.056 --> 01:08:04.536
+<v Theo Davies>Mhm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5323-1
+01:08:07.543 --> 01:08:11.176
+<v Toby Sutton OBE (Empowering Tech)>but what about the planning for the next
+stage?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5371-0
+01:08:12.056 --> 01:08:15.228
+<v Toby Sutton OBE (Empowering Tech)>you know,
+what comes after this is all agreed.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5371-1
+01:08:15.228 --> 01:08:20.560
+<v Toby Sutton OBE (Empowering Tech)>I know we've had a couple of meetings and
+we've cancelled them or delayed them</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5371-2
+01:08:20.560 --> 01:08:25.419
+<v Toby Sutton OBE (Empowering Tech)>because you guys weren't ready.
+But are we getting closer to being able</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5344-0
+01:08:21.696 --> 01:08:21.976
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5371-3
+01:08:25.419 --> 01:08:29.536
+<v Toby Sutton OBE (Empowering Tech)>to actually start talking about
+priorities for after launch?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5371-4
+01:08:29.536 --> 01:08:31.696
+<v Toby Sutton OBE (Empowering Tech)>We don't want there to be a lag.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5361-0
+01:08:30.216 --> 01:08:30.376
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5380-0
+01:08:31.776 --> 01:08:35.609
+<v Toby Sutton OBE (Empowering Tech)>between us finishing this load of work
+and starting the next load of work,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5372-0
+01:08:33.576 --> 01:08:34.096
+<v Peter Johansson>Boome.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5380-1
+01:08:35.609 --> 01:08:36.376
+<v Toby Sutton OBE (Empowering Tech)>I guess, do we?</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5379-0
+01:08:35.656 --> 01:08:36.216
+<v Peter Johansson>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5381-0
+01:08:37.376 --> 01:08:37.656
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5421-0
+01:08:39.096 --> 01:08:42.764
+<v Peter Johansson>I can say a bit of that.
+I think that up until year end,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5421-1
+01:08:42.764 --> 01:08:47.912
+<v Peter Johansson>I think we should focus on things that we
+have intentionally left behind a bit.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5421-2
+01:08:47.912 --> 01:08:52.481
+<v Peter Johansson>We have small things that we've said,
+okay, let's wait and let's wait.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5421-3
+01:08:52.481 --> 01:08:56.664
+<v Peter Johansson>We'll spend the first few months,
+focus on that and get that in.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5421-4
+01:08:56.664 --> 01:08:58.016
+<v Peter Johansson>And then beyond that,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5423-0
+01:08:58.136 --> 01:08:58.776
+<v Peter Johansson>So, oh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5460-0
+01:09:00.136 --> 01:09:06.039
+<v Peter Johansson>in parallel with that being done,
+I think we should consider what the next</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5460-1
+01:09:06.039 --> 01:09:10.289
+<v Peter Johansson>level really is, the priorities,
+where we want to go,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5460-2
+01:09:10.289 --> 01:09:16.585
+<v Peter Johansson>if we want to improve or enhance even
+further about the things we already have,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5460-3
+01:09:16.585 --> 01:09:19.576
+<v Peter Johansson>or if we want to add another layer on.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5490-0
+01:09:19.896 --> 01:09:24.179
+<v Peter Johansson>onto it.
+Things like adding more activities is</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5490-1
+01:09:24.179 --> 01:09:29.919
+<v Peter Johansson>definitely in my book.
+Having one single doesn't really cut it</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5479-0
+01:09:29.896 --> 01:09:30.056
+<v Toby Sutton OBE (Empowering Tech)>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5490-2
+01:09:29.919 --> 01:09:36.753
+<v Peter Johansson>very far. We need to think about that.
+And then I would probably look into</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5490-3
+01:09:36.753 --> 01:09:38.576
+<v Peter Johansson>adding more valuable</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5493-0
+01:09:38.656 --> 01:09:41.176
+<v Peter Johansson>Old teachers for teachers.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5496-0
+01:09:41.976 --> 01:09:42.456
+<v Toby Sutton OBE (Empowering Tech)>Yep.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5530-0
+01:09:42.296 --> 01:09:49.025
+<v Peter Johansson>Support them in any generation of
+worksheets or some whatever makes sense</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5512-0
+01:09:47.496 --> 01:09:48.376
+<v Toby Sutton OBE (Empowering Tech)>Yeah, I agree.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5530-1
+01:09:49.025 --> 01:09:54.936
+<v Peter Johansson>there, but within that within that area,
+I think we can getting.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5547-0
+01:09:52.936 --> 01:09:55.296
+<v Toby Sutton OBE (Empowering Tech)>So,
+you're not worried that you're not</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5525-0
+01:09:55.256 --> 01:09:55.576
+<v Theo Davies>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5547-1
+01:09:55.296 --> 01:10:00.016
+<v Toby Sutton OBE (Empowering Tech)>worried people are gonna run out of
+things to do before we set the these next</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5538-0
+01:09:59.376 --> 01:09:59.696
+<v Peter Johansson>Boome.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5547-2
+01:10:00.016 --> 01:10:02.376
+<v Toby Sutton OBE (Empowering Tech)>tasks, the this next priorities though.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5541-0
+01:10:01.296 --> 01:10:01.576
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5588-0
+01:10:03.416 --> 01:10:06.503
+<v Peter Johansson>No,
+I think we can keep basically everyone</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5588-1
+01:10:06.503 --> 01:10:12.174
+<v Peter Johansson>busy with things we already have in the
+backlog and we can basically just pick</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5588-2
+01:10:12.174 --> 01:10:17.415
+<v Peter Johansson>things and move forward there and make
+sure that everyone has across the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5588-3
+01:10:17.415 --> 01:10:22.656
+<v Peter Johansson>functions, they have things to do.
+And in parallel, we try to have a few</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5596-0
+01:10:23.656 --> 01:10:27.816
+<v Peter Johansson>Brainstorming sessions and setting the
+direction for.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5604-0
+01:10:29.176 --> 01:10:33.096
+<v Peter Johansson>for the next larger initiative of change.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5610-0
+01:10:34.056 --> 01:10:37.576
+<v Peter Johansson>Because I want, I would want us not to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5634-0
+01:10:38.456 --> 01:10:45.248
+<v Peter Johansson>Continue spoon feeding feature by feature,
+small things at the at each time,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5634-1
+01:10:45.248 --> 01:10:48.776
+<v Peter Johansson>but keeping them busy for a while, post.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5646-0
+01:10:49.816 --> 01:10:54.603
+<v Peter Johansson>start a pilot,
+but then having a larger initiative that</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5646-1
+01:10:54.603 --> 01:10:56.056
+<v Peter Johansson>will be the next.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5676-0
+01:10:57.336 --> 01:11:03.505
+<v Peter Johansson>iteration where everyone basically has
+something to do for a few months.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5676-1
+01:11:03.505 --> 01:11:10.181
+<v Peter Johansson>And if it doesn't keep everyone busy,
+then we can have some side tasks that we</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5676-2
+01:11:10.181 --> 01:11:15.336
+<v Peter Johansson>want to push through else.
+But I want to take a larger grip.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5678-0
+01:11:17.816 --> 01:11:18.856
+<v Peter Johansson>Kind of moving it.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5692-0
+01:11:19.936 --> 01:11:25.154
+<v Peter Johansson>a window objective further and not just
+by something that can spin around in two</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5692-1
+01:11:25.154 --> 01:11:26.056
+<v Peter Johansson>to four weeks.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5693-0
+01:11:32.536 --> 01:11:32.776
+<v Toby Sutton OBE (Empowering Tech)>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5694-0
+01:11:41.016 --> 01:11:41.256
+<v Peter Johansson>Hmm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5695-0
+01:11:47.856 --> 01:11:52.060
+<v Peter Johansson>But soon enough, soon enough,
+we need to have a session where we sit</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5695-1
+01:11:52.060 --> 01:11:53.096
+<v Peter Johansson>down and do that.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5714-0
+01:11:54.216 --> 01:11:58.596
+<v Peter Johansson>Just that Theo has been up over his head
+for a while now,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5714-1
+01:11:58.596 --> 01:12:02.296
+<v Peter Johansson>and will be for a couple of weeks more,
+I guess.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5706-0
+01:11:58.696 --> 01:11:59.416
+<v Toby Sutton OBE (Empowering Tech)>Yeah, I'm sure.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5715-0
+01:12:03.176 --> 01:12:03.496
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5722-0
+01:12:03.256 --> 01:12:06.216
+<v Theo Davies>Yeah, yeah, we, we've got the, yeah,
+we've got the...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5727-0
+01:12:08.456 --> 01:12:10.136
+<v Theo Davies>The plan of how to...</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5744-0
+01:12:11.176 --> 01:12:15.606
+<v Theo Davies>Hard to process, yeah,
+I just haven't been able to give it the</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5733-0
+01:12:13.576 --> 01:12:13.816
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5744-1
+01:12:15.606 --> 01:12:19.896
+<v Theo Davies>time to try to process it and, you know,
+effectively create.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5748-0
+01:12:21.496 --> 01:12:22.776
+<v Theo Davies>Create those.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5757-0
+01:12:24.616 --> 01:12:30.456
+<v Theo Davies>buckets for new features and beyond
+immediate polishing.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5754-0
+01:12:28.416 --> 01:12:28.616
+<v Peter Johansson>OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-0
+01:12:32.736 --> 01:12:36.247
+<v Toby Sutton OBE (Empowering Tech)>And I think we all want to get the
+product launch, you know,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-1
+01:12:36.247 --> 01:12:40.621
+<v Toby Sutton OBE (Empowering Tech)>at this minimum level to a very high
+standard so that people start using it</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5760-0
+01:12:38.616 --> 01:12:38.776
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-2
+01:12:40.621 --> 01:12:44.477
+<v Toby Sutton OBE (Empowering Tech)>and thinking this is cool straight away.
+And from what we've seen,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-3
+01:12:44.477 --> 01:12:49.023
+<v Toby Sutton OBE (Empowering Tech)>I think as long as even this minimum
+functionality that we've got is done to a</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5761-0
+01:12:49.016 --> 01:12:49.256
+<v Peter Johansson>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-4
+01:12:49.023 --> 01:12:53.167
+<v Toby Sutton OBE (Empowering Tech)>cool, is done to a high standard,
+I think people will think it's a cool</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5762-5
+01:12:53.167 --> 01:12:54.376
+<v Toby Sutton OBE (Empowering Tech)>product moving it on.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5802-0
+01:12:54.776 --> 01:12:58.009
+<v Toby Sutton OBE (Empowering Tech)>But yeah,
+I think we probably all equally want to</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5802-1
+01:12:58.009 --> 01:13:02.859
+<v Toby Sutton OBE (Empowering Tech)>start seeing some more features being
+developed and added on progressively</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5775-0
+01:13:02.056 --> 01:13:02.136
+<v Peter Johansson>The.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5802-2
+01:13:02.859 --> 01:13:07.645
+<v Toby Sutton OBE (Empowering Tech)>month after month after month just so
+that we can see it moving. So yeah,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5784-0
+01:13:05.736 --> 01:13:05.896
+<v Peter Johansson>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5802-3
+01:13:07.645 --> 01:13:11.913
+<v Toby Sutton OBE (Empowering Tech)>but first things first,
+let's launch product to high quality with</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5802-4
+01:13:11.913 --> 01:13:14.176
+<v Toby Sutton OBE (Empowering Tech)>what we've got there at the moment.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5804-0
+01:13:14.296 --> 01:13:15.656
+<v Toby Sutton OBE (Empowering Tech)>So, yeah, OK.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5801-0
+01:13:15.016 --> 01:13:15.416
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5805-0
+01:13:16.616 --> 01:13:16.936
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5806-0
+01:13:17.896 --> 01:13:18.296
+<v Theo Davies>Ann.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5838-0
+01:13:19.096 --> 01:13:24.292
+<v Theo Davies>Yeah, I just got the,
+I did just get the QR code log in to work</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5838-1
+01:13:24.292 --> 01:13:28.108
+<v Theo Davies>second time.
+I wasn't really able to show you,</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5838-2
+01:13:28.108 --> 01:13:32.248
+<v Theo Davies>but yeah, yeah,
+just an example of a little bit of</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5838-3
+01:13:32.248 --> 01:13:35.496
+<v Theo Davies>glitchiness, bit of bugginess to get to.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5843-0
+01:13:37.656 --> 01:13:41.286
+<v Theo Davies>Yeah,
+some of these newer features feeling more</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5843-1
+01:13:41.286 --> 01:13:41.816
+<v Theo Davies>robust.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5844-0
+01:13:45.976 --> 01:13:46.376
+<v Toby Sutton OBE (Empowering Tech)>Cool.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5845-0
+01:13:47.296 --> 01:13:47.656
+<v Theo Davies>Okay.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5850-0
+01:13:50.776 --> 01:13:53.176
+<v Theo Davies>Yeah, nothing else, nothing else for me.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5851-0
+01:13:50.936 --> 01:13:56.856
+<v Peter Johansson>Right. Nothing else. We're at Q&amp;A.
+All good.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5852-0
+01:13:57.496 --> 01:14:00.136
+<v Sharmella Kirby>It's all looking really good Theo,
+well done.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5854-0
+01:14:00.816 --> 01:14:01.176
+<v Theo Davies>Thanks.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5856-0
+01:14:02.376 --> 01:14:02.776
+<v Toby Sutton OBE (Empowering Tech)>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5861-0
+01:14:02.376 --> 01:14:04.776
+<v Sharmella Kirby>Yeah, it's all looking really,
+really good.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5857-0
+01:14:02.736 --> 01:14:03.096
+<v Theo Davies>Thanks.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5860-0
+01:14:04.216 --> 01:14:04.376
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5863-0
+01:14:06.376 --> 01:14:07.176
+<v Toby Sutton OBE (Empowering Tech)>I agree.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5864-0
+01:14:06.896 --> 01:14:09.096
+<v Peter Johansson>Gradually, gradually coming together.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5876-0
+01:14:09.976 --> 01:14:12.696
+<v Sharmella Kirby>Yeah, we will see Theo smile.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5875-0
+01:14:10.936 --> 01:14:11.176
+<v Peter Johansson>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5873-0
+01:14:11.656 --> 01:14:12.456
+<v Jack Churchill>Yeah, thanks, Theo.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5883-0
+01:14:14.376 --> 01:14:16.056
+<v Theo Davies>One day, maybe.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5881-0
+01:14:14.456 --> 01:14:14.656
+<v Toby Sutton OBE (Empowering Tech)>Ugh.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5887-0
+01:14:14.776 --> 01:14:17.736
+<v Jack Churchill>But there's big progress there on many
+fronts.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5888-0
+01:14:18.856 --> 01:14:19.136
+<v Sharmella Kirby>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5889-0
+01:14:18.856 --> 01:14:19.176
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5890-0
+01:14:21.416 --> 01:14:21.656
+<v Theo Davies>Yeah.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5891-0
+01:14:21.416 --> 01:14:21.656
+<v Toby Sutton OBE (Empowering Tech)>Mm.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5892-0
+01:14:21.416 --> 01:14:21.816
+<v Sharmella Kirby>Brilliant.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5893-0
+01:14:21.896 --> 01:14:22.296
+<v Peter Johansson>Rights.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5913-0
+01:14:23.016 --> 01:14:26.376
+<v Toby Sutton OBE (Empowering Tech)>Cool. Thanks, everyone. Thanks, Theo.
+Bye bye.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5921-0
+01:14:23.096 --> 01:14:27.976
+<v Theo Davies>Cool. Okay. Thanks everyone.
+Thanks everyone. Bye bye. Bye.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5900-0
+01:14:23.776 --> 01:14:24.856
+<v Peter Johansson>Thanks, everyone.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5917-0
+01:14:24.056 --> 01:14:27.256
+<v Sharmella Kirby>Thanks a lot, Theo. Thanks. Bye, bye.</v>
+
+0fa7a09d-848d-4bcf-8f31-307efefaf5f3/5922-0
+01:14:26.296 --> 01:14:28.616
+<v Peter Johansson>Thanks, Theo. Bye. Cheers. Bye.</v>
