@@ -37,6 +37,31 @@
       "organiser_patterns": [
         "NPIProcess@scanningpens.com"
       ],
+      "product_context": {
+        "version": "1.0",
+        "default_product": "SuperPen",
+        "default_weight": 2,
+        "likely_threshold": 5,
+        "default_is_not_direct_evidence": true,
+        "products": [
+          {
+            "name": "SuperPen",
+            "aliases": ["SuperPen", "Super Pen"],
+            "distinctive_cues": [
+              { "id": "two_pen_workflow", "patterns": ["two pen", "two-pen"], "weight": 3 },
+              { "id": "360_web_app", "patterns": ["360", "web app"], "weight": 1 },
+              { "id": "charging_hub", "patterns": ["charging hub", "charging"], "weight": 2 },
+              { "id": "osi_build", "patterns": ["OSI"], "weight": 2 },
+              { "id": "second_camera", "patterns": ["second camera", "second-camera"], "weight": 2 }
+            ]
+          },
+          {
+            "name": "Reader 3",
+            "aliases": ["Reader 3", "Exam Reader 3"],
+            "distinctive_cues": []
+          }
+        ]
+      },
       "notes": "NPI meetings may include finance, ops and other dept speakers — context lens is always product development"
     },
     {
