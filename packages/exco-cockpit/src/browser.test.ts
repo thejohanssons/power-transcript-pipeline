@@ -304,6 +304,54 @@ describe('Feedback export from live session state', () => {
   });
 });
 
+describe('Filtered All Content Markdown export', () => {
+  let dom: JSDOM, window: AnyWindow;
+  beforeEach(async () => {
+    ({ dom, window } = buildDOM());
+    await waitForInit();
+    window.document.getElementById('tab-all-content').click();
+  });
+  afterEach(() => dom.window.close());
+
+  it('provides an accessible enabled Export button after content loads', () => {
+    const button = window.document.getElementById('all-content-export');
+    expect(button).toBeTruthy();
+    expect(button.getAttribute('aria-label')).toBe('Export filtered content as Markdown');
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('exports exactly the active filtered results without issuing API requests', () => {
+    const typeSelect = window.document.getElementById('filter-type');
+    typeSelect.value = 'Decision';
+    typeSelect.dispatchEvent(new window.Event('change'));
+    const expectedCount = window.document.querySelectorAll('#all-content-results .card').length;
+    const fetchCountBeforeExport = window.fetch.mock.calls.length;
+
+    window.document.getElementById('all-content-export').click();
+
+    expect(window.fetch).toHaveBeenCalledTimes(fetchCountBeforeExport);
+    expect(window.URL.createObjectURL).toHaveBeenCalledOnce();
+    const blob = window.URL.createObjectURL.mock.calls[0][0];
+    expect(blob).toBeInstanceOf(window.Blob);
+    expect(blob.type).toBe('text/markdown;charset=utf-8');
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    expect(window.document.getElementById('all-content-export-status').textContent)
+      .toContain(`Exported ${expectedCount} items as eip-exco-cockpit-export-`);
+  });
+
+  it('disables export when no items match the current filters', async () => {
+    const keyword = window.document.getElementById('filter-keyword');
+    keyword.value = 'no-export-match-12345';
+    keyword.dispatchEvent(new window.Event('input'));
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const button = window.document.getElementById('all-content-export');
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+  });
+});
+
 describe('Reset — cancel and confirm paths', () => {
   let dom: JSDOM, window: AnyWindow;
   beforeEach(async () => {

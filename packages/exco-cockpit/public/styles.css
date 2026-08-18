@@ -555,6 +555,22 @@ body {
 
 .filter-group-keyword { flex: 1; min-width: 200px; }
 
+.filter-actions { align-self: flex-end; }
+
+.filter-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-action-buttons .btn-secondary { white-space: nowrap; }
+
+.export-status {
+  min-height: 18px;
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
 .filter-label {
   font-size: 11px;
   font-weight: 600;
