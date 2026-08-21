@@ -1,0 +1,268 @@
+Here's a paste-ready Cloudflare Development Feature Request for the EIP Product backlog.
+
+Feature Request: Copilot Studio Integration API
+
+ID: EIP-FR-001
+ Priority: High
+ Owner: EIP Product
+ Requested By: Peter Johansson
+ Date: 19 Aug 2026
+
+Summary
+
+Create a dedicated API layer within EIP to support Microsoft Copilot Studio integration.
+
+The objective is to expose EIP Topics, Executive Dashboards and Evidence through a standards-based REST API that can be imported directly into Microsoft Copilot Studio using an OpenAPI definition.
+
+This will allow Copilot agents to query EIP as a knowledge and intelligence service while maintaining Cloudflare as the canonical source of memory, topic intelligence and evidence.
+
+Problem Statement
+
+Current EIP functionality is available through the EIP Cockpit and internal APIs.
+
+Microsoft Copilot Studio requires externally callable tools exposed through an OpenAPI specification.
+
+Without a dedicated Copilot Integration API:
+
+Copilot cannot consume EIP natively.
+Topics cannot be surfaced as executive dashboards.
+Topic evidence cannot be drilled into from Copilot.
+Executive intelligence remains siloed from Microsoft 365 workflows.
+Objective
+
+Enable EIP to act as an external intelligence service for Microsoft Copilot.
+
+Provide simple, stable and versioned REST endpoints that expose:
+
+Executive dashboards
+Topic intelligence
+Evidence
+Topic search
+
+The API must be designed for machine consumption by AI agents.
+
+User Story
+
+As an Executive
+
+I want to ask Microsoft Copilot:
+
+Show the ExCo dashboard
+
+and receive a structured EIP-backed view.
+
+I also want to drill down:
+
+Dashboard
+  → Topic
+      → Claim
+          → Evidence
+              → Source artefact
+
+
+without leaving Copilot.
+
+Proposed Scope
+Phase 1
+
+Implement the following endpoints.
+
+Executive Dashboard
+GET /api/v1/dashboard
+
+
+Parameters:
+
+lens
+
+
+Example:
+
+GET /api/v1/dashboard?lens=exco
+
+
+Returns:
+
+{
+  "lens": "exco",
+  "headline": "Executive attention remains focused on cash flow and product delivery.",
+  "topics": []
+}
+
+Topic Details
+GET /api/v1/topic/{topicId}
+
+
+Returns:
+
+{
+  "id": "superpen",
+  "title": "SuperPen",
+  "status": "red",
+  "summary": "...",
+  "owner": "cpo",
+  "confidence": "high"
+}
+
+Topic Evidence
+GET /api/v1/topic/{topicId}/evidence
+
+
+Returns:
+
+{
+  "topic": "superpen",
+  "claims": [],
+  "evidence": []
+}
+
+Topic Search
+GET /api/v1/search
+
+
+Example:
+
+GET /api/v1/search?q=superpen
+
+
+Returns:
+
+{
+  "results": []
+}
+
+OpenAPI Support
+
+The service must expose:
+
+GET /openapi.json
+
+
+or
+
+GET /swagger.json
+
+
+containing a complete OpenAPI 3 specification.
+
+Requirement:
+
+Import directly into Microsoft Copilot Studio
+No manual connector construction required
+Operations automatically generated as Copilot tools
+Authentication
+
+Phase 1:
+
+Bearer Token
+
+
+stored within Copilot Studio.
+
+Future:
+
+Microsoft Entra ID
+OAuth2
+
+
+for enterprise deployment.
+
+Dashboard Model
+
+The API should be topic-first.
+
+Avoid:
+
+Documents
+Folders
+Pages
+
+
+Prefer:
+
+Topics
+Claims
+Evidence
+Artefacts
+
+
+The API should never expose raw document repositories as the primary model.
+
+Evidence Model
+
+Every executive conclusion must support:
+
+{
+  "claim": "",
+  "supportLevel": "",
+  "confidence": "",
+  "evidence": []
+}
+
+
+Supported values:
+
+Supported
+Partially Supported
+Mixed
+Contradicted
+Not Evidenced
+
+
+This aligns with the EIP governance principle:
+
+User assertions are hypotheses. Artefacts are evidence.
+
+Copilot Use Cases
+
+Phase 1 target scenarios:
+
+Dashboard
+Show the ExCo dashboard
+
+Executive Lens
+Show the CPO dashboard
+
+Topic View
+Explain the status of SuperPen
+
+Evidence
+Show evidence for this conclusion
+
+Search
+What do we know about Reader 3?
+
+Acceptance Criteria
+ID	RequirementAC1	Dashboard endpoint operational
+AC2	Topic endpoint operational
+AC3	Evidence endpoint operational
+AC4	Search endpoint operational
+AC5	OpenAPI definition available
+AC6	Import successful into Copilot Studio
+AC7	Copilot can invoke dashboard tool
+AC8	Copilot can invoke topic tool
+AC9	Evidence drill-down supported
+AC10	Responses include confidence and traceability
+Strategic Outcome
+
+This feature establishes the first formal integration between:
+
+Microsoft Copilot
+        ↔
+EIP Cloudflare Platform
+
+
+and creates the foundation for:
+
+Executive dashboards in Copilot
+Topic conversations
+Evidence drill-down
+Lens-based intelligence
+Future MCP support
+EIP Product external integrations
+
+Architecture Principle
+
+Cloudflare = Canonical Memory & Intelligence
+
+Copilot = Conversation & Presentation Layer

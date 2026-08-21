@@ -66,10 +66,12 @@ function buildDOM() {
       const item = queue.awaitingReview[0];
       if (item) {
         queue.awaitingReview = [];
-        queue.recordedDecisions = [{ ...item, disposition: {
-          feedbackId: 'fixture-feedback-1', verdict: 'accurate', affectedField: 'overall',
-          reviewerName: 'Executive Reviewer', createdAt: new Date().toISOString(), correctsFeedbackId: null,
-        } }];
+        queue.recordedDecisions = [{
+          reviewEventId: 'review-event-1', candidateMemoryId: item.itemId,
+          targetMemoryId: item.proposedMatchMemoryId || 'memory-target', decision: 'approve_match',
+          reviewerName: 'Executive Reviewer', reviewerNote: 'Verified the evidence supports the merged trajectory.',
+          candidateMatchStatusAfter: 'merged', createdAt: new Date().toISOString(),
+        }];
       }
     }
     return {
@@ -1006,7 +1008,7 @@ describe('Review Queue', () => {
     expect(window.document.getElementById('review-queue-recorded')?.textContent).not.toContain('Reviewer:');
   });
 
-  it('reveals recorded reviewer and verdict context through the accessible audit toggle', async () => {
+  it('reveals authoritative runtime decision context through the accessible audit toggle', async () => {
     await submitCurrentMemoryFeedback();
     const toggle = window.document.getElementById('review-queue-audit-toggle');
     toggle.checked = true;
@@ -1014,13 +1016,13 @@ describe('Review Queue', () => {
     const recorded = window.document.getElementById('review-queue-recorded');
     expect(recorded.hasAttribute('hidden')).toBe(false);
     expect(recorded.textContent).toContain('Executive Reviewer');
-    expect(recorded.textContent).toContain('accurate');
+    expect(recorded.textContent).toContain('Runtime decision applied');
   });
 
-  it('moves an exact-current-version item from Awaiting review to Recorded decisions after feedback', async () => {
+  it('keeps feedback-only annotations out of authoritative runtime decision history', async () => {
     const item = await submitCurrentMemoryFeedback();
     expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === item.itemId)).toBe(false);
-    expect(window.state.reviewQueue.recordedDecisions.some(x => x.itemId === item.itemId)).toBe(true);
+    expect(window.state.reviewQueue.recordedDecisions.some(x => x.candidateMemoryId === item.itemId)).toBe(true);
   });
 
   it('does not expose storage locators or transcript fields in queue output', () => {
@@ -1055,8 +1057,12 @@ describe('Pending Review match decisions', () => {
   }
 
   function prepareDecision(note = 'Reviewed current evidence and trajectory.') {
-    window.document.getElementById('pending-decision-note').value = note;
-    window.document.getElementById('pending-decision-warning').checked = true;
+    const noteInput = window.document.getElementById('pending-decision-note');
+    const acknowledgement = window.document.getElementById('pending-decision-warning');
+    noteInput.value = note;
+    noteInput.dispatchEvent(new window.Event('input'));
+    acknowledgement.checked = true;
+    acknowledgement.dispatchEvent(new window.Event('change'));
     window.confirm = vi.fn(() => true);
   }
 
@@ -1064,13 +1070,24 @@ describe('Pending Review match decisions', () => {
     expect(typeof window.handleMatchClick).toBe('function');
   });
 
-  it('requires a reviewer name before submitting a Match decision', async () => {
-    const [match] = pendingButtons();
-    match.click();
-    await new Promise(r => setTimeout(r, 80));
+  it('keeps Match and No match disabled until reviewer name, note, and acknowledgement are complete', () => {
+    const [match, noMatch] = pendingButtons();
+    expect(match.disabled).toBe(true);
+    expect(noMatch.disabled).toBe(true);
 
-    expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Please enter your reviewer name'));
-    expect(window.fetch.mock.calls.filter(([url, init]) => url === '/api/v1/feedback' && init?.method === 'POST')).toHaveLength(0);
+    setReviewerName();
+    expect(match.disabled).toBe(true);
+
+    const note = window.document.getElementById('pending-decision-note');
+    note.value = 'Reviewed current evidence and trajectory.';
+    note.dispatchEvent(new window.Event('input'));
+    expect(match.disabled).toBe(true);
+
+    const acknowledgement = window.document.getElementById('pending-decision-warning');
+    acknowledgement.checked = true;
+    acknowledgement.dispatchEvent(new window.Event('change'));
+    expect(match.disabled).toBe(false);
+    expect(noMatch.disabled).toBe(false);
   });
 
   it('sends approve_match with exact source version and target without mutating fixture memory', async () => {
@@ -1091,6 +1108,7 @@ describe('Pending Review match decisions', () => {
       expectedProposedMatchMemoryId: memory.proposedMatchMemoryId,
       reviewerName: 'Executive Reviewer',
       warningAcknowledged: true,
+      idempotencyKey: expect.any(String),
     });
     expect(JSON.parse(decisionCalls[0][1].body).note).toBe('Reviewed current evidence and trajectory.');
     expect(JSON.stringify(memory)).toBe(before);
@@ -1115,6 +1133,7 @@ describe('Pending Review match decisions', () => {
       expectedSourceVersion: memory.updatedAt,
       expectedProposedMatchMemoryId: memory.proposedMatchMemoryId,
       reviewerName: 'Executive Reviewer',
+      idempotencyKey: expect.any(String),
     });
     expect(window.state.reviewQueue.awaitingReview.some(x => x.itemId === memory.memoryId)).toBe(false);
   });

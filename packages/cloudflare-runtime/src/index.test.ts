@@ -212,7 +212,7 @@ function makeMeetingOutput(topicCount = 0): MeetingOutput {
       executiveScope: 'Operational' as const,
       topicStatement: `Topic ${i + 1}`,
       summary: null,
-      keyFacts: [],
+      keyFacts: [{ id: `2026-08-07_0900_sales_call-topic-${i + 1}-keyfact-1`, text: `Evidence for topic ${i + 1}` }],
       decisions: [],
       actions: [],
       risks: [],

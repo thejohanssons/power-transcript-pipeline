@@ -781,5 +781,26 @@ AI assistant session started
 - Recovered only immutable synthetic run `788eb37a-5454-4f13-94b3-7ec29286e396`. It completed successfully and wrote the versioned direct-Azure checkpoint plus normalized-output, publication-intent, and comparison artifacts.
 - The completed comparison is intentionally `blocked`: 6 blocking and 2 material differences. Blocking paths are five publication-intent values and assertions; material paths are topic count and classification. This is comparison evidence only—nothing was published.
 
+## Session Update — 2026-08-21 (evidence remediation, transcript safety, and memory linking)
+
+- Completed the runtime evidence remediation flow: evidence-complete prompt/validation, fixed-topic historical R2 reprocessing, safe chunked evidence mode, D1 evidence backfill, and production coverage verification.
+- Production topic evidence reached full key-fact coverage for the eligible historical topic set; two smoke-test topics remain excluded.
+- Added guarded admin operations for historical reprocessing, evidence backfill, meeting invalidation/quarantine, memory reconciliation, and topic-memory consolidation preview/apply.
+- Invalidated six contaminated meeting runs caused by recurring Graph transcript collections being concatenated across occurrences. Runtime outputs were quarantined and D1 derived records invalidated; invalidated memories are filtered from Cockpit.
+- Deployed and hardened the Azure transcript acquisition path: identity normalization, organizer/attendee lookup, organizer date-range fallback, channel fallback, nearest-occurrence selection, exact meeting identity checks, and protection against cross-occurrence concatenation.
+- Confirmed a remaining Azure source gap: some known Teams transcripts are not returned by the Graph paths currently available; those meetings now skip safely instead of publishing guessed or stale transcripts.
+- Deployed future topic-memory linking: confirmed observations reuse an existing memory, new observations create a rooted memory, ambiguous matches remain pending, and invalidated memories are excluded from matching.
+- Historical consolidation preview produced 818 high-confidence links, 43 new-memory candidates, 3 ambiguous topics, and 4 duplicate memory clusters. The apply was attempted and partially progressed; one SQL ambiguity was fixed and the apply endpoint now reports per-topic errors. Production state must be audited before any further consolidation apply.
+- Important current runtime state: topic evidence is substantially repaired, but historical topic-memory consolidation is not fully complete. Reconcile remaining unlinked topics, unrooted legacy memories, and partial consolidation state before declaring memory history complete.
+- Validation completed: Cloudflare runtime typecheck and 53 tests; ExCo Cockpit 163 tests; local Cockpit Server 68 tests; PowerShell pipeline parse checks.
+- Production deployments made: Cloudflare runtime, ExCo Cockpit, and Azure Function App `peter-consolidate-meeting-transcripts`. Secrets were not added to source.
+
+### Resume priorities
+1. Audit and repair the partial topic-memory consolidation apply state; do not rerun blindly.
+2. Resolve remaining unlinked production topics and unrooted legacy memories through dry-run reports.
+3. Implement the pending SharePoint/Confluence cleanup workflow for invalidated artifacts.
+4. Continue Azure transcript-source investigation for meetings Graph cannot retrieve.
+5. Validate Cockpit memory history export after links are repaired.
+
 ### Resume point
 - The model transport and required output schema are now verified end to end for the synthetic fixture. Next work, if separately approved, is to analyze and correct the observed semantic comparison divergences while retaining the same non-publishing, synthetic-only boundary.

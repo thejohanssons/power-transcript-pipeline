@@ -162,6 +162,7 @@ export function createRuntimeD1Adapter(config: RuntimeD1Config): RuntimeD1Adapte
                 merged_into_memory_id, review_resolved_at, review_event_id,
                 status, created_at, updated_at
          FROM topic_memory
+         WHERE status <> 'invalidated'
          ORDER BY last_seen_date DESC
          LIMIT ? OFFSET ?`,
         [limit, offset]
@@ -187,7 +188,7 @@ export function createRuntimeD1Adapter(config: RuntimeD1Config): RuntimeD1Adapte
                 match_status, proposed_match_memory_id, proposed_match_reason,
                 merged_into_memory_id, review_resolved_at, review_event_id,
                 status, created_at, updated_at
-         FROM topic_memory WHERE memory_id = ?`,
+         FROM topic_memory WHERE memory_id = ? AND status <> 'invalidated'`,
         [memoryId]
       );
       return rows[0] ?? null;
