@@ -4,15 +4,67 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-11",
   "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Do not expose the Cockpit on a public workers.dev hostname. Deployment
+  // requires a dedicated custom hostname protected by Cloudflare Access.
+  "workers_dev": false,
   "assets": {
     "directory": "./public"
   },
-  // No D1, R2, Queue, or secret bindings — synthetic data only.
-  // Real-data promotion is blocked until Cloudflare Access is configured
-  // and a separate constrained D1 read-model design is approved.
+  "routes": [
+    {
+      "pattern": "cockpit.thejohanssons.nu",
+      "custom_domain": true
+    }
+  ],
+  // Phase 1: runtime D1 is exposed only through the Worker’s fixed-query,
+  // read-only DTO layer. Cloudflare Access remains configured outside Wrangler.
+  "d1_databases": [
+    {
+      "binding": "RUNTIME_DB",
+      "database_name": "eip-cloudflare-runtime",
+      "database_id": "953bd671-7f96-450c-96da-736ecbfdf19d"
+    },
+    {
+      "binding": "FEEDBACK_DB",
+      "database_name": "eip-local-feedback",
+      "database_id": "6611d066-72be-4d70-ab40-31b6aceea1f5",
+      "migrations_dir": "migrations-feedback"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "COCKPIT_ACCESS_MODE": "cloudflare-access-required"
+  },
   "env": {
     "staging": {
-      "name": "eip-exco-cockpit-staging"
+      "name": "eip-exco-cockpit-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "COCKPIT_ACCESS_MODE": "cloudflare-access-required"
+      },
+      "d1_databases": [
+        {
+          "binding": "RUNTIME_DB",
+          "database_name": "eip-cloudflare-runtime-staging",
+          "database_id": "ffca8ee1-eb6c-49ec-810a-050afcc0cb40"
+        },
+        {
+          "binding": "FEEDBACK_DB",
+          "database_name": "eip-exco-cockpit-feedback-staging",
+          "database_id": "5216a183-bebe-4849-b0c8-f27cf05b6499",
+          "migrations_dir": "migrations-feedback"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "cockpit-staging.thejohanssons.nu",
+          "custom_domain": true
+        }
+      ]
     }
   }
 }

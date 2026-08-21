@@ -69,6 +69,8 @@ export interface CockpitTopic {
   accountableExecutive: MaybeExtracted<string>;
   confidence: MaybeExtracted<string>;
   validation: ValidationResult;
+  /** Runtime source-record version used as feedback provenance. */
+  updatedAt?: string;
 }
 
 // ── Decision ──────────────────────────────────────────────
@@ -88,6 +90,8 @@ export interface CockpitDecision {
   topicDomain?: MaybeExtracted<string>;
   topicEntityType?: MaybeExtracted<string>;
   topicEntity?: MaybeExtracted<string>;
+  /** Runtime source-record version used as feedback provenance. */
+  updatedAt?: string;
 }
 
 // ── Action ────────────────────────────────────────────────
@@ -108,6 +112,8 @@ export interface CockpitAction {
   topicDomain?: MaybeExtracted<string>;
   topicEntityType?: MaybeExtracted<string>;
   topicEntity?: MaybeExtracted<string>;
+  /** Runtime source-record version used as feedback provenance. */
+  updatedAt?: string;
 }
 
 // ── Topic Memory ──────────────────────────────────────────
@@ -136,6 +142,43 @@ export interface CockpitTopicMemory {
   reviewEventId?: string | null;
   updatedAt?: string;
   status: 'open' | 'resolved' | 'closed' | 'watching';
+}
+
+// ── Authoritative Topic Memory review decisions (runtime D1) ─
+
+export type TopicMemoryReviewDecision = 'approve_match' | 'reject_match';
+
+export interface TopicMemoryReviewDecisionRequest {
+  decision: TopicMemoryReviewDecision;
+  expectedSourceVersion: string;
+  expectedProposedMatchMemoryId: string;
+  reviewerName: string;
+  note: string;
+  warningAcknowledged: true;
+  idempotencyKey: string;
+}
+
+export interface TopicMemoryReviewDecisionResponse {
+  decision: TopicMemoryReviewDecision;
+  candidateMemoryId: string;
+  candidateMatchStatus: 'merged' | 'confirmed';
+  targetMemoryId: string;
+  candidateUpdatedAt: string;
+  targetUpdatedAt: string | null;
+  auditEventId: string;
+  appliedAt: string;
+  idempotentReplay: boolean;
+}
+
+export interface RuntimeReviewDecisionRecord {
+  reviewEventId: string;
+  candidateMemoryId: string;
+  targetMemoryId: string;
+  decision: TopicMemoryReviewDecision;
+  reviewerName: string;
+  reviewerNote: string;
+  candidateMatchStatusAfter: 'merged' | 'confirmed';
+  createdAt: string;
 }
 
 // ── Risks and Actions combined response ───────────────────
@@ -191,15 +234,51 @@ export interface CockpitOverview {
   meetings: MeetingSummary[];
 }
 
-// ── Feedback (browser-session only, never sent to server) ─
+// ── Persistent feedback (dedicated D1; append-only) ────────
 
+export const FEEDBACK_ITEM_TYPES = ['meeting', 'topic', 'action', 'decision', 'memory'] as const;
+export type FeedbackItemType = typeof FEEDBACK_ITEM_TYPES[number];
 export type FeedbackVerdict = 'accurate' | 'incomplete' | 'incorrect' | 'irrelevant';
 
+export interface FeedbackSubmission {
+  feedbackId: string;
+  itemType: FeedbackItemType;
+  itemId: string;
+  sourceKind: 'd1';
+  sourceVersion: string;
+  reviewerName: string;
+  verdict: FeedbackVerdict;
+  affectedField: string;
+  note: string;
+  warningAcknowledged: boolean;
+  correctsFeedbackId: string | null;
+  sourceLocation: string | null;
+}
+
+/** Database-shaped response deliberately limited to feedback records only. */
+export interface FeedbackRow {
+  feedback_id: string;
+  item_type: FeedbackItemType;
+  item_id: string;
+  source_kind: 'd1';
+  source_version: string;
+  reviewer_name: string;
+  verdict: FeedbackVerdict;
+  affected_field: string;
+  note: string;
+  warning_acknowledged: 0 | 1;
+  corrects_feedback_id: string | null;
+  source_location: string | null;
+  created_at: string;
+}
+
+/** Browser-session state used only for the current UI session. */
 export interface SessionFeedback {
-  itemType: string;
+  itemType: FeedbackItemType;
   itemId: string;
   verdict: FeedbackVerdict;
   affectedField: string;
-  notes: string;
+  note: string;
+  reviewerName: string;
   createdAt: string;
 }

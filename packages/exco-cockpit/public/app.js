@@ -898,6 +898,22 @@ function initReviewerNameInputs() {
   });
 }
 
+function updateDecisionActionAvailability() {
+  const reviewerName = el('pending-reviewer-name')?.value?.trim() || '';
+  const note = el('pending-decision-note')?.value?.trim() || '';
+  const acknowledged = Boolean(el('pending-decision-warning')?.checked);
+  const ready = Boolean(reviewerName && note && acknowledged);
+  document.querySelectorAll('.match-actions button[data-decision]').forEach(button => {
+    button.disabled = !ready;
+    button.setAttribute('aria-disabled', String(!ready));
+  });
+  const status = el('pending-decision-status');
+  if (!ready && status) {
+    status.textContent = 'Enter your name and decision note, then acknowledge permanent retention to enable Match / No match.';
+    status.className = '';
+  }
+}
+
 // ── Pending Review tab ────────────────────────────────────
 
 // ── Match decision quick-submit (no modal) ───────────────
@@ -950,6 +966,7 @@ async function submitMatchDecision(memoryId, topicId, decision, memoryUpdatedAt,
         reviewerName: reviewerName.trim(),
         note,
         warningAcknowledged: true,
+        idempotencyKey: crypto.randomUUID(),
       }),
     });
     const result = await response.json().catch(() => ({}));
@@ -1119,6 +1136,7 @@ function renderPendingReview() {
         <label style="font-size:12px;font-weight:600;white-space:nowrap;" for="pending-reviewer-name">Your name:</label>
         <input id="pending-reviewer-name" type="text"
           placeholder="Required before recording Match / No match"
+          aria-required="true"
           style="flex:1;padding:5px 10px;border:1px solid var(--color-border);border-radius:4px;font-size:12px;" />
         <span style="font-size:11px;color:var(--color-text-muted);">Runtime decisions change the live memory state and are permanently audited.</span>
       </div>
@@ -1140,6 +1158,27 @@ function renderPendingReview() {
 
       ${proposedMatchesHtml || '<div class="empty-state">No proposed matches awaiting review.</div>'}
     </div>`;
+
+  const reviewerName = el('pending-reviewer-name');
+  const note = el('pending-decision-note');
+  const acknowledgement = el('pending-decision-warning');
+  reviewerName?.addEventListener('input', () => {
+    setReviewerName(reviewerName.value);
+    updateDecisionActionAvailability();
+  });
+  note?.addEventListener('input', updateDecisionActionAvailability);
+  acknowledgement?.addEventListener('change', updateDecisionActionAvailability);
+  updateDecisionActionAvailability();
+}
+
+function runtimeDecisionHtml(decision) {
+  const outcome = decision.decision === 'approve_match' ? 'Approved match — candidate merged' : 'Rejected match — candidate confirmed separately';
+  return `<div class="card" style="margin-bottom:8px;">
+    <div class="card-title" style="font-size:13px;">Runtime decision applied: ${esc(outcome)}</div>
+    <div class="card-meta">Candidate: ${esc(decision.candidateMemoryId)} · Target: ${esc(decision.targetMemoryId)}</div>
+    <div class="card-meta">Reviewer: ${esc(decision.reviewerName)} · Recorded: ${esc(decision.createdAt)}</div>
+    <div style="font-size:12px;margin-top:5px;">${esc(decision.reviewerNote)}</div>
+  </div>`;
 }
 
 function reviewDispositionHtml(disposition) {
@@ -1179,9 +1218,9 @@ function renderReviewQueue() {
     </div>
     <div style="margin-top:10px;">${awaiting.length ? awaiting.map(card).join('') : '<div class="empty-state">No candidates awaiting review.</div>'}</div>
     <div id="review-queue-recorded" ${state.reviewQueueAudit ? '' : 'hidden'} style="margin-top:14px;padding-top:10px;border-top:1px solid var(--color-border);">
-      <h4 style="margin:0 0 8px;">Recorded decisions (${recorded.length})</h4>
-      ${recorded.length ? recorded.map(card).join('') : '<div class="empty-state">No recorded decisions.</div>'}
-      <p class="card-meta">Recorded decisions are audit history only and do not alter runtime state.</p>
+      <h4 style="margin:0 0 8px;">Runtime decision history (${recorded.length})</h4>
+      ${recorded.length ? recorded.map(runtimeDecisionHtml).join('') : '<div class="empty-state">No runtime decisions have been applied.</div>'}
+      <p class="card-meta">This is authoritative runtime audit history. Feedback-only annotations remain separate and do not alter runtime state.</p>
     </div>`;
   const toggle = el('review-queue-audit-toggle');
   if (toggle) toggle.addEventListener('change', () => { state.reviewQueueAudit = toggle.checked; renderReviewQueue(); });

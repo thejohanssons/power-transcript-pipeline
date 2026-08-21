@@ -1,4 +1,5 @@
-import type { Env, MeetingOutput, TranscriptSubmission, TopicRecord, PersonRecord, ActionRecord, DecisionRecord } from './types';
+import type { Env, EvidenceAssertion, MeetingOutput, TranscriptSubmission, TopicRecord, PersonRecord, ActionRecord, DecisionRecord } from './types';
+import { fixedTopicEvidenceInput, mergeFixedTopicEvidence, type FixedTopicContext } from './topic-enrichment';
 import {
   CONTRACT_VERSION,
   RUNTIME_VERSION,
@@ -46,6 +47,50 @@ function validateVocabularyValue(value: unknown, validValues: readonly string[])
   return validValues.includes(normalized) ? normalized : null;
 }
 
+export function correctTechnicalDeliveryRiskClassification(topic: {
+  entityType: string | null;
+  entity: string | null;
+  topicStatement: string;
+  summary: string | null;
+  keyFacts: EvidenceAssertion[];
+  outcome: string | null;
+  disposition: string | null;
+  domain: string | null;
+  aspect: string | null;
+}): Pick<typeof topic, 'domain' | 'aspect' | 'outcome' | 'disposition'> & { entityType: string | null } {
+  const evidenceText = [
+    topic.entity,
+    topic.topicStatement,
+    topic.summary,
+    ...topic.keyFacts.map((fact) => fact.text),
+  ].filter(Boolean).join(' ');
+  const technicalEntity = topic.entityType === 'Technology Platform' || topic.entityType === 'Service';
+  const deliverySignal = /at risk|blocked|blocker|freeze|frozen|workaround|defer|deferred|mvp|release|launch|delivery|remediation|dependency/i.test(evidenceText);
+
+  const productTechnicalCapability = /camera|firmware|software|sdk|web application|web app|flutter|browser|integration|technical platform|product feature/i.test(evidenceText);
+  const correctedEntityType = topic.entityType === 'Service' && productTechnicalCapability
+    ? 'Technology Platform'
+    : topic.entityType;
+
+  if (!technicalEntity || !deliverySignal) {
+    return {
+      entityType: correctedEntityType,
+      domain: topic.domain,
+      aspect: topic.aspect,
+      outcome: topic.outcome,
+      disposition: topic.disposition,
+    };
+  }
+
+  return {
+    entityType: correctedEntityType,
+    domain: 'Product Management',
+    aspect: topic.aspect === 'Quality' ? 'Performance' : topic.aspect,
+    outcome: 'Risk',
+    disposition: /workaround|defer|deferred|mvp/i.test(evidenceText) ? 'Deferral' : topic.disposition,
+  };
+}
+
 function buildEvidenceAssertions(
   assertions: unknown,
   prefix: string,
@@ -91,15 +136,31 @@ function normalizeTopic(
   const decisions = buildEvidenceAssertions(topic.decisions, `${meetingId}-topic-${index + 1}-decision`);
   const actions = buildEvidenceAssertions(topic.actions, `${meetingId}-topic-${index + 1}-action`);
   const risks = buildEvidenceAssertions(topic.risks, `${meetingId}-topic-${index + 1}-risk`);
-
-  return {
-    topicId,
+  if (keyFacts.length === 0) {
+    warnings.push('keyFacts is empty — at least one grounded fact is required for every topic');
+  }
+  const entity = normalizeString(topic.entity) ?? null;
+  const normalizedTopicStatement = topicStatement;
+  const correctedClassification = correctTechnicalDeliveryRiskClassification({
     domain,
     entityType,
-    entity: normalizeString(topic.entity) ?? null,
+    entity,
     aspect,
     outcome,
     disposition,
+    topicStatement: normalizedTopicStatement,
+    summary: normalizeString(topic.summary),
+    keyFacts,
+  });
+
+  return {
+    topicId,
+    domain: correctedClassification.domain,
+    entityType,
+    entity,
+    aspect: correctedClassification.aspect,
+    outcome: correctedClassification.outcome,
+    disposition: correctedClassification.disposition,
     executiveScope,
     topicStatement,
     summary: normalizeString(topic.summary),
@@ -159,7 +220,7 @@ function normalizeDecision(raw: unknown, meetingId: string, index: number): Deci
   };
 }
 
-function buildPrompt(submission: TranscriptSubmission, transcriptSha256: string): string {
+function buildPrompt(submission: TranscriptSubmission, transcriptSha256: string, fixedTopics?: FixedTopicContext[], evidenceOnly = false): string {
   return `You are a structured meeting output generator. Use the following taxonomy vocabulary exactly when populating controlled vocabulary fields. If a value is outside the listed vocabulary, set that field to null and add a warning in the topic validation reasons.
 
 Domains:
@@ -179,9 +240,13 @@ Return a single JSON object with these top-level fields:
 meetingId, sourceSystem, nativeId, subject, organiser, eventDate, transcriptSha256, processing, classification, summaryAssertions, topics, people, actions, decisions, validation.
 
 For every topic, populate entityType from the controlled EntityTypes vocabulary and entity as the free-text, specific named instance being discussed.
+ENTITY TYPE GUIDANCE: Use "Technology Platform" for software, firmware, SDKs, web applications, camera subsystems, integrations, and technical product capabilities. Use "Service" only for an explicitly named business, operational, or externally delivered service. Do not classify a product feature or technical capability as "Service" merely because it provides functionality.
+CLASSIFICATION GUIDANCE: Engineering, software, platform, camera, SDK, integration, release-blocker, workaround, freeze, and other implementation constraints affecting a product are Product Management concerns. When they threaten delivery, require a workaround, block an MVP/release, or are deferred for later remediation, classify them as outcome "Risk" rather than "Issue", use aspect "Performance" rather than "Quality" where appropriate, and use disposition "Deferral" when the workaround or remediation is explicitly deferred.
 REQUIRED: populate entity with the specific named thing being discussed (for example, "Reader 3", "M12 milestone", "Firmware 6.10", or "UK Education market"). Never leave entity null if a specific named entity is mentioned in the transcript.
 
 REQUIRED: topicStatement must be a single complete sentence describing an enduring business condition. It must be specific, not generic. Good: "M12 integration testing is at risk due to Firmware 6.10 approval delays." Bad: "project risk". Never leave topicStatement empty.
+EVIDENCE REQUIREMENT: Every topic must contain at least one grounded key fact in keyFacts. The key fact must be directly supported by the transcript and must explain the concrete condition being classified. Do not return an empty keyFacts array when the topic has been created.
+EVIDENCE SHAPES: keyFacts, decisions, actions, and risks are arrays of objects with deterministic id and non-empty text fields. Include decisions, actions, and risks when the transcript supports them; use an empty array only when that evidence type is genuinely absent. Never invent evidence, and never use the topic title as a substitute for evidence text.
 REQUIRED: Every action item must have a non-empty text field describing exactly what needs to be done. Owner alone is not sufficient.
 REQUIRED: Every decision must have a non-empty text field describing what was decided. Never leave text empty.
 
@@ -207,6 +272,8 @@ decisions: [{
 
 The IDs for topics, people, actions, decisions, and evidence assertions must be deterministic and based on meetingId and the position index. Example: ${submission.meetingId}-topic-1, ${submission.meetingId}-action-1.
 
+${fixedTopics && fixedTopics.length > 0 ? `EVIDENCE-ONLY ENRICHMENT MODE: The following topics already exist in D1. Return exactly this topic set, with exactly these topicId values. Do not create, delete, merge, split, rename, or reclassify topics. Generate only grounded evidence and summary enrichment for each supplied topic. Preserve the supplied topic statement and topic identity; apply only the controlled classification corrections defined above. Fixed topics:\n${fixedTopicEvidenceInput(fixedTopics)}\n` : ''}
+${evidenceOnly ? 'SAFE EVIDENCE MODE: This is a transcript segment, not the full meeting. Return evidence only for supplied topics supported by this segment. It is valid for a topic to have empty evidence in this segment. Do not reproduce sensitive wording; paraphrase neutral factual project context and return no raw transcript text.\n' : ''}
 Respond with JSON only. Do not include any explanation or markdown outside code fences. If you need to wrap the JSON in markdown, it is acceptable to use \`\`\`json ... \`\`\`.
 
 Input:
@@ -222,11 +289,53 @@ ${submission.transcript}
 `;
 }
 
-function buildMeetingOutput(parsed: unknown, submission: TranscriptSubmission, transcriptSha256: string, env: Pick<Env, 'AZURE_OPENAI_DEPLOYMENT'>): MeetingOutput {
+export interface ProcessMeetingOptions {
+  fixedTopics?: FixedTopicContext[];
+  evidenceOnly?: boolean;
+}
+
+function buildMeetingOutput(
+  parsed: unknown,
+  submission: TranscriptSubmission,
+  transcriptSha256: string,
+  env: Pick<Env, 'AZURE_OPENAI_DEPLOYMENT'>,
+  options?: ProcessMeetingOptions,
+): MeetingOutput {
   const raw = (parsed as Partial<MeetingOutput>) || {};
   const meetingId = submission.meetingId;
-
-  const topics = ensureArray<unknown>(raw.topics).map((topic, index) => normalizeTopic(topic, meetingId, index));
+  const rawTopics = ensureArray<Record<string, unknown>>(raw.topics);
+  const topicInputs = options?.fixedTopics
+    ? options.fixedTopics.map((fixed) => {
+      const generated = rawTopics.find((topic) => topic.topicId === fixed.topicId);
+      return mergeFixedTopicEvidence(generated, fixed);
+    })
+    : rawTopics;
+  const topics = topicInputs.map((topic, index) => {
+    const normalized = normalizeTopic(topic, meetingId, index);
+    if (options?.evidenceOnly && normalized.keyFacts.length === 0) {
+      normalized.validation = {
+        ...normalized.validation,
+        reasons: normalized.validation.reasons.filter((reason) => !reason.includes('keyFacts is empty')),
+        status: normalized.validation.reasons.some((reason) => !reason.includes('keyFacts is empty')) ? 'warning' : 'pass',
+      };
+    }
+    const fixed = options?.fixedTopics?.[index];
+    return fixed ? {
+      ...normalized,
+      topicId: fixed.topicId,
+      domain: fixed.domain,
+      entityType: normalized.entityType,
+      entity: fixed.entity,
+      aspect: normalized.aspect,
+      outcome: normalized.outcome,
+      disposition: normalized.disposition,
+      executiveScope: fixed.executiveScope,
+      topicStatement: fixed.topicStatement,
+      owners: fixed.owners,
+      confidence: fixed.confidence,
+      memoryId: fixed.memoryId,
+    } : normalized;
+  });
   const people = ensureArray<unknown>(raw.people).map((person, index) => normalizePerson(person, meetingId, index));
   const actions = ensureArray<unknown>(raw.actions).map((action, index) => normalizeAction(action, meetingId, index));
   const decisions = ensureArray<unknown>(raw.decisions).map((decision, index) => normalizeDecision(decision, meetingId, index));
@@ -237,8 +346,11 @@ function buildMeetingOutput(parsed: unknown, submission: TranscriptSubmission, t
   const decisionWarnings = decisions
     .filter((decision) => !decision.text)
     .map((decision) => `decision ${decision.decisionId} has empty text — required field`);
+  const topicWarnings = topics.flatMap((topic) =>
+    topic.validation.reasons.map((reason) => `${topic.topicId}: ${reason}`));
   const validationReasons = [
     ...ensureArray<string>(raw.validation?.reasons).map((reason) => normalizeString(reason) ?? '').filter(Boolean),
+    ...topicWarnings,
     ...actionWarnings,
     ...decisionWarnings,
   ];
@@ -285,8 +397,9 @@ export async function processMeeting(
   submission: TranscriptSubmission,
   transcriptSha256: string,
   env: Pick<Env, 'AZURE_OPENAI_ENDPOINT' | 'AZURE_OPENAI_DEPLOYMENT' | 'AZURE_OPENAI_API_KEY'>,
+  options?: ProcessMeetingOptions,
 ): Promise<MeetingOutput> {
-  const prompt = buildPrompt(submission, transcriptSha256);
+  const prompt = buildPrompt(submission, transcriptSha256, options?.fixedTopics, options?.evidenceOnly);
   const resourceRoot = env.AZURE_OPENAI_ENDPOINT.replace(/\/openai(?:\/v\d+)?$/i, '');
   const url = `${resourceRoot}/openai/deployments/${encodeURIComponent(env.AZURE_OPENAI_DEPLOYMENT)}/chat/completions?api-version=${OPENAI_API_VERSION}`;
   const response = await fetch(url, {
@@ -316,7 +429,9 @@ export async function processMeeting(
 
   const message = (responseBody?.choices?.[0]?.message?.content ?? responseBody?.choices?.[0]?.text) as string | undefined;
   if (!message) {
-    throw new Error('LLM response did not contain a message content field');
+    const choice = responseBody?.choices?.[0];
+    const responseShape = choice && typeof choice === 'object' ? Object.keys(choice).join(',') : 'no-choice';
+    throw new Error(`LLM response did not contain a message content field (status=${response.status}, choiceKeys=${responseShape})`);
   }
 
   const parsed = parseJsonResponse(message);

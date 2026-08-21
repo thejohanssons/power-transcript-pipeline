@@ -28,6 +28,7 @@ function createMockDb() {
           if (query.startsWith('INSERT INTO topic_memory')) {
             const [
               memoryId,
+              rootTopicId,
               domain,
               entityType,
               entity,
@@ -48,6 +49,7 @@ function createMockDb() {
             ] = this._bound as any[];
             rows.push({
               memory_id: memoryId,
+              root_topic_id: rootTopicId,
               domain,
               entity_type: entityType,
               entity,
@@ -71,6 +73,9 @@ function createMockDb() {
           return { success: true };
         },
       };
+    },
+    async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+      return Promise.all(statements.map((statement) => statement.run()));
     },
   };
 }
@@ -238,8 +243,8 @@ describe('matchTopicsToMemory', () => {
 
     await matchTopicsToMemory(output, env);
     const resultDb = env.DB as unknown as ReturnType<typeof createMockDb>;
-    expect(resultDb.rows).toHaveLength(2);
-    expect(resultDb.rows[1].match_status).toBe('confirmed');
+    expect(resultDb.rows).toHaveLength(1);
+    expect(resultDb.rows[0].meeting_count).toBeUndefined();
   });
 
   test('AC10 no webhook URL does not attempt fetch', async () => {

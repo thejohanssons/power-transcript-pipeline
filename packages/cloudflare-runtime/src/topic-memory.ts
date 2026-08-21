@@ -83,13 +83,14 @@ export async function matchTopicsToMemory(
 
     if (!entityType || !entity) {
       await env.DB.prepare(`INSERT INTO topic_memory (
-        memory_id, domain, entity_type, entity, aspect, canonical_statement,
+        memory_id, root_topic_id, domain, entity_type, entity, aspect, canonical_statement,
         first_seen_meeting_id, first_seen_date, last_seen_meeting_id, last_seen_date,
         meeting_count, latest_outcome, latest_disposition, latest_executive_scope,
         match_status, proposed_match_reason, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(
           memoryId,
+          topic.topicId,
           topic.domain,
           entityType ?? '',
           entity ?? '',
@@ -112,20 +113,21 @@ export async function matchTopicsToMemory(
     }
 
     const existing = await env.DB.prepare(
-      'SELECT memory_id, canonical_statement FROM topic_memory WHERE entity_type = ? AND lower(trim(entity)) = lower(trim(?)) ORDER BY updated_at DESC LIMIT 1',
+      "SELECT memory_id, canonical_statement FROM topic_memory WHERE entity_type = ? AND lower(trim(entity)) = lower(trim(?)) AND status <> 'invalidated' ORDER BY updated_at DESC LIMIT 1",
     )
       .bind(entityType, entity)
       .first<{ memory_id: string; canonical_statement: string }>();
 
     if (!existing) {
       await env.DB.prepare(`INSERT INTO topic_memory (
-        memory_id, domain, entity_type, entity, aspect, canonical_statement,
+        memory_id, root_topic_id, domain, entity_type, entity, aspect, canonical_statement,
         first_seen_meeting_id, first_seen_date, last_seen_meeting_id, last_seen_date,
         meeting_count, latest_outcome, latest_disposition, latest_executive_scope,
         match_status, proposed_match_reason, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(
           memoryId,
+          topic.topicId,
           topic.domain,
           entityType,
           entity,
@@ -149,17 +151,35 @@ export async function matchTopicsToMemory(
 
     const overlap = keywordOverlap(existing.canonical_statement, topicStatement);
     const isStrongMatch = overlap >= 2;
-    const matchStatus = isStrongMatch ? 'pending_review' : 'confirmed';
-    const proposedMatchMemoryId = isStrongMatch ? existing.memory_id : null;
+
+    if (!isStrongMatch) {
+      await env.DB.batch([
+        env.DB.prepare(`UPDATE topic_memory SET
+          last_seen_meeting_id = ?, last_seen_date = ?, meeting_count = meeting_count + 1,
+          latest_outcome = ?, latest_disposition = ?, latest_executive_scope = ?,
+          updated_at = datetime('now') WHERE memory_id = ?`).bind(
+            meetingOutput.meetingId,
+            meetingOutput.eventDate,
+            topic.outcome,
+            topic.disposition,
+            topic.executiveScope,
+            existing.memory_id,
+          ),
+        env.DB.prepare("UPDATE topics SET memory_id = ?, updated_at = datetime('now') WHERE topic_id = ?")
+          .bind(existing.memory_id, topic.topicId),
+      ]);
+      continue;
+    }
 
     await env.DB.prepare(`INSERT INTO topic_memory (
-      memory_id, domain, entity_type, entity, aspect, canonical_statement,
+      memory_id, root_topic_id, domain, entity_type, entity, aspect, canonical_statement,
       first_seen_meeting_id, first_seen_date, last_seen_meeting_id, last_seen_date,
       meeting_count, latest_outcome, latest_disposition, latest_executive_scope,
       match_status, proposed_match_memory_id, proposed_match_reason, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         memoryId,
+        null,
         topic.domain,
         entityType,
         entity,
@@ -173,9 +193,9 @@ export async function matchTopicsToMemory(
         topic.outcome,
         topic.disposition,
         topic.executiveScope,
-        matchStatus,
-        proposedMatchMemoryId,
-        isStrongMatch ? `Keyword overlap ${overlap}` : null,
+        'pending_review',
+        existing.memory_id,
+        `Keyword overlap ${overlap}`,
         'open',
       )
       .run();

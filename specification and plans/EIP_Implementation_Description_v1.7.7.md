@@ -91,6 +91,17 @@ All permissions are **Application-level** and require Admin Consent:
 | `Sites.ReadWrite.All` | Create folders and upload to SharePoint |
 | `User.Read.All` | Resolve organizer IDs and UPNs |
 
+**Transcript-access prerequisites:** Calendar acquisition resolves the authoritative
+organizer object ID from the Teams join URL and calls Graph only under that organizer's
+`onlineMeetings` collection. The application must be permitted to access that organizer's
+online meetings and transcripts. Tenant policies must not disable Graph transcript access;
+`GraphAccessToTranscriptsDisabled` is logged as
+`transcript_access_disabled_by_tenant_policy` and requires tenant remediation. Teams
+Recap access in the client can be delegated and therefore does not prove that the pipeline's
+app-only token has equivalent access. Channel meetings or meetings outside the app's
+organizer scope are logged for access review rather than retrieved through attendee or
+same-day fallback heuristics.
+
 ### 2.5 Environment Variables / App Settings
 
 | Variable | Purpose | Default fallback in code |
@@ -159,7 +170,7 @@ All permissions are **Application-level** and require Admin Consent:
 | `Participant` | string | None | Optional participant filter |
 
 ### Mode 1: Calendar Mode (default)
-Scans MS Graph for Teams meetings between `FromDate`/`ToDate` for the configured user. Filters by online meeting join URL. Deduplicates by meeting URL. Uses a tiered organizer lookup (organizer ID → calendar user ID fallback → skip with `[POLICY]` warning). Processes transcript for each meeting.
+Scans MS Graph for Teams meetings between `FromDate`/`ToDate` for the configured user. Filters by online meeting join URL and deduplicates by that URL. It resolves the organizer object ID encoded in the join URL, then resolves exactly one organizer-scoped online meeting by `VideoTeleconferenceId` or exact `JoinWebUrl` equality. It does not probe attendees or the calendar user as transcript owners. Unsupported app-only channel or organizer access is logged with an explicit acquisition outcome for review.
 
 ### Mode 2: VTT Inbox Mode (automatic)
 Runs at the end of every pipeline execution. Scans `/Documents/Transcripts` in OneDrive for `*.vtt` files. Each file is processed through the full pipeline. Source file deleted from inbox on success. Deduplicates against `master_log.json`.
@@ -175,7 +186,9 @@ Processes a single local `.vtt` file directly. Bypasses calendar and Graph trans
 Check `master_log.json` for existing entry with matching `MeetingId` and `Status: success`. If found, skip entirely.
 
 ### Step 1: Transcript Acquisition
-- **Calendar:** `GET /users/{upn}/calendarView` → filter Teams meetings → `GET /users/{id}/onlineMeetings/{id}/transcripts`
+- **Calendar:** `GET /users/{upn}/calendarView` → filter Teams meetings → derive organizer object ID from the Teams join URL → resolve one organizer-scoped online meeting by `VideoTeleconferenceId` or exact `JoinWebUrl` → `GET /users/{organizerId}/onlineMeetings/{meetingId}/transcripts`.
+- **Transcript verification:** Exact transcript `meetingId` matches may include reconnect segments inside an 18-hour occurrence guard and a six-hour session window. If a canonical user-scoped Graph response omits `meetingId`, only its nearest transcript is accepted. Date-only, attendee, organizer-wide, and tenant-wide fallbacks are rejected to prevent cross-meeting contamination.
+- **Access outcomes:** `transcript_unavailable_channel_app_only`, `transcript_unavailable_organiser_scope`, and `transcript_access_disabled_by_tenant_policy` are recorded as `access_review_required` rather than treated as an empty transcript.
 - **VTT:** Parse filename via `ConvertFrom-VttFilename`; strip WebVTT headers via `ConvertFrom-Vtt`
 
 **Ongoing Meeting Guard (Calendar mode only):**  

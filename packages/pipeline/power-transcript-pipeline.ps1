@@ -3040,6 +3040,98 @@ function Get-OrganiserIdFromJoinUrl {
     return $null
 }
 
+function Resolve-CanonicalOnlineMeeting {
+    <#
+    Resolves a calendar event to one onlineMeeting under the organiser object ID
+    encoded in the Teams join URL. App-only acquisition must not guess between
+    attendees, because those identities are not authoritative transcript owners.
+    #>
+    param(
+        [Parameter(Mandatory=$true)][string]$JoinUrl,
+        [string]$JoinUrlOrganiserId,
+        [object]$CalendarOnlineMeeting,
+        [string]$BodyPreview,
+        [hashtable]$Headers
+    )
+
+    if (-not $JoinUrlOrganiserId) {
+        return [pscustomobject]@{ Meeting = $null; OrganiserId = $null; Outcome = 'missing_join_url_organiser' }
+    }
+
+    $meetingNumbers = @()
+    if ($CalendarOnlineMeeting -and $CalendarOnlineMeeting.conferenceId) { $meetingNumbers += [string]$CalendarOnlineMeeting.conferenceId }
+    if ($BodyPreview -match 'Meeting ID: ([\d\s]{10,})') { $meetingNumbers += ($matches[1] -replace '\s', '') }
+    elseif ($BodyPreview -match 'teams\.microsoft\.com/meet/(\d+)') { $meetingNumbers += $matches[1] }
+
+    foreach ($meetingNumber in @($meetingNumbers | Where-Object { $_ } | Select-Object -Unique)) {
+        try {
+            $filter = [System.Uri]::EscapeDataString("VideoTeleconferenceId eq '$meetingNumber'")
+            $uri = "https://graph.microsoft.com/v1.0/users/$JoinUrlOrganiserId/onlineMeetings?`$filter=$filter"
+            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $Headers -ErrorAction Stop
+            $matches = @($response.value | Where-Object { $_.id })
+            if ($matches.Count -eq 1) { return [pscustomobject]@{ Meeting = $matches[0]; OrganiserId = $JoinUrlOrganiserId; Outcome = 'resolved_video_teleconference_id' } }
+            if ($matches.Count -gt 1) { return [pscustomobject]@{ Meeting = $null; OrganiserId = $JoinUrlOrganiserId; Outcome = 'ambiguous_video_teleconference_id' } }
+        } catch {
+            Write-Warning "  [DIAG] Canonical meeting-number lookup failed: $($_.Exception.Message)"
+        }
+    }
+
+    # Use only an exact full JoinWebUrl equality filter. Client-side fragment matches
+    # can select another channel or recurring-series occurrence.
+    $quotedJoinUrl = $JoinUrl -replace "'", "''"
+    try {
+        $filter = [System.Uri]::EscapeDataString("JoinWebUrl eq '$quotedJoinUrl'")
+        $uri = "https://graph.microsoft.com/v1.0/users/$JoinUrlOrganiserId/onlineMeetings?`$filter=$filter"
+        $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $Headers -ErrorAction Stop
+        $matches = @($response.value | Where-Object { $_.id })
+        if ($matches.Count -eq 1) { return [pscustomobject]@{ Meeting = $matches[0]; OrganiserId = $JoinUrlOrganiserId; Outcome = 'resolved_join_web_url' } }
+        if ($matches.Count -gt 1) { return [pscustomobject]@{ Meeting = $null; OrganiserId = $JoinUrlOrganiserId; Outcome = 'ambiguous_join_web_url' } }
+        return [pscustomobject]@{ Meeting = $null; OrganiserId = $JoinUrlOrganiserId; Outcome = 'not_found_for_join_url_organiser' }
+    } catch {
+        $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { $null }
+        $outcome = if ($status -eq 403) { 'organiser_scope_forbidden' } else { 'canonical_lookup_failed' }
+        Write-Warning "  [DIAG] Canonical JoinWebUrl lookup failed: $($_.Exception.Message)"
+        return [pscustomobject]@{ Meeting = $null; OrganiserId = $JoinUrlOrganiserId; Outcome = $outcome }
+    }
+}
+
+function Get-VerifiedTranscriptSegments {
+    <#
+    Returns only transcripts demonstrated to belong to the resolved onlineMeeting.
+    A user-scoped response without meetingId can contribute only one nearest item.
+    #>
+    param(
+        [object[]]$Candidates,
+        [string]$MeetingId,
+        [datetime]$EventStart,
+        [string]$CollectionSource = 'canonical_user_scoped',
+        [int]$MaxOccurrenceDeltaHours = 18,
+        [int]$SessionSegmentWindowHours = 6
+    )
+
+    $rows = @($Candidates | Where-Object { $_.id -and $_.createdDateTime } | ForEach-Object {
+        $created = [datetime]$_.createdDateTime
+        [pscustomobject]@{ Transcript = $_; Created = $created; DeltaHours = [math]::Abs(($created - $EventStart).TotalHours) }
+    } | Sort-Object DeltaHours)
+    $exact = @($rows | Where-Object { $_.Transcript.meetingId -and $_.Transcript.meetingId -eq $MeetingId })
+
+    if ($exact.Count -gt 0) {
+        $anchor = $exact | Select-Object -First 1
+        if ($anchor.DeltaHours -gt $MaxOccurrenceDeltaHours) { return @() }
+        return @($exact | Where-Object {
+            $_.DeltaHours -le $MaxOccurrenceDeltaHours -and
+            [math]::Abs(($_.Created - $anchor.Created).TotalHours) -le $SessionSegmentWindowHours
+        } | Sort-Object Created | ForEach-Object { $_.Transcript })
+    }
+
+    # Date-only matching for a fallback endpoint is unsafe. It caused unrelated
+    # same-day transcripts to be concatenated into the calendar event.
+    if ($CollectionSource -ne 'canonical_user_scoped') { return @() }
+    $nearest = $rows | Select-Object -First 1
+    if ($nearest -and $nearest.DeltaHours -le $MaxOccurrenceDeltaHours) { return @($nearest.Transcript) }
+    return @()
+}
+
 function Ensure-DriveFolder {
     param($DriveId, $FolderPath)
     $currentItem = "root"
@@ -3779,155 +3871,61 @@ foreach ($calendarEvent in $events) {
     $eventFolderPath = "$spTranscriptRootFolder/$eventDateFolder"
     $eventFolderId = Ensure-DriveFolder -DriveId $driveId -FolderPath $eventFolderPath
 
-    $organiserId = Get-OrganiserIdFromJoinUrl -JoinUrl $joinUrl
+    $joinUrlOrganiserId = Get-OrganiserIdFromJoinUrl -JoinUrl $joinUrl
+    $isChannelMeeting = $joinUrl -match 'threadId|thread\.tacv2'
+    $canonicalMeeting = Resolve-CanonicalOnlineMeeting `
+        -JoinUrl $joinUrl -JoinUrlOrganiserId $joinUrlOrganiserId `
+        -CalendarOnlineMeeting $calendarEvent.onlineMeeting -BodyPreview $calendarEvent.bodyPreview `
+        -Headers $authHeader
 
-    if (-not $organiserId) {
+    if (-not $canonicalMeeting.Meeting) {
+        $status = if ($isChannelMeeting) { 'transcript_unavailable_channel_app_only' } else { 'transcript_unavailable_organiser_scope' }
+        Write-Warning "  [SKIP] Canonical meeting resolution failed ($($canonicalMeeting.Outcome)) for '$subject'. $status. The Teams client may have delegated access that this app-only token cannot reproduce."
         $log += [pscustomobject]@{
-            RunId         = $runId
-            Subject       = $subject
-            EventDate     = $start
-            Status        = "error"
-            Type          = $meetingType
-            Priority      = $priority
-            AgentState    = "error"
-            LastProcessed = $null
-            RetryCount    = 0
-            File          = $null
+            RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start
+            Status = $status; AcquisitionOutcome = $canonicalMeeting.Outcome
+            Type = $meetingType; Priority = $priority; AgentState = 'access_review_required'
+            LastProcessed = $null; RetryCount = 0; File = $null
         }
         continue
     }
 
-    $meetingId = $null
-    
-    # Extract OID from Join URL context if available (most reliable identity for onlineMeetings)
-    $urlOid = if ($joinUrl -match "Oid%22%3a%22([a-zA-Z0-9-]+)%22") { $matches[1] } else { $null }
-    $lookupIdentities = @($urlOid, $organiserId, $organiser, $calendarUserUpn) | Where-Object { $_ } | Select-Object -Unique
-    
-    $meeting = $null
-    $resolvedUsingId = $null
-
-    # Pre-calculate variations for matching
-    $baseJoinUrl = $joinUrl.Split('?')[0]
-    $cleanJoinUrl = $joinUrl -replace "'", "''"
-    $cleanBaseUrl = $baseJoinUrl -replace "'", "''"
-    $escapedUrlValue = [System.Uri]::EscapeDataString($cleanJoinUrl)
-    
-    $variations = @(
-        @{ Label = "Full URL (escaped)"; Value = $escapedUrlValue },
-        @{ Label = "Full URL (raw)";     Value = $cleanJoinUrl },
-        @{ Label = "Base URL (raw)";     Value = $cleanBaseUrl }
-    )
-
-    # Extract Meeting IDs from metadata and body (numeric resolution is most robust)
-    $meetingIdsToTry = @()
-    # 1. From onlineMeeting metadata (if provided by Graph in calendar fetch)
-    if ($calendarEvent.onlineMeeting.conferenceId) { $meetingIdsToTry += $calendarEvent.onlineMeeting.conferenceId }
-    # 2. From body text (regex)
-    if ($calendarEvent.bodyPreview -match "Meeting ID: ([\d\s]{10,})") { 
-        $meetingIdsToTry += ($matches[1] -replace "\s", "") 
-    } elseif ($calendarEvent.bodyPreview -match "teams\.microsoft\.com/meet/(\d+)") {
-        $meetingIdsToTry += $matches[1]
-    }
-    $meetingIdsToTry = $meetingIdsToTry | Select-Object -Unique
-
-    # 1. Try resolving via JoinWebUrl OR VideoTeleconferenceId across potential identities
-    foreach ($identity in $lookupIdentities) {
-        # Strategy A: Filter by numeric Meeting ID (VideoTeleconferenceId) - HIGHEST PRIORITY
-        foreach ($mid in $meetingIdsToTry) {
-            Write-Host "  [DIAG] Resolving via identity: $identity (Meeting ID: $mid)" -ForegroundColor Gray
-            try {
-                $vtcUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings?`$filter=VideoTeleconferenceId eq '$mid'"
-                $resp = Invoke-RestMethod -Method Get -Uri $vtcUri -Headers $authHeader
-                if ($resp.value -and $resp.value.Count -gt 0) {
-                    $meeting = $resp
-                    $resolvedUsingId = $identity
-                    Write-Host "  [DIAG] Resolved via Meeting ID ✅" -ForegroundColor Green
-                    break
-                }
-            } catch {
-                $err = $_.Exception.Message
-                if ($err -match "403") {
-                    Write-Host "  [DIAG] 403 Forbidden for $identity. Likely missing Application Access Policy." -ForegroundColor Yellow
-                }
-            }
-        }
-        if ($meeting) { break }
-
-        # Strategy B: Filter by JoinWebUrl (multiple variations)
-        foreach ($v in $variations) {
-            Write-Host "  [DIAG] Resolving via identity: $identity ($($v.Label))" -ForegroundColor Gray
-            try {
-                $meetingUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings?`$filter=JoinWebUrl eq '$($v.Value)'"
-                $resp = Invoke-RestMethod -Method Get -Uri $meetingUri -Headers $authHeader
-                if ($resp.value -and $resp.value.Count -gt 0) {
-                    $meeting = $resp
-                    $resolvedUsingId = $identity
-                    break
-                }
-            } catch { }
-        }
-        if ($meeting) { break }
-    }
-
-    # 2. Try resolving via ID/fragment matching in list (for complex Channel URLs)
-    if (-not $meeting) {
-        Write-Host "  [DIAG] No match on filters. Attempting client-side fragment matching..." -ForegroundColor Gray
-        
-        # Channel Meeting URLs often hide a unique fragment (like meeting_... or threadId/tacv2 fragment)
-        $fragment = $null
-        if ($joinUrl -match "meeting_([a-zA-Z0-9]+)") {
-            $fragment = $matches[1]
-        } elseif ($joinUrl -match "19%3a([a-zA-Z0-9-]+)%40thread") {
-            $fragment = $matches[1]
-        } elseif ($joinUrl -match "19:([a-zA-Z0-9-]+)@thread") {
-            $fragment = $matches[1]
-        } else {
-            $fragment = $baseJoinUrl
-        }
-        
-        foreach ($identity in $lookupIdentities) {
-            try {
-                # Some environments allow listing if we filter by something common like startsWith(subject, ...)
-                # But here we try to list and filter client-side if we can get a page.
-                $listUri = "https://graph.microsoft.com/v1.0/users/$identity/onlineMeetings"
-                $all = Invoke-RestMethod -Method Get -Uri $listUri -Headers $authHeader
-                
-                $found = $all.value | Where-Object { $_.joinWebUrl -match [regex]::Escape($fragment) }
-                if ($found) {
-                    $meeting = @{ value = @($found) }
-                    $resolvedUsingId = $identity
-                    Write-Host "  [DIAG] Resolved via list match on identity: $identity ✅" -ForegroundColor Green
-                    break
-                }
-            } catch { }
-        }
-    }
+    $meetingId = $canonicalMeeting.Meeting.id
+    $organiserId = $canonicalMeeting.OrganiserId
+    Write-Host "  [DIAG] Canonical meeting ID resolved ($($canonicalMeeting.Outcome), organiser object ID: $organiserId): $meetingId" -ForegroundColor Gray
 
     try {
-        if (-not $meeting -or -not $meeting.value -or $meeting.value.Count -eq 0) { 
-            Write-Warning "  [DIAG] Could not resolve online meeting via Graph. It may be an external meeting or the organizer has not granted permission."
-            continue 
-        }
-
-        $meetingId = $meeting.value[0].id
-        $organiserId = $resolvedUsingId # Update for subsequent transcript calls
-        Write-Host "  [DIAG] Meeting ID resolved ($resolvedUsingId): $meetingId" -ForegroundColor Gray
-        
+        # Query the transcript collection only through the same organiser-scoped
+        # onlineMeeting used for canonical resolution. Do not probe attendees or
+        # construct date-range/tenant fallbacks; neither proves transcript ownership.
         $transcriptsUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts"
+        Write-Host "  [DIAG] Querying canonical organiser transcript collection." -ForegroundColor Gray
         $transcripts = $null
         try {
-            $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader
+            $transcripts = Invoke-RestMethod -Method Get -Uri $transcriptsUri -Headers $authHeader -ErrorAction Stop
         } catch {
             $errBody = $_.ErrorDetails.Message
-            if ($errBody -match "GraphAccessToTranscriptsDisabled") {
-                # Tenant-level Graph transcript access is disabled — not our fault, not a code error.
-                # Do NOT write to master log — absence means this meeting will be retried next run.
-                Write-Warning "  [SKIP] Graph API transcript access disabled at tenant level for '$subject'. Meeting will be retried automatically when the policy is re-enabled."
+            if ($errBody -match 'GraphAccessToTranscriptsDisabled') {
+                Write-Warning "  [SKIP] Transcript API access is disabled by tenant policy for '$subject'. The Teams client may still have delegated access."
+                $log += [pscustomobject]@{
+                    RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start
+                    Status = 'transcript_access_disabled_by_tenant_policy'; AcquisitionOutcome = 'GraphAccessToTranscriptsDisabled'
+                    Type = $meetingType; Priority = $priority; AgentState = 'access_review_required'
+                    LastProcessed = $null; RetryCount = 0; File = $null
+                }
                 continue
             }
-            # Any other error — re-throw so the outer catch handles it normally
-            throw
+            $status = if ($isChannelMeeting) { 'transcript_unavailable_channel_app_only' } else { 'transcript_unavailable_organiser_scope' }
+            Write-Warning "  [SKIP] Canonical transcript collection is unavailable ($status): $($_.Exception.Message)"
+            $log += [pscustomobject]@{
+                RunId = $runId; Subject = $subject; Organiser = $organiser; EventDate = $start
+                Status = $status; AcquisitionOutcome = 'canonical_transcript_lookup_failed'
+                Type = $meetingType; Priority = $priority; AgentState = 'access_review_required'
+                LastProcessed = $null; RetryCount = 0; File = $null
+            }
+            continue
         }
+        $transcriptCollectionSource = 'canonical_user_scoped'
 
         $eventStartTime = [datetime]$start
         $eventEndTime   = if ($end) { [datetime]$end } else { $eventStartTime.AddHours(1) }
@@ -3945,14 +3943,21 @@ foreach ($calendarEvent in $events) {
             continue
         }
 
-        $windowStart = $eventStartTime.AddHours(-2)
-        $windowEnd   = $eventStartTime.AddHours(24)
-        
-        $transcriptsForThisEvent = @($transcripts.value | Where-Object { 
-            $_.createdDateTime -and ([datetime]$_.createdDateTime) -ge $windowStart -and ([datetime]$_.createdDateTime) -le $windowEnd
-        } | Sort-Object { [datetime]$_.createdDateTime }) # Chronological order for concatenation
+        $allTranscriptCandidates = @($transcripts.value | Where-Object { $_.id })
+        $candidateDates = @($allTranscriptCandidates | ForEach-Object {
+            if ($_.createdDateTime) { ([datetime]$_.createdDateTime).ToString('o') } else { '<no-createdDateTime>' }
+        })
+        Write-Host "  [DIAG] Graph returned $($allTranscriptCandidates.Count) transcript candidate(s): $($candidateDates -join ', ')" -ForegroundColor Gray
 
-        Write-Host "  [DIAG] Found $($transcriptsForThisEvent.Count) matching transcript(s) for this date." -ForegroundColor Gray
+        # Only retain a verified meetingId match. Graph can omit meetingId in a
+        # canonical user-scoped response, in which case one nearest occurrence is
+        # safe; it must never cause same-day candidates to be concatenated.
+        $transcriptsForThisEvent = @(Get-VerifiedTranscriptSegments `
+            -Candidates $allTranscriptCandidates `
+            -MeetingId $meetingId `
+            -EventStart $eventStartTime `
+            -CollectionSource $transcriptCollectionSource)
+        Write-Host "  [DIAG] Verified $($transcriptsForThisEvent.Count) transcript segment(s) for the canonical meeting." -ForegroundColor Gray
         if ($transcriptsForThisEvent.Count -gt 1) {
             Write-Warning "  [DIAG] Multiple transcripts detected — meeting may have disconnected and restarted. Concatenating $($transcriptsForThisEvent.Count) segments into one."
         }
@@ -3987,7 +3992,11 @@ foreach ($calendarEvent in $events) {
         $transcriptContentForbidden = $false
         foreach ($t in $transcriptsForThisEvent) {
             $transcriptId = $t.id
-            $contentUri = "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
+            $contentUri = if ($t.transcriptContentUrl) {
+                $t.transcriptContentUrl
+            } else {
+                "https://graph.microsoft.com/v1.0/users/$organiserId/onlineMeetings/$meetingId/transcripts/$transcriptId/content"
+            }
             $segmentContent = $null
             $retryLimit = 3
             $retryCount = 0

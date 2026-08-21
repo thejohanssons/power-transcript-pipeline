@@ -1,3 +1,10 @@
+import { backfillAllTopicEvidence } from './evidence-backfill';
+import { invalidateMeetings, parseMeetingInvalidationRequest } from './meeting-invalidation';
+import { parseMemoryReconciliationRequest, previewMemoryReconciliation } from './memory-reconciliation';
+import { applyMemoryReconciliation } from './memory-reconciliation-apply';
+import { parseConsolidationRequest, previewMemoryConsolidation } from './memory-consolidation';
+import { applyMemoryConsolidation, parseConsolidationApplyRequest } from './memory-consolidation-apply';
+import { parseHistoricalReprocessingRequest, reprocessHistoricalMeetings } from './historical-reprocessing';
 import type {
   Env,
   TranscriptSubmission,
@@ -147,6 +154,30 @@ export default {
         return this.handlePostMeeting(request, env);
       }
 
+      if (path === '/v1/admin/backfill-topic-evidence' && method === 'POST') {
+        return this.handleBackfillTopicEvidence(request, env);
+      }
+
+      if (path === '/v1/admin/invalidate-meetings' && method === 'POST') {
+        return this.handleInvalidateMeetings(request, env);
+      }
+
+      if (path === '/v1/admin/reconcile-invalidated-memories' && method === 'POST') {
+        return this.handleReconcileInvalidatedMemories(request, env);
+      }
+
+      if (path === '/v1/admin/consolidate-topic-memory' && method === 'POST') {
+        return this.handleConsolidateTopicMemory(request, env);
+      }
+
+      if (path === '/v1/admin/apply-topic-memory-consolidation' && method === 'POST') {
+        return this.handleApplyTopicMemoryConsolidation(request, env);
+      }
+
+      if (path === '/v1/admin/reprocess-historical' && method === 'POST') {
+        return this.handleReprocessHistorical(request, env);
+      }
+
       if (path === '/v1/topic-memory' && method === 'GET') {
         return this.handleGetTopicMemory(env);
       }
@@ -161,6 +192,85 @@ export default {
       console.error('Cloudflare runtime error:', err);
       return errorResponse(`Internal server error: ${err instanceof Error ? err.message : String(err)}`, 500);
     }
+  },
+
+  async handleBackfillTopicEvidence(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+      return errorResponse('Unauthorised', 401);
+    }
+
+    const result = await backfillAllTopicEvidence(env.DB, env.OUTPUT_BUCKET);
+    return jsonResponse(result, 200);
+  },
+
+  async handleInvalidateMeetings(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+      return errorResponse('Unauthorised', 401);
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const options = parseMeetingInvalidationRequest(body);
+    if (options.meetingIds.length === 0) {
+      return errorResponse('meetingIds must contain at least one meeting ID', 400);
+    }
+    const result = await invalidateMeetings(env.DB, env.OUTPUT_BUCKET, options);
+    return jsonResponse(result, 200);
+  },
+
+  async handleConsolidateTopicMemory(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) return errorResponse('Unauthorised', 401);
+    const body = await request.json().catch(() => ({}));
+    return jsonResponse(await previewMemoryConsolidation(env.DB, parseConsolidationRequest(body)), 200);
+  },
+
+  async handleApplyTopicMemoryConsolidation(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) return errorResponse('Unauthorised', 401);
+    const body = await request.json().catch(() => ({}));
+    const applyRequest = parseConsolidationApplyRequest(body);
+    const preview = await previewMemoryConsolidation(env.DB, parseConsolidationRequest(body));
+    try {
+      const result = await applyMemoryConsolidation(env.DB, preview.proposals, preview.roots, applyRequest);
+      return jsonResponse({ ...preview, ...result }, 200);
+    } catch (error) {
+      return jsonResponse({
+        error: error instanceof Error ? error.message : String(error),
+        message: 'Consolidation apply failed after partial progress; do not retry until this error is resolved.',
+      }, 500);
+    }
+  },
+
+  async handleReconcileInvalidatedMemories(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+      return errorResponse('Unauthorised', 401);
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const options = parseMemoryReconciliationRequest(body);
+    const result = await previewMemoryReconciliation(env.DB, options);
+    if (options.dryRun) return jsonResponse(result, 200);
+    const applied = await applyMemoryReconciliation(env.DB, result.rows, options);
+    return jsonResponse({ ...result, ...applied }, 200);
+  },
+
+  async handleReprocessHistorical(request: Request, env: Env): Promise<Response> {
+    const auth = request.headers.get('Authorization');
+    if (!auth || auth !== `Bearer ${env.SUBMISSION_TOKEN}`) {
+      return errorResponse('Unauthorised', 401);
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const options = parseHistoricalReprocessingRequest(body);
+    const result = await reprocessHistoricalMeetings(env.DB, env.OUTPUT_BUCKET, {
+      AZURE_OPENAI_ENDPOINT: env.AZURE_OPENAI_ENDPOINT,
+      AZURE_OPENAI_DEPLOYMENT: env.AZURE_OPENAI_DEPLOYMENT,
+      AZURE_OPENAI_API_KEY: env.AZURE_OPENAI_API_KEY,
+    }, options);
+    return jsonResponse(result, 200);
   },
 
   async handlePostMeeting(request: Request, env: Env): Promise<Response> {
@@ -300,6 +410,11 @@ export default {
         AZURE_OPENAI_DEPLOYMENT: env.AZURE_OPENAI_DEPLOYMENT,
         AZURE_OPENAI_API_KEY: env.AZURE_OPENAI_API_KEY,
       });
+
+      const incompleteTopics = meetingOutput.topics.filter((topic) => topic.keyFacts.length === 0);
+      if (incompleteTopics.length > 0) {
+        throw new Error(`Evidence completeness validation failed for topics: ${incompleteTopics.map((topic) => topic.topicId).join(', ')}`);
+      }
 
       const r2Key = `meetings/${meetingId}/meeting-output.json`;
       await env.OUTPUT_BUCKET.put(r2Key, JSON.stringify(meetingOutput, null, 2), {
